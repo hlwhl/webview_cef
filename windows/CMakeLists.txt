@@ -68,5 +68,8 @@ set(webview_cef_bundled_libraries
     $<$<CONFIG:Release>:${CMAKE_CURRENT_SOURCE_DIR}/cefbins/release/bin/chrome_elf.dll>
     $<$<CONFIG:Release>:${CMAKE_CURRENT_SOURCE_DIR}/cefbins/release/bin/libcef.dll>
     $<$<CONFIG:Release>:${CMAKE_CURRENT_SOURCE_DIR}/cefbins/release/bin/v8_context_snapshot.bin>
+    $<$<CONFIG:Profile>:${CMAKE_CURRENT_SOURCE_DIR}/cefbins/release/bin/chrome_elf.dll>
+    $<$<CONFIG:Profile>:${CMAKE_CURRENT_SOURCE_DIR}/cefbins/release/bin/libcef.dll>
+    $<$<CONFIG:Profile>:${CMAKE_CURRENT_SOURCE_DIR}/cefbins/release/bin/v8_context_snapshot.bin>
     PARENT_SCOPE)
 
