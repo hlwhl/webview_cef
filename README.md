@@ -9,6 +9,7 @@ Flutter webview backed by CEF (Chromium Embedded Framework). *Still working in p
 - keyboard events support
 - mouse events support
 - js bridge support
+- release to pub
 
 # limitations
 seems cef does not support media player when using off screen rendering.
