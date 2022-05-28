@@ -15,9 +15,6 @@ Flutter webview backed by CEF (Chromium Embedded Framework). *Still working in p
 # notice
 when first time building the project, a prebuilt cef bin package (200MB, link in release) will be downloaded automatically, hence you may wait for a longer time if you are building the project for the first time.
 
-# limitations
-seems cef does not support media player when using off screen rendering.
-
 # demo
 ![image](https://user-images.githubusercontent.com/7610615/170815938-f8c7eadc-bcee-4aca-83df-95c23939485d.png)
 
