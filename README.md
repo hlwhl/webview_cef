@@ -17,9 +17,8 @@ when first time building the project, a prebuilt cef bin package (200MB, link in
 
 # demo
 ![image](https://user-images.githubusercontent.com/7610615/170815938-f8c7eadc-bcee-4aca-83df-95c23939485d.png)
-
+![image](https://user-images.githubusercontent.com/7610615/170827339-04912462-bc53-4487-924b-c59a5b68e79b.png)
 ![image](https://user-images.githubusercontent.com/7610615/170815979-2ed10a05-4f6c-48c2-ab40-ec58ffc8957a.png)
-
 ![image](https://user-images.githubusercontent.com/7610615/170816159-559642b4-4fd4-40c7-a029-424bb7cff7fd.png)
 
 # thanks
