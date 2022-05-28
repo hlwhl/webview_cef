@@ -156,7 +156,7 @@ bool SimpleHandler::IsChromeRuntimeEnabled() {
   return value == 1;
 }
 
-void SimpleHandler::sUP()
+void SimpleHandler::scrollUp()
 {
     BrowserList::const_iterator it = browser_list_.begin();
     if (it != browser_list_.end()) {
@@ -167,7 +167,7 @@ void SimpleHandler::sUP()
     }
 }
 
-void SimpleHandler::sDown()
+void SimpleHandler::scrollDown()
 {
     BrowserList::const_iterator it = browser_list_.begin();
     if (it != browser_list_.end()) {
@@ -185,6 +185,17 @@ void SimpleHandler::changeSize(int w, int h)
     BrowserList::const_iterator it = browser_list_.begin();
     if (it != browser_list_.end()) {
         (*it)->GetHost()->WasResized();
+    }
+}
+
+void SimpleHandler::cursorClick(int x, int y, bool up)
+{
+    BrowserList::const_iterator it = browser_list_.begin();
+    if (it != browser_list_.end()) {
+        CefMouseEvent ev;
+        ev.x = x;
+        ev.y = y;
+        (*it)->GetHost()->SendMouseClickEvent(ev, CefBrowserHost::MouseButtonType::MBT_LEFT, up, 1);
     }
 }
 

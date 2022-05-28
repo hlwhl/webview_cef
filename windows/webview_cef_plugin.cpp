@@ -159,8 +159,11 @@ namespace webview_cef {
 		const flutter::MethodCall<flutter::EncodableValue>& method_call,
 		std::unique_ptr<flutter::MethodResult<flutter::EncodableValue>> result) {
 		if (method_call.method_name().compare("init") == 0) {
-			texture_id = texture_registrar->RegisterTexture(m_texture.get());
-		    new std::thread(startCEF);
+			if (!init) {
+				texture_id = texture_registrar->RegisterTexture(m_texture.get());
+				new std::thread(startCEF);
+				init = true;
+			}
 			result->Success(flutter::EncodableValue(texture_id));
 		}
 		else if (method_call.method_name().compare("loadUrl") == 0) {
@@ -171,8 +174,27 @@ namespace webview_cef {
 		}
 		else if (method_call.method_name().compare("setSize") == 0) {
 			const auto point = GetPointFromArgs(method_call.arguments());
-			std::cout << point->first << "   " << point->second;
 			handler.get()->changeSize(point->first, point->second);
+			result->Success();
+		}
+		else if (method_call.method_name().compare("cursorClickDown") == 0) {
+			const auto point = GetPointFromArgs(method_call.arguments());
+			handler.get()->cursorClick(point->first, point->second, false);
+			result->Success();
+		}
+		else if (method_call.method_name().compare("cursorClickUp") == 0) {
+			const auto point = GetPointFromArgs(method_call.arguments());
+			handler.get()->cursorClick(point->first, point->second, true);
+			result->Success();
+		}
+		else if (method_call.method_name().compare("setScrollDelta") == 0) {
+			const auto point = GetPointFromArgs(method_call.arguments());
+			if (point->second > 0) {
+				handler.get()->scrollDown();
+			}
+			else if (point->second < 0) {
+				handler.get()->scrollUp();
+			}
 			result->Success();
 		}
 		else {

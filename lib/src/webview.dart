@@ -73,8 +73,24 @@ class WebviewController extends ValueNotifier<bool> {
         .invokeMethod('setCursorPos', [position.dx, position.dy]);
   }
 
+  Future<void> _cursorClickDown(Offset position) async {
+    if (_isDisposed) {
+      return;
+    }
+    assert(value);
+    return _pluginChannel.invokeMethod('cursorClickDown', [position.dx.round(), position.dy.round()]);
+  }
+
+  Future<void> _cursorClickUp(Offset position) async {
+    if (_isDisposed) {
+      return;
+    }
+    assert(value);
+    return _pluginChannel.invokeMethod('cursorClickUp', [position.dx.round(), position.dy.round()]);
+  }
+
   /// Sets the horizontal and vertical scroll delta.
-  Future<void> _setScrollDelta(double dx, double dy) async {
+  Future<void> _setScrollDelta(int dx, int dy) async {
     if (_isDisposed) {
       return;
     }
@@ -127,20 +143,23 @@ class _WebviewState extends State<Webview> {
         child: SizeChangedLayoutNotifier(
             child: Listener(
           onPointerHover: (ev) {
-            _controller._setCursorPos(ev.localPosition);
           },
-          onPointerDown: (ev) {},
-          onPointerUp: (ev) {},
+          onPointerDown: (ev) {
+            _controller._cursorClickDown(ev.localPosition);
+          },
+          onPointerUp: (ev) {
+            _controller._cursorClickUp(ev.localPosition);
+          },
           onPointerMove: (ev) {
-            _controller._setCursorPos(ev.localPosition);
+            // _controller._setCursorPos(ev.localPosition);
           },
           onPointerSignal: (signal) {
             if (signal is PointerScrollEvent) {
               _controller._setScrollDelta(
-                  -signal.scrollDelta.dx, -signal.scrollDelta.dy);
+                  -signal.scrollDelta.dx.round(), -signal.scrollDelta.dy.round());
             }
           },
-          child: MouseRegion(child: Texture(textureId: _controller._textureId)),
+          child: Texture(textureId: _controller._textureId),
         )));
   }
 

@@ -61,11 +61,13 @@ class SimpleHandler : public CefClient,
   // Returns true if the Chrome runtime is enabled.
   static bool IsChromeRuntimeEnabled();
 
-  void sUP();
+  void scrollUp();
 
-  void sDown();
+  void scrollDown();
 
   void changeSize(int width, int height);
+
+  void cursorClick(int x, int y, bool up);
   
   void loadUrl(std::string url);
 
