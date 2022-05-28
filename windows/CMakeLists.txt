@@ -23,6 +23,11 @@ set(PLUGIN_NAME "webview_cef_plugin")
 list(APPEND PLUGIN_SOURCES
   "webview_cef_plugin.cpp"
   "webview_cef_plugin.h"
+  "simple_app.cc"
+  "simple_app.h"
+  "simple_handler.cc"
+  "simple_handler.h"
+  "simple_handler_win.cc"
 )
 
 # Define the plugin library target. Its name must not be changed (see comment
