@@ -26,7 +26,7 @@ class _MyAppState extends State<MyApp> {
 
   // Platform messages are asynchronous, so we initialize in an async method.
   Future<void> initPlatformState() async {
-    String url = "www.baidu.com";
+    String url = "https://flutter.dev/";
     _textController.text = url;
     await _controller.initialize();
     // await _controller.loadUrl(url);

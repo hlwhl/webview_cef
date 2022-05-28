@@ -164,6 +164,10 @@ namespace webview_cef {
 			result->Success(flutter::EncodableValue(texture_id));
 		}
 		else if (method_call.method_name().compare("loadUrl") == 0) {
+			if (const auto url = std::get_if<std::string>(method_call.arguments())) {
+				handler.get()->loadUrl(*url);
+				return result->Success();
+			}
 		}
 		else if (method_call.method_name().compare("setSize") == 0) {
 			const auto point = GetPointFromArgs(method_call.arguments());

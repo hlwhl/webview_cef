@@ -188,6 +188,14 @@ void SimpleHandler::changeSize(int w, int h)
     }
 }
 
+void SimpleHandler::loadUrl(std::string url)
+{
+    BrowserList::const_iterator it = browser_list_.begin();
+    if (it != browser_list_.end()) {
+        (*it)->GetMainFrame()->LoadURL(url);
+    }
+}
+
 void SimpleHandler::GetViewRect(CefRefPtr<CefBrowser> browser, CefRect &rect) {
     rect.x = rect.y = 0;
     rect.width = width;

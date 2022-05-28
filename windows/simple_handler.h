@@ -66,6 +66,8 @@ class SimpleHandler : public CefClient,
   void sDown();
 
   void changeSize(int width, int height);
+  
+  void loadUrl(std::string url);
 
  private:
      uint32_t width = 1920;
