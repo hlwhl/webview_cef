@@ -18,6 +18,16 @@ class SimpleApp : public CefApp, public CefBrowserProcessHandler {
   CefRefPtr<CefBrowserProcessHandler> GetBrowserProcessHandler() override {
     return this;
   }
+  void OnBeforeCommandLineProcessing(
+      const CefString& process_type,
+      CefRefPtr<CefCommandLine> command_line) override {
+      command_line->AppendSwitch("disable-gpu");
+      command_line->AppendSwitch("disable-gpu-compositing");
+      command_line->AppendSwitch("enable-begin-frame-scheduling");
+      command_line->AppendSwitch("enable-system-flash");
+      command_line->AppendSwitch("log-severity=disable");
+  }
+
 
   // CefBrowserProcessHandler methods:
   void OnContextInitialized() override;
