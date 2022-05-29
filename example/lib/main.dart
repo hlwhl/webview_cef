@@ -29,7 +29,7 @@ class _MyAppState extends State<MyApp> {
     String url = "https://flutter.dev/";
     _textController.text = url;
     await _controller.initialize();
-    // await _controller.loadUrl(url);
+    await _controller.loadUrl(url);
     // If the widget was removed from the tree while the asynchronous platform
     // message was in flight, we want to discard the reply rather than calling
     // setState to update our non-existent appearance.

@@ -104,7 +104,7 @@ void SimpleApp::OnContextInitialized() {
   // that instead of the default URL.
   url = command_line->GetSwitchValue("url");
   if (url.empty())
-    url = "https://flutter.dev/";
+    url = "about:blank";
 
   if (use_views) {
     // Create the BrowserView.
