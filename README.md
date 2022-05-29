@@ -4,14 +4,6 @@ Flutter webview backed by CEF (Chromium Embedded Framework). *Still working in p
 # requirements
 - Windows 7+
 
-# todos
-- multi instance support
-- keyboard events support
-- mouse events support
-- js bridge support
-- release to pub
-- macos support
-
 # notice
 Inside your application folder, you need to add two lines in your ```windows\runner\main.cpp```.
 ```
@@ -23,6 +15,14 @@ int APIENTRY wWinMain(_In_ HINSTANCE instance, _In_opt_ HINSTANCE prev,
   initCEFProcesses();
 ```
 When first time building the project, a prebuilt cef bin package (200MB, link in release) will be downloaded automatically, hence you may wait for a longer time if you are building the project for the first time.
+
+# todos
+- multi instance support
+- keyboard events support
+- mouse events support
+- js bridge support
+- release to pub
+- macos support
 
 # demo
 ![image](https://user-images.githubusercontent.com/7610615/170815938-f8c7eadc-bcee-4aca-83df-95c23939485d.png)
