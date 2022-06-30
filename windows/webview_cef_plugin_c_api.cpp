@@ -16,3 +16,8 @@ FLUTTER_PLUGIN_EXPORT void initCEFProcesses() {
 	CefMainArgs mainArgs;
 	CefExecuteProcess(mainArgs, nullptr, nullptr);
 }
+
+FLUTTER_PLUGIN_EXPORT void redirectEventsToCEF(HWND hWnd, UINT message, WPARAM wParam, LPARAM lParam)
+{
+    webview_cef::WebviewCefPlugin::OsrWndProc(hWnd, message, wParam, lParam);
+}

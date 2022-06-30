@@ -17,6 +17,7 @@
 
 #include "include/cef_app.h"
 #include "simple_app.h"
+#include <.plugin_symlinks/webview_cef/windows/include/wrapper/cef_helpers.h>
 
 namespace webview_cef {
 	bool init = false;
@@ -40,6 +41,8 @@ namespace webview_cef {
 	CefRefPtr<SimpleApp> app(new SimpleApp(handler));
 	CefMainArgs mainArgs;
 
+	void OnKeyEvent(UINT message, WPARAM wParam, LPARAM lParam) {
+	}
 
 	void SwapBufferFromBgraToRgba(void* _dest, const void* _src, int width, int height) {
 		int32_t* dest = (int32_t*)_dest;
@@ -99,7 +102,7 @@ namespace webview_cef {
 			SwapBufferFromBgraToRgba((void*)pixel_buffer->buffer, buffer, width, height);
 			texture_registrar->MarkTextureFrameAvailable(tid);
 		};*/
-		CefInitialize(mainArgs, cefs, app.get(), nullptr);
+		CefInitialize(mainArgs, cefs, app.get(), nullptr);		
 		CefRunMessageLoop();
 		CefShutdown();
 	}
@@ -154,6 +157,24 @@ namespace webview_cef {
 	WebviewCefPlugin::WebviewCefPlugin() {}
 
 	WebviewCefPlugin::~WebviewCefPlugin() {}
+
+	// static
+	void WebviewCefPlugin::OsrWndProc(HWND hWnd,
+		UINT message,
+		WPARAM wParam,
+		LPARAM lParam) {
+		std::cout << message<<std::endl;
+		switch (message) {
+		case WM_SYSCHAR:
+		case WM_SYSKEYDOWN:
+		case WM_SYSKEYUP:
+		case WM_KEYDOWN:
+		case WM_KEYUP:
+		case WM_CHAR:
+			OnKeyEvent(message, wParam, lParam);
+			break;
+		}
+	}
 
 	void WebviewCefPlugin::HandleMethodCall(
 		const flutter::MethodCall<flutter::EncodableValue>& method_call,

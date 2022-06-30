@@ -20,6 +20,11 @@ class WebviewCefPlugin : public flutter::Plugin {
   WebviewCefPlugin(const WebviewCefPlugin&) = delete;
   WebviewCefPlugin& operator=(const WebviewCefPlugin&) = delete;
 
+  static void WebviewCefPlugin::OsrWndProc(HWND hWnd,
+	  UINT message,
+	  WPARAM wParam,
+	  LPARAM lParam);
+
  private:
   // Called when a method is called on this plugin's channel from Dart.
   void HandleMethodCall(
