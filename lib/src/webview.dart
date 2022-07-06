@@ -1,5 +1,4 @@
 import 'dart:async';
-import 'dart:convert';
 
 import 'package:flutter/gestures.dart';
 import 'package:flutter/material.dart';
@@ -114,10 +113,10 @@ class Webview extends StatefulWidget {
   const Webview(this.controller, {Key? key}) : super(key: key);
 
   @override
-  _WebviewState createState() => _WebviewState();
+  WebviewState createState() => WebviewState();
 }
 
-class _WebviewState extends State<Webview> {
+class WebviewState extends State<Webview> {
   final GlobalKey _key = GlobalKey();
 
   WebviewController get _controller => widget.controller;
@@ -126,7 +125,7 @@ class _WebviewState extends State<Webview> {
   void initState() {
     super.initState();
     // Report initial surface size
-    WidgetsBinding.instance.addPostFrameCallback((_) => _reportSurfaceSize());
+    WidgetsBinding.instance.addPostFrameCallback((_) => _reportSurfaceSize(context));
   }
 
   @override
@@ -137,7 +136,7 @@ class _WebviewState extends State<Webview> {
   Widget _buildInner() {
     return NotificationListener<SizeChangedLayoutNotification>(
         onNotification: (notification) {
-          _reportSurfaceSize();
+          _reportSurfaceSize(context);
           return true;
         },
         child: SizeChangedLayoutNotifier(
@@ -163,11 +162,12 @@ class _WebviewState extends State<Webview> {
         )));
   }
 
-  void _reportSurfaceSize() async {
+  void _reportSurfaceSize(BuildContext context) async {
+    double dpi = MediaQuery.of(context).devicePixelRatio;
     final box = _key.currentContext?.findRenderObject() as RenderBox?;
     if (box != null) {
       await _controller.ready;
-      unawaited(_controller._setSize(box.size));
+      unawaited(_controller._setSize(Size(box.size.width * dpi, box.size.height * dpi)));
     }
   }
 }
