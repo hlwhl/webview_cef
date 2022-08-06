@@ -1,5 +1,5 @@
 # webview_cef
-Flutter webview backed by CEF (Chromium Embedded Framework). *Still working in progress
+Flutter Desktop webview backed by CEF (Chromium Embedded Framework). *Still working in progress
 
 # requirements
 - Windows 7+
