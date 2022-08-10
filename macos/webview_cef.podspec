@@ -16,6 +16,7 @@ Flutter webview backed by CEF (Chromium Embedded Framework)
   s.source           = { :path => '.' }
   s.source_files     = 'Classes/**/*'
   s.dependency 'FlutterMacOS'
+  s.vendored_frameworks = 'third/cef/Chromium\ Embedded\ Framework.framework'
 
   s.platform = :osx, '10.11'
   s.pod_target_xcconfig = { 'DEFINES_MODULE' => 'YES' }
