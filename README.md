@@ -5,7 +5,7 @@ Flutter Desktop webview backed by CEF (Chromium Embedded Framework). *Still work
 - Windows 7+
 
 # notice
-Inside your application folder, you need to add two lines in your ```windows\runner\main.cpp```.
+Inside your application folder, you need to add two lines in your ```windows\runner\main.cpp```.（Because of Chromium multi process arch.）
 ```
 #include "webview_cef/webview_cef_plugin_c_api.h"
 
