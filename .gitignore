@@ -67,3 +67,6 @@ app.*.map.json
 /android/app/debug
 /android/app/profile
 /android/app/release
+
+/macos/third/cef/Chromium Embedded Framework.framework
+/macos/third/cef/include
