@@ -23,12 +23,8 @@ public:
                                        CefRefPtr<CefCommandLine> command_line) override {
                                            command_line->AppendSwitch("disable-gpu");
                                            command_line->AppendSwitch("disable-gpu-compositing");
-                                           command_line->AppendSwitch("disable-gpu-shader-disk-cache");
-                                           command_line->AppendSwitch("enable-begin-frame-scheduling");
-                                           command_line->AppendSwitch("enable-system-flash");
-                                           command_line->AppendSwitch("log-severity=disable");
                                            command_line->AppendSwitch("use-mock-keychain");
-                                           command_line->AppendSwitch("off-screen-rendering-enabled");
+                                           command_line->AppendSwitch("single-process");
                                        }
     
     
