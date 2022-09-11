@@ -5,7 +5,8 @@ Flutter Desktop webview backed by CEF (Chromium Embedded Framework). *Still work
 - Windows 7+
 - macOS 10.12+(WIP...)
 
-# notice
+# How To Use
+## Windows
 Inside your application folder, you need to add two lines in your ```windows\runner\main.cpp```.（Because of Chromium multi process arch.）
 ```
 #include "webview_cef/webview_cef_plugin_c_api.h"
@@ -16,6 +17,17 @@ int APIENTRY wWinMain(_In_ HINSTANCE instance, _In_opt_ HINSTANCE prev,
   initCEFProcesses();
 ```
 When first time building the project, a prebuilt cef bin package (200MB, link in release) will be downloaded automatically, hence you may wait for a longer time if you are building the project for the first time.
+
+## macOS
+1.Download prebuilt cef bundles from [arm64](https://github.com/hlwhl/webview_cef/releases/download/prebuilt_cef_bin_mac/CEFbins-mac103.0.12-arm64.zip) or [intel](https://github.com/hlwhl/webview_cef/releases/download/prebuilt_cef_bin_mac_intel/mac103.0.12-Intel.zip) for your target machine.
+
+2.Unzip the archieve and put all files into macos/third/cef.
+
+3.Run the example app.
+
+[HELP WANTED!] Finding a more elegant way to distribue the prebuilt package.
+
+Notice: currently the project haven't enable multi process mode because of debug convenience. You may want enable multi process mode by changing the implementation and built your own helper bundle. (Finding a more elegant way in the future)
 
 # todos
 - [ ] macos support (in progress.. take a look at the macos branch)
