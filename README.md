@@ -3,7 +3,7 @@ Flutter Desktop webview backed by CEF (Chromium Embedded Framework). *Still work
 
 # requirements
 - Windows 7+
-- macOS 10.12+(WIP...)
+- macOS 10.12+
 
 # How To Use
 ## Windows
