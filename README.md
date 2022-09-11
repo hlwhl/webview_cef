@@ -25,7 +25,7 @@ When first time building the project, a prebuilt cef bin package (200MB, link in
 
 3.Run the example app.
 
-[HELP WANTED!] Finding a more elegant way to distribue the prebuilt package.
+[HELP WANTED!] Finding a more elegant way to distribute the prebuilt package.
 
 Notice: currently the project haven't enable multi process mode because of debug convenience. You may want enable multi process mode by changing the implementation and built your own helper bundle. (Finding a more elegant way in the future)
 
