@@ -23,7 +23,7 @@ When first time building the project, a prebuilt cef bin package (200MB, link in
 - [ ] keyboard events support
 - [x] mouse events support
 - [ ] js bridge support
-- [ ] release to pub
+- [x] release to pub
 
 # demo
 ![image](https://user-images.githubusercontent.com/7610615/170815938-f8c7eadc-bcee-4aca-83df-95c23939485d.png)
