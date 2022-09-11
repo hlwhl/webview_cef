@@ -1,4 +1,4 @@
-﻿// Copyright (c) 2013 The Chromium Embedded Framework Authors. All rights
+// Copyright (c) 2013 The Chromium Embedded Framework Authors. All rights
 // reserved. Use of this source code is governed by a BSD-style license that
 // can be found in the LICENSE file.
 
@@ -180,8 +180,8 @@ void SimpleHandler::scrollDown()
 
 void SimpleHandler::changeSize(int w, int h)
 {
-    this->width = w;
-    this->height = h;
+//    this->width = w;
+//    this->height = h;
     BrowserList::const_iterator it = browser_list_.begin();
     if (it != browser_list_.end()) {
         (*it)->GetHost()->WasResized();
@@ -217,5 +217,9 @@ void SimpleHandler::GetViewRect(CefRefPtr<CefBrowser> browser, CefRect &rect) {
 void SimpleHandler::OnPaint(CefRefPtr<CefBrowser> browser, CefRenderHandler::PaintElementType type,
                             const CefRenderHandler::RectList &dirtyRects, const void *buffer, int w, int h) {
     onPaintCallback(buffer, w, h);
+}
+
+void SimpleHandler::PlatformTitleChange(CefRefPtr<CefBrowser> browser,
+                                        const CefString& title) {
 }
 

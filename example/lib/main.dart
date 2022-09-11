@@ -1,6 +1,6 @@
-import 'package:flutter/material.dart';
 import 'dart:async';
 
+import 'package:flutter/material.dart';
 import 'package:webview_cef/webview_cef.dart';
 
 void main() {
@@ -29,7 +29,7 @@ class _MyAppState extends State<MyApp> {
     String url = "https://flutter.dev/";
     _textController.text = url;
     await _controller.initialize();
-    await _controller.loadUrl(url);
+    // await _controller.loadUrl(url);
     // If the widget was removed from the tree while the asynchronous platform
     // message was in flight, we want to discard the reply rather than calling
     // setState to update our non-existent appearance.
@@ -54,8 +54,9 @@ class _MyAppState extends State<MyApp> {
                   _controller.loadUrl(url);
                 },
               ),
-              _controller.value ?
-              Expanded(child: Webview(_controller)) : const Text("not init"),
+              _controller.value
+                  ? Expanded(child: Webview(_controller))
+                  : const Text("not init"),
             ],
           )),
     );

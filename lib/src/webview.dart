@@ -77,7 +77,8 @@ class WebviewController extends ValueNotifier<bool> {
       return;
     }
     assert(value);
-    return _pluginChannel.invokeMethod('cursorClickDown', [position.dx.round(), position.dy.round()]);
+    return _pluginChannel.invokeMethod(
+        'cursorClickDown', [position.dx.round(), position.dy.round()]);
   }
 
   Future<void> _cursorClickUp(Offset position) async {
@@ -85,7 +86,8 @@ class WebviewController extends ValueNotifier<bool> {
       return;
     }
     assert(value);
-    return _pluginChannel.invokeMethod('cursorClickUp', [position.dx.round(), position.dy.round()]);
+    return _pluginChannel.invokeMethod(
+        'cursorClickUp', [position.dx.round(), position.dy.round()]);
   }
 
   /// Sets the horizontal and vertical scroll delta.
@@ -103,7 +105,8 @@ class WebviewController extends ValueNotifier<bool> {
       return;
     }
     assert(value);
-    return _pluginChannel.invokeMethod('setSize', [size.width.round(), size.height.round()]);
+    return _pluginChannel
+        .invokeMethod('setSize', [size.width.round(), size.height.round()]);
   }
 }
 
@@ -125,7 +128,8 @@ class WebviewState extends State<Webview> {
   void initState() {
     super.initState();
     // Report initial surface size
-    WidgetsBinding.instance.addPostFrameCallback((_) => _reportSurfaceSize(context));
+    WidgetsBinding.instance
+        .addPostFrameCallback((_) => _reportSurfaceSize(context));
   }
 
   @override
@@ -141,8 +145,7 @@ class WebviewState extends State<Webview> {
         },
         child: SizeChangedLayoutNotifier(
             child: Listener(
-          onPointerHover: (ev) {
-          },
+          onPointerHover: (ev) {},
           onPointerDown: (ev) {
             _controller._cursorClickDown(ev.localPosition);
           },
@@ -154,8 +157,8 @@ class WebviewState extends State<Webview> {
           },
           onPointerSignal: (signal) {
             if (signal is PointerScrollEvent) {
-              _controller._setScrollDelta(
-                  -signal.scrollDelta.dx.round(), -signal.scrollDelta.dy.round());
+              _controller._setScrollDelta(-signal.scrollDelta.dx.round(),
+                  -signal.scrollDelta.dy.round());
             }
           },
           child: Texture(textureId: _controller._textureId),
@@ -167,7 +170,7 @@ class WebviewState extends State<Webview> {
     final box = _key.currentContext?.findRenderObject() as RenderBox?;
     if (box != null) {
       await _controller.ready;
-      unawaited(_controller._setSize(Size(box.size.width * dpi, box.size.height * dpi)));
+      unawaited(_controller._setSize(Size(box.size.width, box.size.height)));
     }
   }
 }
