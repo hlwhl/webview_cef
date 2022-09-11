@@ -52,7 +52,7 @@ int64_t textureId;
             (__bridge NSString*)kCVPixelBufferCGBitmapContextCompatibilityKey : @YES,
             (__bridge NSString*)kCVPixelBufferCGImageCompatibilityKey : @YES,
         };
-
+        
         static CVPixelBufferRef buf = NULL;
         CVPixelBufferCreate(kCFAllocatorDefault,  width,
                             height, kCVPixelFormatType_32BGRA,
@@ -71,7 +71,7 @@ int64_t textureId;
             src += actureRowSize;
             copyBaseAddress += bytesPerRow;
         }
-
+        
         CVPixelBufferUnlockBaseAddress(buf, 0);
         
         dispatch_semaphore_wait(lock, DISPATCH_TIME_FOREVER);
@@ -108,6 +108,10 @@ int64_t textureId;
 
 + (void)sizeChanged:(int)width height:(int)height {
     handler.get()->changeSize(width, height);
+}
+
++ (void)loadUrl:(NSString*)url {
+    handler.get()->loadUrl(std::string([url cStringUsingEncoding:NSUTF8StringEncoding]));
 }
 
 - (CVPixelBufferRef _Nullable)copyPixelBuffer {

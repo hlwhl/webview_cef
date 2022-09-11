@@ -29,6 +29,8 @@ extern int64_t textureId;
 
 + (void) sizeChanged: (int)width height:(int)height;
 
++ (void) loadUrl: (NSString *)url;
+
 @end
 
 #endif /* CefWrapper_h */

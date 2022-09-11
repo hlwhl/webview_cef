@@ -87,7 +87,7 @@ void SimpleApp::OnContextInitialized() {
     CefBrowserSettings browser_settings;
     browser_settings.windowless_frame_rate = 60;
     
-    std::string url = "https://www.bilibili.com/";
+    std::string url = "https://www.flutter.dev/";
     
     CefWindowInfo window_info;
     window_info.SetAsWindowless(nullptr);

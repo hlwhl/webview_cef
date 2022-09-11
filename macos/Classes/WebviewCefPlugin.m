@@ -28,6 +28,11 @@
         [CefWrapper startCef];
         result([NSNumber numberWithLong:textureId]);
     }
+    else if([@"loadUrl" isEqualToString:call.method]){
+        NSString * url = call.arguments;
+        [CefWrapper loadUrl:url];
+        result(nil);
+    }
     else if([@"setScrollDelta" isEqualToString:call.method]){
         NSArray<NSNumber *> *_arg = call.arguments;
         NSNumber *deltaY = [_arg objectAtIndex:1];
