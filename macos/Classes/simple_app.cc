@@ -43,7 +43,7 @@ public:
     }
     
     CefSize GetPreferredSize(CefRefPtr<CefView> view) override {
-        return CefSize(800, 600);
+        return CefSize(1920, 1080);
     }
     
 private:

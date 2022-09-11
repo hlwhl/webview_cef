@@ -27,7 +27,6 @@ public:
                                            command_line->AppendSwitch("single-process");
                                        }
     
-    
     // CefBrowserProcessHandler methods:
     void OnContextInitialized() override;
     CefRefPtr<CefClient> GetDefaultClient() override;

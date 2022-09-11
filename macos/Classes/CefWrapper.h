@@ -10,6 +10,7 @@
 #import <FlutterMacOS/FlutterMacOS.h>
 
 extern NSObject<FlutterTextureRegistry>* tr;
+extern CGFloat scaleFactor;
 extern int64_t textureId;
 
 @interface CefWrapper : NSObject<FlutterTexture>

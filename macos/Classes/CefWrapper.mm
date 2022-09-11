@@ -13,11 +13,12 @@
 
 #include <thread>
 
-CefRefPtr<SimpleHandler> handler(new SimpleHandler(false));
+CefRefPtr<SimpleHandler> handler(new SimpleHandler(true));
 CefRefPtr<SimpleApp> app(new SimpleApp(handler));
 CefMainArgs mainArgs;
 
 NSObject<FlutterTextureRegistry>* tr;
+CGFloat scaleFactor = 0.0;
 
 static NSTimer* _timer;
 static CVPixelBufferRef buf_cache;
@@ -47,18 +48,30 @@ int64_t textureId;
     textureId = [tr registerTexture:[CefWrapper alloc]];
     handler.get()->onPaintCallback = [](const void* buffer, int32_t width, int32_t height) {
         NSDictionary* dic = @{
-            (__bridge NSString*)kCVPixelBufferPixelFormatTypeKey: @(kCVPixelFormatType_32BGRA),
-            (__bridge NSString*)kCVPixelBufferIOSurfacePropertiesKey: @{},
-            (__bridge NSString*)kCVPixelBufferOpenGLCompatibilityKey : @YES,
             (__bridge NSString*)kCVPixelBufferMetalCompatibilityKey : @YES,
+            (__bridge NSString*)kCVPixelBufferCGBitmapContextCompatibilityKey : @YES,
+            (__bridge NSString*)kCVPixelBufferCGImageCompatibilityKey : @YES,
         };
+
         static CVPixelBufferRef buf = NULL;
-        CVPixelBufferCreate(kCFAllocatorDefault, width,
+        CVPixelBufferCreate(kCFAllocatorDefault,  width,
                             height, kCVPixelFormatType_32BGRA,
                             (__bridge CFDictionaryRef)dic, &buf);
+        
+        //copy data
         CVPixelBufferLockBaseAddress(buf, 0);
-        void *copyBaseAddress = CVPixelBufferGetBaseAddress(buf);
-        memcpy(copyBaseAddress, buffer, width * height * 4);
+        char *copyBaseAddress = (char *)CVPixelBufferGetBaseAddress(buf);
+        
+        //MUST align pixel to pixelBuffer. Otherwise cause render issue
+        size_t bytesPerRow = CVPixelBufferGetBytesPerRowOfPlane(buf, 0);
+        char* src = (char*) buffer;
+        int actureRowSize = width * 4;
+        for(int line = 0; line < height; line++) {
+            memcpy(copyBaseAddress, src, actureRowSize);
+            src += actureRowSize;
+            copyBaseAddress += bytesPerRow;
+        }
+
         CVPixelBufferUnlockBaseAddress(buf, 0);
         
         dispatch_semaphore_wait(lock, DISPATCH_TIME_FOREVER);
@@ -69,9 +82,10 @@ int64_t textureId;
         dispatch_semaphore_signal(lock);
         [tr textureFrameAvailable:textureId];
     };
-    CefSettings cefs;
-    cefs.windowless_rendering_enabled = true;
-    CefInitialize(mainArgs, cefs, app.get(), nullptr);
+    CefSettings settings;
+    settings.windowless_rendering_enabled = true;
+    settings.external_message_pump = true;
+    CefInitialize(mainArgs, settings, app.get(), nullptr);
     _timer = [NSTimer timerWithTimeInterval:0.016f target:self selector:@selector(doMessageLoopWork) userInfo:nil repeats:YES];
     [[NSRunLoop mainRunLoop] addTimer: _timer forMode:NSRunLoopCommonModes];
 }

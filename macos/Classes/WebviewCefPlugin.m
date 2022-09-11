@@ -13,8 +13,6 @@
     [registrar addMethodCallDelegate:instance channel:channel];
     
     tr = registrar.textures;
-    
-    [CefWrapper init];
 }
 
 - (void)handleMethodCall:(FlutterMethodCall*)call result:(FlutterResult)result {
@@ -26,6 +24,7 @@
         result([@"macOS " stringByAppendingString:systemVersion]);
     }
     else if([@"init" isEqualToString:call.method]){
+        [CefWrapper init];
         [CefWrapper startCef];
         result([NSNumber numberWithLong:textureId]);
     }
