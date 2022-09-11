@@ -18,12 +18,12 @@ int APIENTRY wWinMain(_In_ HINSTANCE instance, _In_opt_ HINSTANCE prev,
 When first time building the project, a prebuilt cef bin package (200MB, link in release) will be downloaded automatically, hence you may wait for a longer time if you are building the project for the first time.
 
 # todos
-- [] macos support (in progress..)
-- [] multi instance support
-- [] keyboard events support
+- [ ] macos support (in progress.. take a look at the macos branch)
+- [ ] multi instance support
+- [ ] keyboard events support
 - [x] mouse events support
-- [] js bridge support
-- [] release to pub
+- [ ] js bridge support
+- [ ] release to pub
 
 # demo
 ![image](https://user-images.githubusercontent.com/7610615/170815938-f8c7eadc-bcee-4aca-83df-95c23939485d.png)
