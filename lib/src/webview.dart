@@ -161,6 +161,9 @@ class WebviewState extends State<Webview> {
                   -signal.scrollDelta.dy.round());
             }
           },
+          onPointerPanZoomUpdate: (event) {
+            print(event.panDelta);
+          },
           child: Texture(textureId: _controller._textureId),
         )));
   }

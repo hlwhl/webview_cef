@@ -9,7 +9,8 @@
 #import <Foundation/Foundation.h>
 #import "include/wrapper/cef_library_loader.h"
 #import "include/cef_app.h"
-#import "simple_app.h"
+#import "../../common/simple_app.h"
+#import "../../common/simple_handler.h"
 
 #include <thread>
 
