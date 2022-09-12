@@ -173,8 +173,12 @@ namespace webview_cef {
 			}
 		}
 		else if (method_call.method_name().compare("setSize") == 0) {
-			const auto point = GetPointFromArgs(method_call.arguments());
-			handler.get()->changeSize(point->first, point->second);
+			const flutter::EncodableList* list =
+				std::get_if<flutter::EncodableList>(method_call.arguments());
+			const auto dpi = *std::get_if<double>(&(*list)[0]);
+			const auto width = *std::get_if<int>(&(*list)[1]);
+			const auto height =*std::get_if<int>(&(*list)[2]);
+			handler.get()->changeSize((float)dpi, width, height);
 			result->Success();
 		}
 		else if (method_call.method_name().compare("cursorClickDown") == 0) {

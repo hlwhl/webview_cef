@@ -204,9 +204,9 @@ void SimpleHandler::sendScrollEvent(int x, int y, int deltaX, int deltaY) {
     }
 }
 
-void SimpleHandler::changeSize(float dpi, int w, int h)
+void SimpleHandler::changeSize(float a_dpi, int w, int h)
 {
-    this->dpi = dpi;
+    this->dpi = a_dpi;
     this->width = w;
     this->height = h;
     BrowserList::const_iterator it = browser_list_.begin();
