@@ -176,9 +176,9 @@ namespace webview_cef {
 			const flutter::EncodableList* list =
 				std::get_if<flutter::EncodableList>(method_call.arguments());
 			const auto dpi = *std::get_if<double>(&(*list)[0]);
-			const auto width = *std::get_if<int>(&(*list)[1]);
-			const auto height =*std::get_if<int>(&(*list)[2]);
-			handler.get()->changeSize((float)dpi, width, height);
+			const auto width = *std::get_if<double>(&(*list)[1]);
+			const auto height =*std::get_if<double>(&(*list)[2]);
+			handler.get()->changeSize((float)dpi,(int) std::round(width),(int) std::round(height));
 			result->Success();
 		}
 		else if (method_call.method_name().compare("cursorClickDown") == 0) {
@@ -192,13 +192,13 @@ namespace webview_cef {
 			result->Success();
 		}
 		else if (method_call.method_name().compare("setScrollDelta") == 0) {
-			const auto point = GetPointFromArgs(method_call.arguments());
-			if (point->second > 0) {
-				handler.get()->scrollDown();
-			}
-			else if (point->second < 0) {
-				handler.get()->scrollUp();
-			}
+			const flutter::EncodableList* list =
+				std::get_if<flutter::EncodableList>(method_call.arguments());
+			const auto x = *std::get_if<int>(&(*list)[0]);
+			const auto y = *std::get_if<int>(&(*list)[1]);
+			const auto deltaX = *std::get_if<int>(&(*list)[2]);
+			const auto deltaY = *std::get_if<int>(&(*list)[3]);
+			handler.get()->sendScrollEvent(x, y, deltaX, deltaY);
 			result->Success();
 		}
 		else {

@@ -75,10 +75,6 @@ public:
     // Returns true if the Chrome runtime is enabled.
     static bool IsChromeRuntimeEnabled();
     
-    void scrollUp();
-    
-    void scrollDown();
-    
     void sendScrollEvent(int x, int y, int deltaX, int deltaY);
     
     void changeSize(float a_dpi, int width, int height);
@@ -88,8 +84,8 @@ public:
     void loadUrl(std::string url);
     
 private:
-    uint32_t width = 1280;
-    uint32_t height = 720;
+    uint32_t width = 1;
+    uint32_t height = 1;
     float dpi = 1.0;
     
     // Platform-specific implementation.

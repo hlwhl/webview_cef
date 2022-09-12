@@ -172,28 +172,6 @@ bool SimpleHandler::IsChromeRuntimeEnabled() {
     return value == 1;
 }
 
-void SimpleHandler::scrollUp()
-{
-    BrowserList::const_iterator it = browser_list_.begin();
-    if (it != browser_list_.end()) {
-        CefMouseEvent ev;
-        ev.x = 500;
-        ev.y = 500;
-        (*it)->GetHost()->SendMouseWheelEvent(ev, 0, -100);
-    }
-}
-
-void SimpleHandler::scrollDown()
-{
-    BrowserList::const_iterator it = browser_list_.begin();
-    if (it != browser_list_.end()) {
-        CefMouseEvent ev;
-        ev.x = 500;
-        ev.y = 500;
-        (*it)->GetHost()->SendMouseWheelEvent(ev, 0, 100);
-    }
-}
-
 void SimpleHandler::sendScrollEvent(int x, int y, int deltaX, int deltaY) {
     BrowserList::const_iterator it = browser_list_.begin();
     if (it != browser_list_.end()) {
