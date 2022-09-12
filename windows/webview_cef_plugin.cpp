@@ -21,7 +21,7 @@
 namespace webview_cef {
 	bool init = false;
 	int64_t texture_id;
-	
+
 	flutter::TextureRegistrar* texture_registrar;
 	std::shared_ptr<FlutterDesktopPixelBuffer> pixel_buffer;
 	std::unique_ptr<uint8_t> backing_pixel_buffer;
@@ -145,8 +145,8 @@ namespace webview_cef {
 
 		channel->SetMethodCallHandler(
 			[plugin_pointer = plugin.get()](const auto& call, auto result) {
-			plugin_pointer->HandleMethodCall(call, std::move(result));
-		});
+				plugin_pointer->HandleMethodCall(call, std::move(result));
+			});
 
 		registrar->AddPlugin(std::move(plugin));
 	}
@@ -177,8 +177,8 @@ namespace webview_cef {
 				std::get_if<flutter::EncodableList>(method_call.arguments());
 			const auto dpi = *std::get_if<double>(&(*list)[0]);
 			const auto width = *std::get_if<double>(&(*list)[1]);
-			const auto height =*std::get_if<double>(&(*list)[2]);
-			handler.get()->changeSize((float)dpi,(int) std::round(width),(int) std::round(height));
+			const auto height = *std::get_if<double>(&(*list)[2]);
+			handler.get()->changeSize((float)dpi, (int)std::round(width), (int)std::round(height));
 			result->Success();
 		}
 		else if (method_call.method_name().compare("cursorClickDown") == 0) {
