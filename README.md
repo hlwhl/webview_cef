@@ -36,7 +36,7 @@ Notice: currently the project haven't enable multi process mode because of debug
 - [x] mouse events support
 - [ ] js bridge support
 - [x] release to pub
-- [ ] trackpad support (flutter 3.3)
+- [x] trackpad support (flutter 3.3)
 - [ ] better macos binary distribution
 - [ ] easier way to integrate macos helper bundles(multi process)
 
