@@ -32,8 +32,7 @@ public:
         return this;
     }
     virtual CefRefPtr<CefLoadHandler> GetLoadHandler() override { return this; }
-    
-    virtual CefRefPtr<CefRenderHandler> GetRenderHandler() override { return this; } //新加的
+    virtual CefRefPtr<CefRenderHandler> GetRenderHandler() override { return this; } 
     
     // CefDisplayHandler methods:
     virtual void OnTitleChange(CefRefPtr<CefBrowser> browser,
@@ -43,6 +42,18 @@ public:
     virtual void OnAfterCreated(CefRefPtr<CefBrowser> browser) override;
     virtual bool DoClose(CefRefPtr<CefBrowser> browser) override;
     virtual void OnBeforeClose(CefRefPtr<CefBrowser> browser) override;
+    virtual bool OnBeforePopup(CefRefPtr<CefBrowser> browser,
+        CefRefPtr<CefFrame> frame,
+        const CefString& target_url,
+        const CefString& target_frame_name,
+        WindowOpenDisposition target_disposition,
+        bool user_gesture,
+        const CefPopupFeatures& popupFeatures,
+        CefWindowInfo& windowInfo,
+        CefRefPtr<CefClient>& client,
+        CefBrowserSettings& settings,
+        CefRefPtr<CefDictionaryValue>& extra_info,
+        bool* no_javascript_access) override;
     
     // CefLoadHandler methods:
     virtual void OnLoadError(CefRefPtr<CefBrowser> browser,
