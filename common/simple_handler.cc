@@ -204,8 +204,9 @@ void SimpleHandler::sendScrollEvent(int x, int y, int deltaX, int deltaY) {
     }
 }
 
-void SimpleHandler::changeSize(int w, int h)
+void SimpleHandler::changeSize(float dpi, int w, int h)
 {
+    this->dpi = dpi;
     this->width = w;
     this->height = h;
     BrowserList::const_iterator it = browser_list_.begin();
@@ -253,7 +254,7 @@ void SimpleHandler::GetViewRect(CefRefPtr<CefBrowser> browser, CefRect &rect) {
 
 bool SimpleHandler::GetScreenInfo(CefRefPtr<CefBrowser> browser, CefScreenInfo& screen_info) {
     //todo: hi dpi support
-    screen_info.device_scale_factor  = 1;
+    screen_info.device_scale_factor  = this->dpi;
     return false;
 }
 

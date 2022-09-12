@@ -81,7 +81,7 @@ public:
     
     void sendScrollEvent(int x, int y, int deltaX, int deltaY);
     
-    void changeSize(int width, int height);
+    void changeSize(float dpi, int width, int height);
     
     void cursorClick(int x, int y, bool up);
     
@@ -90,6 +90,7 @@ public:
 private:
     uint32_t width = 1280;
     uint32_t height = 720;
+    float dpi = 1.0;
     
     // Platform-specific implementation.
     void PlatformTitleChange(CefRefPtr<CefBrowser> browser,

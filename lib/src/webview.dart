@@ -101,13 +101,13 @@ class WebviewController extends ValueNotifier<bool> {
   }
 
   /// Sets the surface size to the provided [size].
-  Future<void> _setSize(Size size) async {
+  Future<void> _setSize(double dpi, Size size) async {
     if (_isDisposed) {
       return;
     }
     assert(value);
     return _pluginChannel
-        .invokeMethod('setSize', [size.width.round(), size.height.round()]);
+        .invokeMethod('setSize', [dpi, size.width, size.height]);
   }
 }
 
@@ -175,7 +175,7 @@ class WebviewState extends State<Webview> {
     final box = _key.currentContext?.findRenderObject() as RenderBox?;
     if (box != null) {
       await _controller.ready;
-      unawaited(_controller._setSize(Size(box.size.width, box.size.height)));
+      unawaited(_controller._setSize(dpi, Size(box.size.width, box.size.height)));
     }
   }
 }

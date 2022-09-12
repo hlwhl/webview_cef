@@ -111,8 +111,8 @@ int64_t textureId;
     handler.get()->cursorClick(x, y, false);
 }
 
-+ (void)sizeChanged:(int)width height:(int)height {
-    handler.get()->changeSize(width, height);
++ (void)sizeChanged:(float)dpi width:(int)width height:(int)height {
+    handler.get()->changeSize(dpi, width, height);
 }
 
 + (void)loadUrl:(NSString*)url {

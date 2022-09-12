@@ -58,9 +58,10 @@
     }
     else if([@"setSize" isEqualToString:call.method]){
         NSArray<NSNumber *> *_arg = call.arguments;
-        NSNumber *width = [_arg objectAtIndex:0];
-        NSNumber *height = [_arg objectAtIndex:1];
-        [CefWrapper sizeChanged:[width intValue] height:[height intValue]];
+        NSNumber *dpi = [_arg objectAtIndex:0];
+        NSNumber *width = [_arg objectAtIndex:1];
+        NSNumber *height = [_arg objectAtIndex:2];
+        [CefWrapper sizeChanged: [dpi floatValue] width:[width intValue] height:[height intValue]];
         result(nil);
     }
     else {
