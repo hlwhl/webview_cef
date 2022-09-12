@@ -35,13 +35,11 @@
     }
     else if([@"setScrollDelta" isEqualToString:call.method]){
         NSArray<NSNumber *> *_arg = call.arguments;
-        NSNumber *deltaY = [_arg objectAtIndex:1];
-        int delta = [deltaY intValue];
-        if(delta > 0) {
-            [CefWrapper scrollDown];
-        } else {
-            [CefWrapper scrollUp];
-        }
+        NSNumber *x = [_arg objectAtIndex:0];
+        NSNumber *y = [_arg objectAtIndex:1];
+        NSNumber *deltaX = [_arg objectAtIndex:2];
+        NSNumber *deltaY = [_arg objectAtIndex:3];
+        [CefWrapper sendScrollEvent:[x intValue] y:[y intValue] deltaX:[deltaX intValue] deltaY:[deltaY intValue]];
         result(nil);
     }
     else if([@"cursorClickUp" isEqualToString:call.method]){

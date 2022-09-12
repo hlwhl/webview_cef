@@ -1,4 +1,4 @@
-﻿// Copyright (c) 2013 The Chromium Embedded Framework Authors. All rights
+// Copyright (c) 2013 The Chromium Embedded Framework Authors. All rights
 // reserved. Use of this source code is governed by a BSD-style license that
 // can be found in the LICENSE file.
 
@@ -191,6 +191,16 @@ void SimpleHandler::scrollDown()
         ev.x = 500;
         ev.y = 500;
         (*it)->GetHost()->SendMouseWheelEvent(ev, 0, 100);
+    }
+}
+
+void SimpleHandler::sendScrollEvent(int x, int y, int deltaX, int deltaY) {
+    BrowserList::const_iterator it = browser_list_.begin();
+    if (it != browser_list_.end()) {
+        CefMouseEvent ev;
+        ev.x = x;
+        ev.y = y;
+        (*it)->GetHost()->SendMouseWheelEvent(ev, deltaX, deltaY);
     }
 }
 

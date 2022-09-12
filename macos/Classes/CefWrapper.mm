@@ -99,6 +99,10 @@ int64_t textureId;
     handler.get()->scrollDown();
 }
 
++(void)sendScrollEvent:(int)x y:(int)y deltaX:(int)deltaX deltaY:(int)deltaY {
+    handler.get()->sendScrollEvent(x, y, deltaX, deltaY);
+}
+
 + (void)cursorClickUp:(int)x y:(int)y {
     handler.get()->cursorClick(x, y, true);
 }

@@ -91,12 +91,13 @@ class WebviewController extends ValueNotifier<bool> {
   }
 
   /// Sets the horizontal and vertical scroll delta.
-  Future<void> _setScrollDelta(int dx, int dy) async {
+  Future<void> _setScrollDelta(Offset position, int dx, int dy) async {
     if (_isDisposed) {
       return;
     }
     assert(value);
-    return _pluginChannel.invokeMethod('setScrollDelta', [dx, dy]);
+    return _pluginChannel.invokeMethod(
+        'setScrollDelta', [position.dx.round(), position.dy.round(), dx, dy]);
   }
 
   /// Sets the surface size to the provided [size].
@@ -157,12 +158,13 @@ class WebviewState extends State<Webview> {
           },
           onPointerSignal: (signal) {
             if (signal is PointerScrollEvent) {
-              _controller._setScrollDelta(-signal.scrollDelta.dx.round(),
-                  -signal.scrollDelta.dy.round());
+              _controller._setScrollDelta(signal.localPosition,
+                  signal.scrollDelta.dx.round(), signal.scrollDelta.dy.round());
             }
           },
           onPointerPanZoomUpdate: (event) {
-            print(event.panDelta);
+            _controller._setScrollDelta(event.localPosition,
+                event.panDelta.dx.round(), event.panDelta.dy.round());
           },
           child: Texture(textureId: _controller._textureId),
         )));

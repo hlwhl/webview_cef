@@ -27,6 +27,8 @@ extern int64_t textureId;
 
 + (void) cursorClickDown: (int)x y:(int)y;
 
++ (void)sendScrollEvent:(int)x y:(int)y deltaX:(int)deltaX deltaY:(int)deltaY;
+
 + (void) sizeChanged: (int)width height:(int)height;
 
 + (void) loadUrl: (NSString *)url;
