@@ -32,18 +32,22 @@ Notice: currently the project haven't enable multi process mode because of debug
 # todos
 - [x] macos support(partial, in progress..)
 - [ ] multi instance support
-- [ ] keyboard events support
+- [ ] keyboard support
 - [x] mouse events support
 - [ ] js bridge support
 - [x] release to pub
+- [ ] trackpad support (flutter 3.3)
+- [ ] better macos binary distribution
+- [ ] easier way to integrate macos helper bundles(multi process)
 
 # demo
+### Windows
 ![image](https://user-images.githubusercontent.com/7610615/170815938-f8c7eadc-bcee-4aca-83df-95c23939485d.png)
 ![image](https://user-images.githubusercontent.com/7610615/170827339-04912462-bc53-4487-924b-c59a5b68e79b.png)
 ![image](https://user-images.githubusercontent.com/7610615/170816159-559642b4-4fd4-40c7-a029-424bb7cff7fd.png)
+### macOS
 ![image](https://user-images.githubusercontent.com/7610615/189533516-e5ab7dfa-4d53-4de9-b8c2-507eb5fa9196.png)
 ![image](https://user-images.githubusercontent.com/7610615/189533300-9fd87737-00f3-4e56-8750-ff276fc315b3.png)
-ff7fd.png)
 
 
 # thanks
