@@ -91,14 +91,6 @@ int64_t textureId;
     [[NSRunLoop mainRunLoop] addTimer: _timer forMode:NSRunLoopCommonModes];
 }
 
-+ (void)scrollUp {
-    handler.get()->scrollUp();
-}
-
-+(void)scrollDown {
-    handler.get()->scrollDown();
-}
-
 +(void)sendScrollEvent:(int)x y:(int)y deltaX:(int)deltaX deltaY:(int)deltaY {
     handler.get()->sendScrollEvent(x, y, deltaX, deltaY);
 }
