@@ -19,15 +19,11 @@ extern int64_t textureId;
 
 + (void) startCef;
 
-+ (void) scrollUp;
-
-+ (void) scrollDown;
-
 + (void) cursorClickUp: (int)x y:(int)y;
 
 + (void) cursorClickDown: (int)x y:(int)y;
 
-+ (void)sendScrollEvent:(int)x y:(int)y deltaX:(int)deltaX deltaY:(int)deltaY;
++ (void) sendScrollEvent:(int)x y:(int)y deltaX:(int)deltaX deltaY:(int)deltaY;
 
 + (void) sizeChanged: (float)dpi width:(int)width height:(int)height;
 

@@ -61,9 +61,9 @@ int64_t textureId;
         
         //copy data
         CVPixelBufferLockBaseAddress(buf, 0);
-        char *copyBaseAddress = (char *)CVPixelBufferGetBaseAddress(buf);
+        char *copyBaseAddress = (char *) CVPixelBufferGetBaseAddress(buf);
         
-        //MUST align pixel to pixelBuffer. Otherwise cause render issue
+        //MUST align pixel to pixelBuffer. Otherwise cause render issue. see https://www.codeprintr.com/thread/6563066.html
         size_t bytesPerRow = CVPixelBufferGetBytesPerRowOfPlane(buf, 0);
         char* src = (char*) buffer;
         int actureRowSize = width * 4;
@@ -72,7 +72,6 @@ int64_t textureId;
             src += actureRowSize;
             copyBaseAddress += bytesPerRow;
         }
-        
         CVPixelBufferUnlockBaseAddress(buf, 0);
         
         dispatch_semaphore_wait(lock, DISPATCH_TIME_FOREVER);
@@ -86,9 +85,103 @@ int64_t textureId;
     CefSettings settings;
     settings.windowless_rendering_enabled = true;
     settings.external_message_pump = true;
+    CefString(&settings.browser_subprocess_path) = "/Library/Chaches";
+    
     CefInitialize(mainArgs, settings, app.get(), nullptr);
     _timer = [NSTimer timerWithTimeInterval:0.016f target:self selector:@selector(doMessageLoopWork) userInfo:nil repeats:YES];
     [[NSRunLoop mainRunLoop] addTimer: _timer forMode:NSRunLoopCommonModes];
+    
+    [NSEvent addLocalMonitorForEventsMatchingMask:NSEventMaskKeyDown handler:^NSEvent * _Nullable(NSEvent * _Nonnull event) {
+        [self processKeyboardEvent:event];
+        return event;
+    }];
+    
+    [NSEvent addLocalMonitorForEventsMatchingMask:NSEventMaskKeyUp handler:^NSEvent * _Nullable(NSEvent * _Nonnull event) {
+        [self processKeyboardEvent:event];
+        return event;
+    }];
+}
+
++ (void)processKeyboardEvent: (NSEvent*) event {
+    CefKeyEvent keyEvent;
+    
+    keyEvent.native_key_code = [event keyCode];
+    keyEvent.modifiers = [self getModifiersForEvent:event];
+    
+    //handle backspace
+    if(keyEvent.native_key_code == 51) {
+        keyEvent.character = 0;
+        keyEvent.unmodified_character = 0;
+    } else {
+        NSString* s = [event characters];
+        if([s length] == 0) {
+            keyEvent.type = KEYEVENT_KEYDOWN;
+        } else {
+            keyEvent.type = KEYEVENT_CHAR;
+        }
+        if ([s length] > 0)
+            keyEvent.character = [s characterAtIndex:0];
+        
+        s = [event charactersIgnoringModifiers];
+        if ([s length] > 0)
+            keyEvent.unmodified_character = [s characterAtIndex:0];
+        
+        if([event type] == NSKeyUp) {
+            keyEvent.type = KEYEVENT_KEYUP;
+        }
+    }
+    
+    handler.get()->sendKeyEvent(keyEvent);
+}
+
++ (int)getModifiersForEvent:(NSEvent*)event {
+    int modifiers = 0;
+    
+    if ([event modifierFlags] & NSControlKeyMask)
+        modifiers |= EVENTFLAG_CONTROL_DOWN;
+    if ([event modifierFlags] & NSShiftKeyMask)
+        modifiers |= EVENTFLAG_SHIFT_DOWN;
+    if ([event modifierFlags] & NSAlternateKeyMask)
+        modifiers |= EVENTFLAG_ALT_DOWN;
+    if ([event modifierFlags] & NSCommandKeyMask)
+        modifiers |= EVENTFLAG_COMMAND_DOWN;
+    if ([event modifierFlags] & NSAlphaShiftKeyMask)
+        modifiers |= EVENTFLAG_CAPS_LOCK_ON;
+    
+    if ([event type] == NSKeyUp || [event type] == NSKeyDown ||
+        [event type] == NSFlagsChanged) {
+        // Only perform this check for key events
+        //    if ([self isKeyPadEvent:event])
+        //      modifiers |= EVENTFLAG_IS_KEY_PAD;
+    }
+    
+    // OS X does not have a modifier for NumLock, so I'm not entirely sure how to
+    // set EVENTFLAG_NUM_LOCK_ON;
+    //
+    // There is no EVENTFLAG for the function key either.
+    
+    // Mouse buttons
+    switch ([event type]) {
+        case NSLeftMouseDragged:
+        case NSLeftMouseDown:
+        case NSLeftMouseUp:
+            modifiers |= EVENTFLAG_LEFT_MOUSE_BUTTON;
+            break;
+        case NSRightMouseDragged:
+        case NSRightMouseDown:
+        case NSRightMouseUp:
+            modifiers |= EVENTFLAG_RIGHT_MOUSE_BUTTON;
+            break;
+        case NSOtherMouseDragged:
+        case NSOtherMouseDown:
+        case NSOtherMouseUp:
+            modifiers |= EVENTFLAG_MIDDLE_MOUSE_BUTTON;
+            break;
+        default:
+            break;
+    }
+    
+    return modifiers;
 }
 
 +(void)sendScrollEvent:(int)x y:(int)y deltaX:(int)deltaX deltaY:(int)deltaY {

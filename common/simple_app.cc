@@ -1,4 +1,4 @@
-﻿// Copyright (c) 2013 The Chromium Embedded Framework Authors. All rights
+// Copyright (c) 2013 The Chromium Embedded Framework Authors. All rights
 // reserved. Use of this source code is governed by a BSD-style license that
 // can be found in the LICENSE file.
 
@@ -43,7 +43,7 @@ public:
     }
     
     CefSize GetPreferredSize(CefRefPtr<CefView> view) override {
-        return CefSize(1920, 1080);
+        return CefSize(1280, 720);
     }
     
 private:

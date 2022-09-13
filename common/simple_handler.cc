@@ -204,6 +204,14 @@ void SimpleHandler::cursorClick(int x, int y, bool up)
     }
 }
 
+void SimpleHandler::sendKeyEvent(CefKeyEvent ev)
+{
+    BrowserList::const_iterator it = browser_list_.begin();
+    if (it != browser_list_.end()) {
+        (*it)->GetHost()->SendKeyEvent(ev);
+    }
+}
+
 void SimpleHandler::loadUrl(std::string url)
 {
     BrowserList::const_iterator it = browser_list_.begin();
@@ -244,4 +252,3 @@ void SimpleHandler::OnPaint(CefRefPtr<CefBrowser> browser, CefRenderHandler::Pai
 void SimpleHandler::PlatformTitleChange(CefRefPtr<CefBrowser> browser,
                                         const CefString& title) {
 }
-
