@@ -39,6 +39,9 @@ int APIENTRY wWinMain(_In_ HINSTANCE instance, _In_opt_ HINSTANCE prev,
   while (::GetMessage(&msg, nullptr, 0, 0)) {
     ::TranslateMessage(&msg);
     ::DispatchMessage(&msg);
+    
+    //add this line to enable cef keybord input
+    processKeyEventForCEF(msg.message, msg.wParam, msg.lParam);
   }
 
   ::CoUninitialize();

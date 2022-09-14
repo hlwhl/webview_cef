@@ -6,11 +6,14 @@
 
 #include <memory>
 
+#include "include/cef_app.h"
+
 namespace webview_cef {
 
 class WebviewCefPlugin : public flutter::Plugin {
  public:
   static void RegisterWithRegistrar(flutter::PluginRegistrarWindows *registrar);
+  static void sendKeyEvent(CefKeyEvent ev);
 
   WebviewCefPlugin();
 

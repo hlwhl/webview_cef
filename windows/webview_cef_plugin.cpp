@@ -15,7 +15,6 @@
 #include<iostream>
 #include <mutex>
 
-#include "include/cef_app.h"
 #include "simple_app.h"
 
 namespace webview_cef {
@@ -149,6 +148,11 @@ namespace webview_cef {
 			});
 
 		registrar->AddPlugin(std::move(plugin));
+	}
+
+	void WebviewCefPlugin::sendKeyEvent(CefKeyEvent ev)
+	{
+		handler.get()->sendKeyEvent(ev);
 	}
 
 	WebviewCefPlugin::WebviewCefPlugin() {}
