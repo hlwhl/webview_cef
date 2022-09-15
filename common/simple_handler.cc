@@ -220,6 +220,27 @@ void SimpleHandler::loadUrl(std::string url)
     }
 }
 
+void SimpleHandler::goForward() {
+    BrowserList::const_iterator it = browser_list_.begin();
+    if (it != browser_list_.end()) {
+        (*it)->GetMainFrame()->GetBrowser()->GoForward();
+    }
+}
+
+void SimpleHandler::goBack() {
+    BrowserList::const_iterator it = browser_list_.begin();
+    if (it != browser_list_.end()) {
+        (*it)->GetMainFrame()->GetBrowser()->GoBack();
+    }
+}
+
+void SimpleHandler::reload() {
+    BrowserList::const_iterator it = browser_list_.begin();
+    if (it != browser_list_.end()) {
+        (*it)->GetMainFrame()->GetBrowser()->Reload();
+    }
+}
+
 void SimpleHandler::GetViewRect(CefRefPtr<CefBrowser> browser, CefRect &rect) {
     CEF_REQUIRE_UI_THREAD();
     

@@ -7,14 +7,14 @@ import 'package:flutter/widgets.dart';
 
 const MethodChannel _pluginChannel = MethodChannel("webview_cef");
 
-class WebviewController extends ValueNotifier<bool> {
+class WebViewController extends ValueNotifier<bool> {
   late Completer<void> _creatingCompleter;
   int _textureId = 0;
   bool _isDisposed = false;
 
   Future<void> get ready => _creatingCompleter.future;
 
-  WebviewController() : super(false);
+  WebViewController() : super(false);
 
   /// Initializes the underlying platform view.
   Future<void> initialize() async {
@@ -60,6 +60,22 @@ class WebviewController extends ValueNotifier<bool> {
     }
     assert(value);
     return _pluginChannel.invokeMethod('reload');
+  }
+
+  Future<void> goForward() async {
+    if (_isDisposed) {
+      return;
+    }
+    assert(value);
+    return _pluginChannel.invokeMethod('goForward');
+  }
+
+  Future<void> goBack() async {
+    if (_isDisposed) {
+      return;
+    }
+    assert(value);
+    return _pluginChannel.invokeMethod('goBack');
   }
 
   /// Moves the virtual cursor to [position].
@@ -111,19 +127,19 @@ class WebviewController extends ValueNotifier<bool> {
   }
 }
 
-class Webview extends StatefulWidget {
-  final WebviewController controller;
+class WebView extends StatefulWidget {
+  final WebViewController controller;
 
-  const Webview(this.controller, {Key? key}) : super(key: key);
+  const WebView(this.controller, {Key? key}) : super(key: key);
 
   @override
-  WebviewState createState() => WebviewState();
+  WebViewState createState() => WebViewState();
 }
 
-class WebviewState extends State<Webview> {
+class WebViewState extends State<WebView> {
   final GlobalKey _key = GlobalKey();
 
-  WebviewController get _controller => widget.controller;
+  WebViewController get _controller => widget.controller;
 
   @override
   void initState() {

@@ -80,6 +80,9 @@ public:
     void cursorClick(int x, int y, bool up);
     void sendKeyEvent(CefKeyEvent ev);
     void loadUrl(std::string url);
+    void goForward();
+    void goBack();
+    void reload();
     
 private:
     uint32_t width = 1;

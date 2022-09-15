@@ -15,7 +15,7 @@ class MyApp extends StatefulWidget {
 }
 
 class _MyAppState extends State<MyApp> {
-  final _controller = WebviewController();
+  final _controller = WebViewController();
   final _textController = TextEditingController();
 
   @override
@@ -29,36 +29,66 @@ class _MyAppState extends State<MyApp> {
     String url = "https://flutter.dev/";
     _textController.text = url;
     await _controller.initialize();
-    // await _controller.loadUrl(url);
+    await _controller.loadUrl(url);
     // If the widget was removed from the tree while the asynchronous platform
     // message was in flight, we want to discard the reply rather than calling
     // setState to update our non-existent appearance.
     if (!mounted) return;
-
     setState(() {});
   }
 
   @override
   Widget build(BuildContext context) {
     return MaterialApp(
+      theme: ThemeData(useMaterial3: true),
       home: Scaffold(
-          appBar: AppBar(
-            title: const Text('Webview CEF Plugin'),
-          ),
           body: Column(
+        children: [
+          Row(
             children: [
-              TextField(
-                controller: _textController,
-                onSubmitted: (url) {
-                  _textController.text = url;
-                  _controller.loadUrl(url);
-                },
+              SizedBox(
+                height: 48,
+                child: MaterialButton(
+                  onPressed: () {
+                    _controller.reload();
+                  },
+                  child: const Icon(Icons.refresh),
+                ),
               ),
-              _controller.value
-                  ? Expanded(child: Webview(_controller))
-                  : const Text("not init"),
+              SizedBox(
+                height: 48,
+                child: MaterialButton(
+                  onPressed: () {
+                    _controller.goBack();
+                  },
+                  child: const Icon(Icons.arrow_left),
+                ),
+              ),
+              SizedBox(
+                height: 48,
+                child: MaterialButton(
+                  onPressed: () {
+                    _controller.goForward();
+                  },
+                  child: const Icon(Icons.arrow_right),
+                ),
+              ),
+              Expanded(
+                child: TextField(
+                  controller: _textController,
+                  onSubmitted: (url) {
+                    _textController.text = url;
+                    _controller.loadUrl(url);
+                  },
+                ),
+              ),
             ],
-          )),
+          ),
+          _controller.value
+              ? Expanded(child: WebView(_controller))
+              : const Text("not init"),
+        ],
+      )),
     );
   }
 }

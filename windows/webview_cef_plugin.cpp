@@ -205,6 +205,18 @@ namespace webview_cef {
 			handler.get()->sendScrollEvent(x, y, deltaX, deltaY);
 			result->Success();
 		}
+		else if (method_call.method_name().compare("goForward") == 0) {
+			handler.get()->goForward();
+			result->Success();
+		}
+		else if (method_call.method_name().compare("goBack") == 0) {
+			handler.get()->goBack();
+			result->Success();
+		}
+		else if (method_call.method_name().compare("reload") == 0) {
+			handler.get()->reload();
+			result->Success();
+		}
 		else {
 			result->NotImplemented();
 		}
