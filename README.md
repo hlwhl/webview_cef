@@ -42,9 +42,10 @@ Notice: currently the project haven't enable multi process mode because of debug
 
 # demo
 ### Windows
-![image](https://user-images.githubusercontent.com/7610615/170815938-f8c7eadc-bcee-4aca-83df-95c23939485d.png)
-![image](https://user-images.githubusercontent.com/7610615/170827339-04912462-bc53-4487-924b-c59a5b68e79b.png)
-![image](https://user-images.githubusercontent.com/7610615/170816159-559642b4-4fd4-40c7-a029-424bb7cff7fd.png)
+![demo_compressed](https://user-images.githubusercontent.com/7610615/190432410-c53ef1c4-33c2-461b-af29-b0ecab983579.gif)
+![image](https://user-images.githubusercontent.com/7610615/190431027-6824fac1-015d-4091-b034-dd58f79adbcb.png)
+![image](https://user-images.githubusercontent.com/7610615/190431037-62ba0ea7-f7d1-4fca-8ce1-596a0a508f93.png)
+
 ### macOS
 ![image](https://user-images.githubusercontent.com/7610615/189533516-e5ab7dfa-4d53-4de9-b8c2-507eb5fa9196.png)
 ![image](https://user-images.githubusercontent.com/7610615/189533300-9fd87737-00f3-4e56-8750-ff276fc315b3.png)
