@@ -63,7 +63,7 @@ int64_t textureId;
         CVPixelBufferLockBaseAddress(buf, 0);
         char *copyBaseAddress = (char *) CVPixelBufferGetBaseAddress(buf);
         
-        //MUST align pixel to pixelBuffer. Otherwise cause render issue. see https://www.codeprintr.com/thread/6563066.html
+        //MUST align pixel to pixelBuffer. Otherwise cause render issue. see https://www.codeprintr.com/thread/6563066.html about 16 bytes align
         size_t bytesPerRow = CVPixelBufferGetBytesPerRowOfPlane(buf, 0);
         char* src = (char*) buffer;
         int actureRowSize = width * 4;
@@ -202,6 +202,18 @@ int64_t textureId;
 
 + (void)loadUrl:(NSString*)url {
     handler.get()->loadUrl(std::string([url cStringUsingEncoding:NSUTF8StringEncoding]));
+}
+
++ (void)goForward {
+    handler.get()->goForward();
+}
+
++ (void)goBack {
+    handler.get()->goBack();
+}
+
++ (void)reload {
+    handler.get()->reload();
 }
 
 - (CVPixelBufferRef _Nullable)copyPixelBuffer {

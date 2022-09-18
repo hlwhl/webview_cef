@@ -29,6 +29,12 @@ extern int64_t textureId;
 
 + (void) loadUrl: (NSString *)url;
 
++ (void) goForward;
+
++ (void) goBack;
+
++ (void) reload;
+
 @end
 
 #endif /* CefWrapper_h */

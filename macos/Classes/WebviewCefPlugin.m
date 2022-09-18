@@ -64,6 +64,18 @@
         [CefWrapper sizeChanged: [dpi floatValue] width:[width intValue] height:[height intValue]];
         result(nil);
     }
+    else if([@"goForward" isEqualToString:call.method]){
+        [CefWrapper goForward];
+        result(nil);
+    }
+    else if([@"goBack" isEqualToString:call.method]){
+        [CefWrapper goBack];
+        result(nil);
+    }
+    else if([@"reload" isEqualToString:call.method]){
+        [CefWrapper reload];
+        result(nil);
+    }
     else {
         result(FlutterMethodNotImplemented);
     }
