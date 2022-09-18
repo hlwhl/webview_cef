@@ -47,9 +47,8 @@ Notice: currently the project haven't enable multi process mode because of debug
 ![image](https://user-images.githubusercontent.com/7610615/190431037-62ba0ea7-f7d1-4fca-8ce1-596a0a508f93.png)
 
 ### macOS
-![image](https://user-images.githubusercontent.com/7610615/189533516-e5ab7dfa-4d53-4de9-b8c2-507eb5fa9196.png)
-![image](https://user-images.githubusercontent.com/7610615/189533300-9fd87737-00f3-4e56-8750-ff276fc315b3.png)
-
+![image](https://user-images.githubusercontent.com/7610615/190911381-db88cf33-70a2-4abc-9916-e563e54eb3f9.png)
+![image](https://user-images.githubusercontent.com/7610615/190911410-bd01e912-5482-4f9e-9dae-858874e5aaed.png)
 
 # thanks
 This project inspired by https://github.com/jnschulze/flutter-webview-windows
