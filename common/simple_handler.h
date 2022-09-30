@@ -17,6 +17,7 @@ public CefLoadHandler,
 public CefRenderHandler{
 public:
     std::function<void(const void*, int32_t width, int32_t height)> onPaintCallback;
+    std::function<void(int x, int y, int w, int h)> imePositionCallback;
     
     explicit SimpleHandler(bool use_views);
     ~SimpleHandler();
@@ -66,6 +67,13 @@ public:
     virtual void GetViewRect(CefRefPtr<CefBrowser> browser, CefRect& rect) override;
     virtual void OnPaint(CefRefPtr<CefBrowser> browser, PaintElementType type, const RectList& dirtyRects, const void* buffer, int width, int height) override;
     virtual bool GetScreenInfo(CefRefPtr<CefBrowser> browser, CefScreenInfo& screen_info) override;
+    virtual void OnImeCompositionRangeChanged(
+          CefRefPtr<CefBrowser> browser,
+          const CefRange& selection_range,
+                                      const CefRenderHandler::RectList& character_bounds) override;
+    virtual void OnTextSelectionChanged(CefRefPtr<CefBrowser> browser,
+                                        const CefString& selected_text,
+                                        const CefRange& selected_range) override;
     
     // Request that all existing browser windows close.
     void CloseAllBrowsers(bool force_close);

@@ -13,6 +13,13 @@ extern NSObject<FlutterTextureRegistry>* tr;
 extern CGFloat scaleFactor;
 extern int64_t textureId;
 
+@interface EventsStreamHandler : NSObject<FlutterStreamHandler>
+@property (nonatomic, strong) FlutterEventSink events;
+- (void)sendEvents:(NSDictionary *)dic;
+@end
+
+extern EventsStreamHandler *evHandler;
+
 @interface CefWrapper : NSObject<FlutterTexture>
 
 + (void) init;

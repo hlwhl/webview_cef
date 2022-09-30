@@ -21,6 +21,8 @@ CefMainArgs mainArgs;
 NSObject<FlutterTextureRegistry>* tr;
 CGFloat scaleFactor = 0.0;
 
+EventsStreamHandler *evHandler;
+
 static NSTimer* _timer;
 static CVPixelBufferRef buf_cache;
 static CVPixelBufferRef buf_temp;
@@ -47,6 +49,14 @@ int64_t textureId;
 
 + (void)startCef {
     textureId = [tr registerTexture:[CefWrapper alloc]];
+    handler.get()->imePositionCallback = [](int x, int y, int w, int h){
+        NSMutableDictionary *dic = [NSMutableDictionary dictionary];
+        [dic setObject:[NSNumber numberWithInt:x] forKey:@"x"];
+        [dic setObject:[NSNumber numberWithInt:y] forKey:@"y"];
+        [dic setObject:[NSNumber numberWithInt:w] forKey:@"w"];
+        [dic setObject:[NSNumber numberWithInt:h] forKey:@"h"];
+        [evHandler sendEvents:dic];
+    };
     handler.get()->onPaintCallback = [](const void* buffer, int32_t width, int32_t height) {
         NSDictionary* dic = @{
             (__bridge NSString*)kCVPixelBufferMetalCompatibilityKey : @YES,
@@ -222,6 +232,29 @@ int64_t textureId;
     CVPixelBufferRetain(buf_temp);
     dispatch_semaphore_signal(lock);
     return buf_temp;
+}
+
+@end
+
+
+@implementation EventsStreamHandler
+
+- (void)sendEvents:(NSDictionary *)dic {
+    if(self.events != NULL) {
+        self.events(dic);
+    }
+}
+
+- (FlutterError * _Nullable)onCancelWithArguments:(id _Nullable)arguments {
+    if (_events != NULL) {
+        _events = NULL;
+    }
+    return nil;
+}
+
+- (FlutterError * _Nullable)onListenWithArguments:(id _Nullable)arguments eventSink:(nonnull FlutterEventSink)events {
+    _events = events;
+    return  nil;
 }
 
 @end

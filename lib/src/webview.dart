@@ -2,10 +2,13 @@ import 'dart:async';
 
 import 'package:flutter/gestures.dart';
 import 'package:flutter/material.dart';
+import 'package:flutter/rendering.dart';
 import 'package:flutter/services.dart';
-import 'package:flutter/widgets.dart';
+
+import 'text_input_handler.dart';
 
 const MethodChannel _pluginChannel = MethodChannel("webview_cef");
+const EventChannel _channel = EventChannel('webview_cef_events');
 
 class WebViewController extends ValueNotifier<bool> {
   late Completer<void> _creatingCompleter;
@@ -30,7 +33,6 @@ class WebViewController extends ValueNotifier<bool> {
     } on PlatformException catch (e) {
       _creatingCompleter.completeError(e);
     }
-
     return _creatingCompleter.future;
   }
 
@@ -147,43 +149,80 @@ class WebViewState extends State<WebView> {
     // Report initial surface size
     WidgetsBinding.instance
         .addPostFrameCallback((_) => _reportSurfaceSize(context));
+
+    _channel.receiveBroadcastStream().listen((event) {
+      var a = TextInput.attach(MytextInput(), const TextInputConfiguration());
+      a.show();
+      Matrix4 matrix4 = Matrix4.zero();
+      var b = context.findRenderObject()?.getTransformTo(null);
+      if (b != null) {
+        matrix4 = b;
+      }
+      print(event);
+      // a.setComposingRect(Rect.fromLTWH(10, 10, 20, 20));
+      a.setCaretRect(Rect.fromLTWH(event["x"].toDouble(), event["y"].toDouble(),
+          event["w"].toDouble(), event["h"].toDouble()));
+      a.setEditableSizeAndTransform(const Size(0, 0), matrix4);
+
+      TextEditingController textCon = TextEditingController();
+    });
   }
 
   @override
   Widget build(BuildContext context) {
+    return NotificationListener(
+      onNotification: (notification) {
+        print(notification);
+        return false;
+      },
+      child: Scrollable(
+          viewportBuilder: (BuildContext context, ViewportOffset position) {
+        return SizedBox.expand(key: _key, child: _buildInner());
+      }),
+    );
     return SizedBox.expand(key: _key, child: _buildInner());
   }
 
   Widget _buildInner() {
-    return NotificationListener<SizeChangedLayoutNotification>(
-        onNotification: (notification) {
-          _reportSurfaceSize(context);
-          return true;
-        },
-        child: SizeChangedLayoutNotifier(
-            child: Listener(
-          onPointerHover: (ev) {},
-          onPointerDown: (ev) {
-            _controller._cursorClickDown(ev.localPosition);
-          },
-          onPointerUp: (ev) {
-            _controller._cursorClickUp(ev.localPosition);
-          },
-          onPointerMove: (ev) {
-            // _controller._setCursorPos(ev.localPosition);
-          },
-          onPointerSignal: (signal) {
-            if (signal is PointerScrollEvent) {
-              _controller._setScrollDelta(signal.localPosition,
-                  signal.scrollDelta.dx.round(), signal.scrollDelta.dy.round());
-            }
-          },
-          onPointerPanZoomUpdate: (event) {
-            _controller._setScrollDelta(event.localPosition,
-                event.panDelta.dx.round(), event.panDelta.dy.round());
-          },
-          child: Texture(textureId: _controller._textureId),
-        )));
+    return Stack(
+      children: [
+        NotificationListener<SizeChangedLayoutNotification>(
+            onNotification: (notification) {
+              _reportSurfaceSize(context);
+              return true;
+            },
+            child: SizeChangedLayoutNotifier(
+                child: Listener(
+              onPointerHover: (ev) {},
+              onPointerDown: (ev) {
+                _controller._cursorClickDown(ev.localPosition);
+              },
+              onPointerUp: (ev) {
+                _controller._cursorClickUp(ev.localPosition);
+              },
+              onPointerMove: (ev) {
+                // _controller._setCursorPos(ev.localPosition);
+              },
+              onPointerSignal: (signal) {
+                if (signal is PointerScrollEvent) {
+                  _controller._setScrollDelta(
+                      signal.localPosition,
+                      signal.scrollDelta.dx.round(),
+                      signal.scrollDelta.dy.round());
+                }
+              },
+              onPointerPanZoomUpdate: (event) {
+                _controller._setScrollDelta(event.localPosition,
+                    event.panDelta.dx.round(), event.panDelta.dy.round());
+              },
+              child: Texture(textureId: _controller._textureId),
+            ))),
+        MaterialButton(
+          onPressed: () {},
+          child: const Text("555"),
+        ),
+      ],
+    );
   }
 
   void _reportSurfaceSize(BuildContext context) async {
@@ -191,7 +230,8 @@ class WebViewState extends State<WebView> {
     final box = _key.currentContext?.findRenderObject() as RenderBox?;
     if (box != null) {
       await _controller.ready;
-      unawaited(_controller._setSize(dpi, Size(box.size.width, box.size.height)));
+      unawaited(
+          _controller._setSize(dpi, Size(box.size.width, box.size.height)));
     }
   }
 }

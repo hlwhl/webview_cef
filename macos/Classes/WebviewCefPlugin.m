@@ -13,6 +13,10 @@
     [registrar addMethodCallDelegate:instance channel:channel];
     
     tr = registrar.textures;
+    
+    FlutterEventChannel *evChannel = [FlutterEventChannel eventChannelWithName:@"webview_cef_events" binaryMessenger:[registrar messenger]];
+    evHandler = [[EventsStreamHandler alloc] init];
+    [evChannel setStreamHandler:evHandler];
 }
 
 - (void)handleMethodCall:(FlutterMethodCall*)call result:(FlutterResult)result {

@@ -201,6 +201,7 @@ void SimpleHandler::cursorClick(int x, int y, bool up)
         ev.x = x;
         ev.y = y;
         (*it)->GetHost()->SendMouseClickEvent(ev, CefBrowserHost::MouseButtonType::MBT_LEFT, up, 1);
+        (*it)->GetHost()->SetFocus(true);
     }
 }
 
@@ -208,7 +209,14 @@ void SimpleHandler::sendKeyEvent(CefKeyEvent ev)
 {
     BrowserList::const_iterator it = browser_list_.begin();
     if (it != browser_list_.end()) {
-        (*it)->GetHost()->SendKeyEvent(ev);
+//        (*it)->GetHost()->SendKeyEvent(ev);
+        std::vector<CefCompositionUnderline> lines;
+        CefCompositionUnderline line;
+        lines.emplace_back(line);
+        CefRange range;
+        range.from = 0;
+        range.to = 1;
+        (*it)->GetHost()->ImeSetComposition("abc", lines, range, range);
     }
 }
 
@@ -272,4 +280,19 @@ void SimpleHandler::OnPaint(CefRefPtr<CefBrowser> browser, CefRenderHandler::Pai
 
 void SimpleHandler::PlatformTitleChange(CefRefPtr<CefBrowser> browser,
                                         const CefString& title) {
+}
+
+void SimpleHandler::OnImeCompositionRangeChanged(
+                                                 CefRefPtr<CefBrowser> browser,
+                                                 const CefRange& selection_range,
+                                                 const CefRenderHandler::RectList& character_bounds) {
+    std::cout << character_bounds.begin()->x << "   "<< character_bounds.begin()->y <<"   " << character_bounds.begin()->width << "    " << character_bounds.begin()->height;
+    
+    imePositionCallback(character_bounds.begin()->x, character_bounds.begin()->y, character_bounds.begin()->width, character_bounds.begin()->height);
+}
+
+void SimpleHandler::OnTextSelectionChanged(CefRefPtr<CefBrowser> browser,
+                                                        const CefString& selected_text,
+                                           const CefRange& selected_range) {
+    std::cout << "777";
 }
