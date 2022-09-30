@@ -78,6 +78,7 @@ public:
     void sendScrollEvent(int x, int y, int deltaX, int deltaY);
     void changeSize(float a_dpi, int width, int height);
     void cursorClick(int x, int y, bool up);
+    void cursorMove(int x, int y);
     void sendKeyEvent(CefKeyEvent ev);
     void loadUrl(std::string url);
     void goForward();

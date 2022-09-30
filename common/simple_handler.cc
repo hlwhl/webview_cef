@@ -204,6 +204,17 @@ void SimpleHandler::cursorClick(int x, int y, bool up)
     }
 }
 
+void SimpleHandler::cursorMove(int x , int y)
+{
+    BrowserList::const_iterator it = browser_list_.begin();
+    if (it != browser_list_.end()) {
+        CefMouseEvent ev;
+        ev.x = x;
+        ev.y = y;
+        (*it)->GetHost()->SendMouseMoveEvent(ev, false);
+    }
+}
+
 void SimpleHandler::sendKeyEvent(CefKeyEvent ev)
 {
     BrowserList::const_iterator it = browser_list_.begin();

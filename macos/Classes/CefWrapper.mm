@@ -196,6 +196,10 @@ int64_t textureId;
     handler.get()->cursorClick(x, y, false);
 }
 
++ (void)cursorMove:(int)x y:(int)y {
+    handler.get()->cursorMove(x, y);
+}
+
 + (void)sizeChanged:(float)dpi width:(int)width height:(int)height {
     handler.get()->changeSize(dpi, width, height);
 }

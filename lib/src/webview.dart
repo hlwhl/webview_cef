@@ -79,13 +79,13 @@ class WebViewController extends ValueNotifier<bool> {
   }
 
   /// Moves the virtual cursor to [position].
-  Future<void> _setCursorPos(Offset position) async {
+  Future<void> _cursorMove(Offset position) async {
     if (_isDisposed) {
       return;
     }
     assert(value);
     return _pluginChannel
-        .invokeMethod('setCursorPos', [position.dx, position.dy]);
+        .invokeMethod('cursorMove', [position.dx, position.dy]);
   }
 
   Future<void> _cursorClickDown(Offset position) async {
@@ -162,15 +162,21 @@ class WebViewState extends State<WebView> {
         },
         child: SizeChangedLayoutNotifier(
             child: Listener(
-          onPointerHover: (ev) {},
+          onPointerHover: (ev) {
+            print("move1");
+            _controller._cursorMove(ev.localPosition);
+          },
           onPointerDown: (ev) {
+            print("down");
             _controller._cursorClickDown(ev.localPosition);
           },
           onPointerUp: (ev) {
+            print("up");
             _controller._cursorClickUp(ev.localPosition);
           },
           onPointerMove: (ev) {
-            // _controller._setCursorPos(ev.localPosition);
+            print("move2");
+            _controller._cursorMove(ev.localPosition);
           },
           onPointerSignal: (signal) {
             if (signal is PointerScrollEvent) {
@@ -191,7 +197,8 @@ class WebViewState extends State<WebView> {
     final box = _key.currentContext?.findRenderObject() as RenderBox?;
     if (box != null) {
       await _controller.ready;
-      unawaited(_controller._setSize(dpi, Size(box.size.width, box.size.height)));
+      unawaited(
+          _controller._setSize(dpi, Size(box.size.width, box.size.height)));
     }
   }
 }

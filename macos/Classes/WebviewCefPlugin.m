@@ -56,6 +56,13 @@
         [CefWrapper cursorClickDown:[x intValue] y:[y intValue]];
         result(nil);
     }
+    else if([@"cursorMove" isEqualToString:call.method]){
+        NSArray<NSNumber *> *_arg = call.arguments;
+        NSNumber *x = [_arg objectAtIndex:0];
+        NSNumber *y = [_arg objectAtIndex:1];
+        [CefWrapper cursorMove:[x intValue] y:[y intValue]];
+        result(nil);
+    }
     else if([@"setSize" isEqualToString:call.method]){
         NSArray<NSNumber *> *_arg = call.arguments;
         NSNumber *dpi = [_arg objectAtIndex:0];
