@@ -88,6 +88,15 @@ class WebViewController extends ValueNotifier<bool> {
         .invokeMethod('cursorMove', [position.dx, position.dy]);
   }
 
+    Future<void> _cursorDragging(Offset position) async {
+    if (_isDisposed) {
+      return;
+    }
+    assert(value);
+    return _pluginChannel
+        .invokeMethod('cursorDragging', [position.dx, position.dy]);
+  }
+
   Future<void> _cursorClickDown(Offset position) async {
     if (_isDisposed) {
       return;
@@ -163,20 +172,16 @@ class WebViewState extends State<WebView> {
         child: SizeChangedLayoutNotifier(
             child: Listener(
           onPointerHover: (ev) {
-            print("move1");
             _controller._cursorMove(ev.localPosition);
           },
           onPointerDown: (ev) {
-            print("down");
             _controller._cursorClickDown(ev.localPosition);
           },
           onPointerUp: (ev) {
-            print("up");
             _controller._cursorClickUp(ev.localPosition);
           },
           onPointerMove: (ev) {
-            print("move2");
-            _controller._cursorMove(ev.localPosition);
+            _controller._cursorDragging(ev.localPosition);
           },
           onPointerSignal: (signal) {
             if (signal is PointerScrollEvent) {

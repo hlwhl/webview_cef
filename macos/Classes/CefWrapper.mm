@@ -196,8 +196,8 @@ int64_t textureId;
     handler.get()->cursorClick(x, y, false);
 }
 
-+ (void)cursorMove:(int)x y:(int)y {
-    handler.get()->cursorMove(x, y);
++ (void)cursorMove:(int)x y:(int)y dragging:(bool)dragging {
+    handler.get()->cursorMove(x, y, dragging);
 }
 
 + (void)sizeChanged:(float)dpi width:(int)width height:(int)height {

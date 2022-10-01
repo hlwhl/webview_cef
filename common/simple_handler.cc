@@ -105,17 +105,17 @@ void SimpleHandler::OnBeforeClose(CefRefPtr<CefBrowser> browser) {
 }
 
 bool SimpleHandler::OnBeforePopup(CefRefPtr<CefBrowser> browser,
-    CefRefPtr<CefFrame> frame,
-    const CefString& target_url,
-    const CefString& target_frame_name,
-    WindowOpenDisposition target_disposition,
-    bool user_gesture,
-    const CefPopupFeatures& popupFeatures,
-    CefWindowInfo& windowInfo,
-    CefRefPtr<CefClient>& client,
-    CefBrowserSettings& settings,
-    CefRefPtr<CefDictionaryValue>& extra_info,
-    bool* no_javascript_access) {
+                                  CefRefPtr<CefFrame> frame,
+                                  const CefString& target_url,
+                                  const CefString& target_frame_name,
+                                  WindowOpenDisposition target_disposition,
+                                  bool user_gesture,
+                                  const CefPopupFeatures& popupFeatures,
+                                  CefWindowInfo& windowInfo,
+                                  CefRefPtr<CefClient>& client,
+                                  CefBrowserSettings& settings,
+                                  CefRefPtr<CefDictionaryValue>& extra_info,
+                                  bool* no_javascript_access) {
     loadUrl(target_url);
     return true;
 }
@@ -204,13 +204,16 @@ void SimpleHandler::cursorClick(int x, int y, bool up)
     }
 }
 
-void SimpleHandler::cursorMove(int x , int y)
+void SimpleHandler::cursorMove(int x , int y, bool dragging)
 {
     BrowserList::const_iterator it = browser_list_.begin();
     if (it != browser_list_.end()) {
         CefMouseEvent ev;
         ev.x = x;
         ev.y = y;
+        if(dragging) {
+            ev.modifiers = EVENTFLAG_LEFT_MOUSE_BUTTON;
+        }
         (*it)->GetHost()->SendMouseMoveEvent(ev, false);
     }
 }

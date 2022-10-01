@@ -60,7 +60,14 @@
         NSArray<NSNumber *> *_arg = call.arguments;
         NSNumber *x = [_arg objectAtIndex:0];
         NSNumber *y = [_arg objectAtIndex:1];
-        [CefWrapper cursorMove:[x intValue] y:[y intValue]];
+        [CefWrapper cursorMove:[x intValue] y:[y intValue] dragging: false];
+        result(nil);
+    }
+    else if([@"cursorDragging" isEqualToString:call.method]){
+        NSArray<NSNumber *> *_arg = call.arguments;
+        NSNumber *x = [_arg objectAtIndex:0];
+        NSNumber *y = [_arg objectAtIndex:1];
+        [CefWrapper cursorMove:[x intValue] y:[y intValue] dragging: true];
         result(nil);
     }
     else if([@"setSize" isEqualToString:call.method]){
