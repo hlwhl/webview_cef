@@ -200,7 +200,14 @@ void SimpleHandler::cursorClick(int x, int y, bool up)
         CefMouseEvent ev;
         ev.x = x;
         ev.y = y;
-        (*it)->GetHost()->SendMouseClickEvent(ev, CefBrowserHost::MouseButtonType::MBT_LEFT, up, 1);
+        ev.modifiers = EVENTFLAG_LEFT_MOUSE_BUTTON;
+        if(up && is_dragging) {
+            (*it)->GetHost()->DragTargetDrop(ev);
+            (*it)->GetHost()->DragSourceSystemDragEnded();
+            is_dragging = false;
+        } else {
+            (*it)->GetHost()->SendMouseClickEvent(ev, CefBrowserHost::MouseButtonType::MBT_LEFT, up, 1);
+        }
     }
 }
 
@@ -214,8 +221,29 @@ void SimpleHandler::cursorMove(int x , int y, bool dragging)
         if(dragging) {
             ev.modifiers = EVENTFLAG_LEFT_MOUSE_BUTTON;
         }
-        (*it)->GetHost()->SendMouseMoveEvent(ev, false);
+        if(is_dragging && dragging) {
+            (*it)->GetHost()->DragTargetDragOver(ev, DRAG_OPERATION_EVERY);
+        } else {
+            (*it)->GetHost()->SendMouseMoveEvent(ev, false);
+        }
     }
+}
+
+bool SimpleHandler::StartDragging(CefRefPtr<CefBrowser> browser,
+                                  CefRefPtr<CefDragData> drag_data,
+                                  DragOperationsMask allowed_ops,
+                                  int x,
+                                  int y){
+    BrowserList::const_iterator it = browser_list_.begin();
+    if (it != browser_list_.end()) {
+        CefMouseEvent ev;
+        ev.x = x;
+        ev.y = y;
+        ev.modifiers = EVENTFLAG_LEFT_MOUSE_BUTTON;
+        (*it)->GetHost()->DragTargetDragEnter(drag_data, ev, DRAG_OPERATION_EVERY);
+        is_dragging = true;
+    }
+    return true;
 }
 
 void SimpleHandler::sendKeyEvent(CefKeyEvent ev)

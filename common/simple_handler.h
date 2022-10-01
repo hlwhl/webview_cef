@@ -32,7 +32,7 @@ public:
         return this;
     }
     virtual CefRefPtr<CefLoadHandler> GetLoadHandler() override { return this; }
-    virtual CefRefPtr<CefRenderHandler> GetRenderHandler() override { return this; } 
+    virtual CefRefPtr<CefRenderHandler> GetRenderHandler() override { return this; }
     
     // CefDisplayHandler methods:
     virtual void OnTitleChange(CefRefPtr<CefBrowser> browser,
@@ -43,17 +43,17 @@ public:
     virtual bool DoClose(CefRefPtr<CefBrowser> browser) override;
     virtual void OnBeforeClose(CefRefPtr<CefBrowser> browser) override;
     virtual bool OnBeforePopup(CefRefPtr<CefBrowser> browser,
-        CefRefPtr<CefFrame> frame,
-        const CefString& target_url,
-        const CefString& target_frame_name,
-        WindowOpenDisposition target_disposition,
-        bool user_gesture,
-        const CefPopupFeatures& popupFeatures,
-        CefWindowInfo& windowInfo,
-        CefRefPtr<CefClient>& client,
-        CefBrowserSettings& settings,
-        CefRefPtr<CefDictionaryValue>& extra_info,
-        bool* no_javascript_access) override;
+                               CefRefPtr<CefFrame> frame,
+                               const CefString& target_url,
+                               const CefString& target_frame_name,
+                               WindowOpenDisposition target_disposition,
+                               bool user_gesture,
+                               const CefPopupFeatures& popupFeatures,
+                               CefWindowInfo& windowInfo,
+                               CefRefPtr<CefClient>& client,
+                               CefBrowserSettings& settings,
+                               CefRefPtr<CefDictionaryValue>& extra_info,
+                               bool* no_javascript_access) override;
     
     // CefLoadHandler methods:
     virtual void OnLoadError(CefRefPtr<CefBrowser> browser,
@@ -66,6 +66,11 @@ public:
     virtual void GetViewRect(CefRefPtr<CefBrowser> browser, CefRect& rect) override;
     virtual void OnPaint(CefRefPtr<CefBrowser> browser, PaintElementType type, const RectList& dirtyRects, const void* buffer, int width, int height) override;
     virtual bool GetScreenInfo(CefRefPtr<CefBrowser> browser, CefScreenInfo& screen_info) override;
+    virtual bool StartDragging(CefRefPtr<CefBrowser> browser,
+                               CefRefPtr<CefDragData> drag_data,
+                               DragOperationsMask allowed_ops,
+                               int x,
+                               int y) override;
     
     // Request that all existing browser windows close.
     void CloseAllBrowsers(bool force_close);
@@ -89,6 +94,7 @@ private:
     uint32_t width = 1;
     uint32_t height = 1;
     float dpi = 1.0;
+    bool is_dragging = false;
     
     // Platform-specific implementation.
     void PlatformTitleChange(CefRefPtr<CefBrowser> browser,
