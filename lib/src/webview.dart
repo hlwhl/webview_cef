@@ -85,7 +85,7 @@ class WebViewController extends ValueNotifier<bool> {
     }
     assert(value);
     return _pluginChannel
-        .invokeMethod('cursorMove', [position.dx, position.dy]);
+        .invokeMethod('cursorMove', [position.dx.round(), position.dy.round()]);
   }
 
     Future<void> _cursorDragging(Offset position) async {
@@ -94,7 +94,7 @@ class WebViewController extends ValueNotifier<bool> {
     }
     assert(value);
     return _pluginChannel
-        .invokeMethod('cursorDragging', [position.dx, position.dy]);
+        .invokeMethod('cursorDragging', [position.dx.round(), position.dy.round()]);
   }
 
   Future<void> _cursorClickDown(Offset position) async {

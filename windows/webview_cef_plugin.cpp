@@ -195,6 +195,16 @@ namespace webview_cef {
 			handler.get()->cursorClick(point->first, point->second, true);
 			result->Success();
 		}
+		else if (method_call.method_name().compare("cursorMove") == 0) {
+			const auto point = GetPointFromArgs(method_call.arguments());
+			handler.get()->cursorMove(point->first, point->second, false);
+			result->Success();
+		}
+		else if (method_call.method_name().compare("cursorDragging") == 0) {
+			const auto point = GetPointFromArgs(method_call.arguments());
+			handler.get()->cursorMove(point->first, point->second, true);
+			result->Success();
+		}
 		else if (method_call.method_name().compare("setScrollDelta") == 0) {
 			const flutter::EncodableList* list =
 				std::get_if<flutter::EncodableList>(method_call.arguments());
