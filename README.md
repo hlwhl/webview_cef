@@ -29,7 +29,7 @@ When first time building the project, a prebuilt cef bin package (200MB, link in
 
 Notice: currently the project haven't enable multi process mode because of debug convenience. You may want enable multi process mode by changing the implementation and built your own helper bundle. (Finding a more elegant way in the future)
 
-# todos (welcome for PR!)
+# todos (PR welcome!)
 - [x] macos support
 - [ ] Linux support
 - [ ] multi instance support
