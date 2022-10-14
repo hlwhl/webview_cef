@@ -15,7 +15,7 @@
 #include<iostream>
 #include <mutex>
 
-#include "simple_app.h"
+#include "webview_app.h"
 
 namespace webview_cef {
 	bool init = false;
@@ -35,8 +35,8 @@ namespace webview_cef {
 		}
 		return buffer;
 		}));
-	CefRefPtr<SimpleHandler> handler(new SimpleHandler(false));
-	CefRefPtr<SimpleApp> app(new SimpleApp(handler));
+	CefRefPtr<WebviewHandler> handler(new WebviewHandler());
+	CefRefPtr<WebviewApp> app(new WebviewApp(handler));
 	CefMainArgs mainArgs;
 
 
