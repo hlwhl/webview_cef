@@ -90,6 +90,10 @@
         [CefWrapper reload];
         result(nil);
     }
+    else if([@"openDevTools" isEqualToString:call.method]){
+        [CefWrapper openDevTools];
+        result(nil);
+    }
     else {
         result(FlutterMethodNotImplemented);
     }

@@ -37,6 +37,8 @@ extern int64_t textureId;
 
 + (void) reload;
 
++ (void) openDevTools;
+
 @end
 
 #endif /* CefWrapper_h */

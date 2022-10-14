@@ -220,6 +220,10 @@ int64_t textureId;
     handler.get()->reload();
 }
 
++ (void)openDevTools {
+    handler.get()->openDevTools();
+}
+
 - (CVPixelBufferRef _Nullable)copyPixelBuffer {
     dispatch_semaphore_wait(lock, DISPATCH_TIME_FOREVER);
     buf_temp = buf_cache;
