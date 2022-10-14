@@ -2,7 +2,7 @@
 // reserved. Use of this source code is governed by a BSD-style license that
 // can be found in the LICENSE file.
 
-#include "simple_app.h"
+#include "webview_app.h"
 
 #include <string>
 
@@ -76,11 +76,11 @@ private:
 
 }  // namespace
 
-SimpleApp::SimpleApp(CefRefPtr<SimpleHandler> handler) {
+WebviewApp::WebviewApp(CefRefPtr<WebviewHandler> handler) {
     m_handler = handler;
 }
 
-void SimpleApp::OnContextInitialized() {
+void WebviewApp::OnContextInitialized() {
     CEF_REQUIRE_UI_THREAD();
     
     // Specify CEF browser settings here.
@@ -97,7 +97,7 @@ void SimpleApp::OnContextInitialized() {
                                   nullptr, nullptr);
 }
 
-CefRefPtr<CefClient> SimpleApp::GetDefaultClient() {
+CefRefPtr<CefClient> WebviewApp::GetDefaultClient() {
     // Called when a new browser window is created via the Chrome runtime UI.
-    return SimpleHandler::GetInstance();
+    return WebviewHandler::GetInstance();
 }

@@ -10,7 +10,7 @@
 #include <functional>
 #include <list>
 
-class SimpleHandler : public CefClient,
+class WebviewHandler : public CefClient,
 public CefDisplayHandler,
 public CefLifeSpanHandler,
 public CefLoadHandler,
@@ -18,11 +18,11 @@ public CefRenderHandler{
 public:
     std::function<void(const void*, int32_t width, int32_t height)> onPaintCallback;
     
-    explicit SimpleHandler(bool use_views);
-    ~SimpleHandler();
+    explicit WebviewHandler(bool use_views);
+    ~WebviewHandler();
     
     // Provide access to the single global instance of this object.
-    static SimpleHandler* GetInstance();
+    static WebviewHandler* GetInstance();
     
     // CefClient methods:
     virtual CefRefPtr<CefDisplayHandler> GetDisplayHandler() override {
@@ -110,7 +110,7 @@ private:
     bool is_closing_;
     
     // Include the default reference counting implementation.
-    IMPLEMENT_REFCOUNTING(SimpleHandler);
+    IMPLEMENT_REFCOUNTING(WebviewHandler);
 };
 
 #endif  // CEF_TESTS_CEFSIMPLE_SIMPLE_HANDLER_H_
