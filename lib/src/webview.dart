@@ -78,6 +78,14 @@ class WebViewController extends ValueNotifier<bool> {
     return _pluginChannel.invokeMethod('goBack');
   }
 
+  Future<void> openDevTools() async {
+    if (_isDisposed) {
+      return;
+    }
+    assert(value);
+    return _pluginChannel.invokeMethod('openDevTools');
+  }
+
   /// Moves the virtual cursor to [position].
   Future<void> _cursorMove(Offset position) async {
     if (_isDisposed) {
@@ -88,13 +96,13 @@ class WebViewController extends ValueNotifier<bool> {
         .invokeMethod('cursorMove', [position.dx.round(), position.dy.round()]);
   }
 
-    Future<void> _cursorDragging(Offset position) async {
+  Future<void> _cursorDragging(Offset position) async {
     if (_isDisposed) {
       return;
     }
     assert(value);
-    return _pluginChannel
-        .invokeMethod('cursorDragging', [position.dx.round(), position.dy.round()]);
+    return _pluginChannel.invokeMethod(
+        'cursorDragging', [position.dx.round(), position.dy.round()]);
   }
 
   Future<void> _cursorClickDown(Offset position) async {

@@ -227,6 +227,10 @@ namespace webview_cef {
 			handler.get()->reload();
 			result->Success();
 		}
+		else if (method_call.method_name().compare("openDevTools") == 0) {
+			handler.get()->openDevTools();
+			result->Success();
+		}
 		else {
 			result->NotImplemented();
 		}

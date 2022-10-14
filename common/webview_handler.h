@@ -87,6 +87,7 @@ public:
     void goForward();
     void goBack();
     void reload();
+    void openDevTools();
     
 private:
     uint32_t width = 1;

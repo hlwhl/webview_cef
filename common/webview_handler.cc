@@ -259,6 +259,15 @@ void WebviewHandler::reload() {
     }
 }
 
+void WebviewHandler::openDevTools() {
+    BrowserList::const_iterator it = browser_list_.begin();
+    if (it != browser_list_.end()) {
+        CefWindowInfo windowInfo;
+        windowInfo.SetAsPopup(nullptr, "DevTools");
+        (*it)->GetHost()->ShowDevTools(windowInfo, this, CefBrowserSettings(), CefPoint());
+    }
+}
+
 void WebviewHandler::GetViewRect(CefRefPtr<CefBrowser> browser, CefRect &rect) {
     CEF_REQUIRE_UI_THREAD();
     

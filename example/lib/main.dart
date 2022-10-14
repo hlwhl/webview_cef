@@ -73,6 +73,15 @@ class _MyAppState extends State<MyApp> {
                   child: const Icon(Icons.arrow_right),
                 ),
               ),
+              SizedBox(
+                height: 48,
+                child: MaterialButton(
+                  onPressed: () {
+                    _controller.openDevTools();
+                  },
+                  child: const Icon(Icons.developer_mode),
+                ),
+              ),
               Expanded(
                 child: TextField(
                   controller: _textController,
