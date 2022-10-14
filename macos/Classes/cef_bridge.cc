@@ -2,7 +2,7 @@
 #ifndef CefBridge_h
 #define CefBridge_h
 
-#include "../../common/simple_app.cc"
-#include "../../common/simple_handler.cc"
+#include "../../common/webview_app.cc"
+#include "../../common/webview_handler.cc"
 
 #endif

@@ -2,7 +2,7 @@
 // reserved. Use of this source code is governed by a BSD-style license that
 // can be found in the LICENSE file.
 
-#include "simple_handler.h"
+#include "webview_handler.h"
 
 #include <sstream>
 #include <string>
@@ -18,7 +18,7 @@
 
 namespace {
 
-SimpleHandler* g_instance = nullptr;
+WebviewHandler* g_instance = nullptr;
 
 // Returns a data: URI with the specified contents.
 std::string GetDataURI(const std::string& data, const std::string& mime_type) {
@@ -29,64 +29,40 @@ std::string GetDataURI(const std::string& data, const std::string& mime_type) {
 
 }  // namespace
 
-SimpleHandler::SimpleHandler(bool use_views)
-: use_views_(use_views), is_closing_(false) {
+WebviewHandler::WebviewHandler() {
     DCHECK(!g_instance);
     g_instance = this;
 }
 
-SimpleHandler::~SimpleHandler() {
+WebviewHandler::~WebviewHandler() {
     g_instance = nullptr;
 }
 
 // static
-SimpleHandler* SimpleHandler::GetInstance() {
+WebviewHandler* WebviewHandler::GetInstance() {
     return g_instance;
 }
 
-void SimpleHandler::OnTitleChange(CefRefPtr<CefBrowser> browser,
+void WebviewHandler::OnTitleChange(CefRefPtr<CefBrowser> browser,
                                   const CefString& title) {
-    CEF_REQUIRE_UI_THREAD();
-    
-    if (use_views_) {
-        // Set the title of the window using the Views framework.
-        CefRefPtr<CefBrowserView> browser_view =
-        CefBrowserView::GetForBrowser(browser);
-        if (browser_view) {
-            CefRefPtr<CefWindow> window = browser_view->GetWindow();
-            if (window)
-                window->SetTitle(title);
-        }
-    } else if (!IsChromeRuntimeEnabled()) {
-        // Set the title of the window using platform APIs.
-        PlatformTitleChange(browser, title);
-    }
+    //todo: title change
 }
 
-void SimpleHandler::OnAfterCreated(CefRefPtr<CefBrowser> browser) {
+void WebviewHandler::OnAfterCreated(CefRefPtr<CefBrowser> browser) {
     CEF_REQUIRE_UI_THREAD();
     
     // Add to the list of existing browsers.
     browser_list_.push_back(browser);
 }
 
-bool SimpleHandler::DoClose(CefRefPtr<CefBrowser> browser) {
-    CEF_REQUIRE_UI_THREAD();
-    
-    // Closing the main window requires special handling. See the DoClose()
-    // documentation in the CEF header for a detailed destription of this
-    // process.
-    if (browser_list_.size() == 1) {
-        // Set a flag to indicate that the window close should be allowed.
-        is_closing_ = true;
-    }
-    
+bool WebviewHandler::DoClose(CefRefPtr<CefBrowser> browser) {
+    CEF_REQUIRE_UI_THREAD();    
     // Allow the close. For windowed browsers this will result in the OS close
     // event being sent.
     return false;
 }
 
-void SimpleHandler::OnBeforeClose(CefRefPtr<CefBrowser> browser) {
+void WebviewHandler::OnBeforeClose(CefRefPtr<CefBrowser> browser) {
     CEF_REQUIRE_UI_THREAD();
     
     // Remove from the list of existing browsers.
@@ -104,7 +80,7 @@ void SimpleHandler::OnBeforeClose(CefRefPtr<CefBrowser> browser) {
     }
 }
 
-bool SimpleHandler::OnBeforePopup(CefRefPtr<CefBrowser> browser,
+bool WebviewHandler::OnBeforePopup(CefRefPtr<CefBrowser> browser,
                                   CefRefPtr<CefFrame> frame,
                                   const CefString& target_url,
                                   const CefString& target_frame_name,
@@ -120,7 +96,7 @@ bool SimpleHandler::OnBeforePopup(CefRefPtr<CefBrowser> browser,
     return true;
 }
 
-void SimpleHandler::OnLoadError(CefRefPtr<CefBrowser> browser,
+void WebviewHandler::OnLoadError(CefRefPtr<CefBrowser> browser,
                                 CefRefPtr<CefFrame> frame,
                                 ErrorCode errorCode,
                                 const CefString& errorText,
@@ -145,7 +121,7 @@ void SimpleHandler::OnLoadError(CefRefPtr<CefBrowser> browser,
     frame->LoadURL(GetDataURI(ss.str(), "text/html"));
 }
 
-void SimpleHandler::CloseAllBrowsers(bool force_close) {
+void WebviewHandler::CloseAllBrowsers(bool force_close) {
     if (!CefCurrentlyOn(TID_UI)) {
         // Execute on the UI thread.
         //    CefPostTask(TID_UI, base::BindOnce(&SimpleHandler::CloseAllBrowsers, this,
@@ -162,7 +138,7 @@ void SimpleHandler::CloseAllBrowsers(bool force_close) {
 }
 
 // static
-bool SimpleHandler::IsChromeRuntimeEnabled() {
+bool WebviewHandler::IsChromeRuntimeEnabled() {
     static int value = -1;
     if (value == -1) {
         CefRefPtr<CefCommandLine> command_line =
@@ -172,7 +148,7 @@ bool SimpleHandler::IsChromeRuntimeEnabled() {
     return value == 1;
 }
 
-void SimpleHandler::sendScrollEvent(int x, int y, int deltaX, int deltaY) {
+void WebviewHandler::sendScrollEvent(int x, int y, int deltaX, int deltaY) {
     BrowserList::const_iterator it = browser_list_.begin();
     if (it != browser_list_.end()) {
         CefMouseEvent ev;
@@ -182,7 +158,7 @@ void SimpleHandler::sendScrollEvent(int x, int y, int deltaX, int deltaY) {
     }
 }
 
-void SimpleHandler::changeSize(float a_dpi, int w, int h)
+void WebviewHandler::changeSize(float a_dpi, int w, int h)
 {
     this->dpi = a_dpi;
     this->width = w;
@@ -193,7 +169,7 @@ void SimpleHandler::changeSize(float a_dpi, int w, int h)
     }
 }
 
-void SimpleHandler::cursorClick(int x, int y, bool up)
+void WebviewHandler::cursorClick(int x, int y, bool up)
 {
     BrowserList::const_iterator it = browser_list_.begin();
     if (it != browser_list_.end()) {
@@ -211,7 +187,7 @@ void SimpleHandler::cursorClick(int x, int y, bool up)
     }
 }
 
-void SimpleHandler::cursorMove(int x , int y, bool dragging)
+void WebviewHandler::cursorMove(int x , int y, bool dragging)
 {
     BrowserList::const_iterator it = browser_list_.begin();
     if (it != browser_list_.end()) {
@@ -229,7 +205,7 @@ void SimpleHandler::cursorMove(int x , int y, bool dragging)
     }
 }
 
-bool SimpleHandler::StartDragging(CefRefPtr<CefBrowser> browser,
+bool WebviewHandler::StartDragging(CefRefPtr<CefBrowser> browser,
                                   CefRefPtr<CefDragData> drag_data,
                                   DragOperationsMask allowed_ops,
                                   int x,
@@ -246,7 +222,7 @@ bool SimpleHandler::StartDragging(CefRefPtr<CefBrowser> browser,
     return true;
 }
 
-void SimpleHandler::sendKeyEvent(CefKeyEvent ev)
+void WebviewHandler::sendKeyEvent(CefKeyEvent ev)
 {
     BrowserList::const_iterator it = browser_list_.begin();
     if (it != browser_list_.end()) {
@@ -254,7 +230,7 @@ void SimpleHandler::sendKeyEvent(CefKeyEvent ev)
     }
 }
 
-void SimpleHandler::loadUrl(std::string url)
+void WebviewHandler::loadUrl(std::string url)
 {
     BrowserList::const_iterator it = browser_list_.begin();
     if (it != browser_list_.end()) {
@@ -262,28 +238,28 @@ void SimpleHandler::loadUrl(std::string url)
     }
 }
 
-void SimpleHandler::goForward() {
+void WebviewHandler::goForward() {
     BrowserList::const_iterator it = browser_list_.begin();
     if (it != browser_list_.end()) {
         (*it)->GetMainFrame()->GetBrowser()->GoForward();
     }
 }
 
-void SimpleHandler::goBack() {
+void WebviewHandler::goBack() {
     BrowserList::const_iterator it = browser_list_.begin();
     if (it != browser_list_.end()) {
         (*it)->GetMainFrame()->GetBrowser()->GoBack();
     }
 }
 
-void SimpleHandler::reload() {
+void WebviewHandler::reload() {
     BrowserList::const_iterator it = browser_list_.begin();
     if (it != browser_list_.end()) {
         (*it)->GetMainFrame()->GetBrowser()->Reload();
     }
 }
 
-void SimpleHandler::GetViewRect(CefRefPtr<CefBrowser> browser, CefRect &rect) {
+void WebviewHandler::GetViewRect(CefRefPtr<CefBrowser> browser, CefRect &rect) {
     CEF_REQUIRE_UI_THREAD();
     
     rect.x = rect.y = 0;
@@ -301,17 +277,13 @@ void SimpleHandler::GetViewRect(CefRefPtr<CefBrowser> browser, CefRect &rect) {
     }
 }
 
-bool SimpleHandler::GetScreenInfo(CefRefPtr<CefBrowser> browser, CefScreenInfo& screen_info) {
+bool WebviewHandler::GetScreenInfo(CefRefPtr<CefBrowser> browser, CefScreenInfo& screen_info) {
     //todo: hi dpi support
     screen_info.device_scale_factor  = this->dpi;
     return false;
 }
 
-void SimpleHandler::OnPaint(CefRefPtr<CefBrowser> browser, CefRenderHandler::PaintElementType type,
+void WebviewHandler::OnPaint(CefRefPtr<CefBrowser> browser, CefRenderHandler::PaintElementType type,
                             const CefRenderHandler::RectList &dirtyRects, const void *buffer, int w, int h) {
     onPaintCallback(buffer, w, h);
-}
-
-void SimpleHandler::PlatformTitleChange(CefRefPtr<CefBrowser> browser,
-                                        const CefString& title) {
 }

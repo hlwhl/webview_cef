@@ -9,13 +9,13 @@
 #import <Foundation/Foundation.h>
 #import "include/wrapper/cef_library_loader.h"
 #import "include/cef_app.h"
-#import "../../common/simple_app.h"
-#import "../../common/simple_handler.h"
+#import "../../common/webview_app.h"
+#import "../../common/webview_handler.h"
 
 #include <thread>
 
-CefRefPtr<SimpleHandler> handler(new SimpleHandler(true));
-CefRefPtr<SimpleApp> app(new SimpleApp(handler));
+CefRefPtr<WebviewHandler> handler(new WebviewHandler());
+CefRefPtr<WebviewApp> app(new WebviewApp(handler));
 CefMainArgs mainArgs;
 
 NSObject<FlutterTextureRegistry>* tr;
