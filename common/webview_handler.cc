@@ -263,7 +263,7 @@ void WebviewHandler::openDevTools() {
     BrowserList::const_iterator it = browser_list_.begin();
     if (it != browser_list_.end()) {
         CefWindowInfo windowInfo;
-#ifdef __WIN32__
+#ifdef _WIN32
         windowInfo.SetAsPopup(nullptr, "DevTools");
 #endif
         (*it)->GetHost()->ShowDevTools(windowInfo, this, CefBrowserSettings(), CefPoint());
