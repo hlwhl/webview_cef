@@ -52,6 +52,7 @@ Notice: currently the project haven't enable multi process mode because of debug
 ### macOS
 ![image](https://user-images.githubusercontent.com/7610615/190911381-db88cf33-70a2-4abc-9916-e563e54eb3f9.png)
 ![image](https://user-images.githubusercontent.com/7610615/190911410-bd01e912-5482-4f9e-9dae-858874e5aaed.png)
+<img width="1397" alt="image" src="https://user-images.githubusercontent.com/7610615/195818746-e5adf0ef-dc8c-48ad-9b11-e552ca65b08a.png">
 
 # thanks
 This project inspired by https://github.com/jnschulze/flutter-webview-windows
