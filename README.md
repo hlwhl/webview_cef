@@ -40,6 +40,7 @@ Notice: currently the project haven't enable multi process mode because of debug
 - [x] trackpad support (flutter 3.3)
 - [ ] better macos binary distribution
 - [ ] easier way to integrate macos helper bundles(multi process)
+- [x] devTools support
 
 # demo
 ### Windows
