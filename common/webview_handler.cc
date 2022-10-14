@@ -29,8 +29,7 @@ std::string GetDataURI(const std::string& data, const std::string& mime_type) {
 
 }  // namespace
 
-WebviewHandler::WebviewHandler(bool use_views)
-: use_views_(use_views), is_closing_(false) {
+WebviewHandler::WebviewHandler() {
     DCHECK(!g_instance);
     g_instance = this;
 }
@@ -46,21 +45,7 @@ WebviewHandler* WebviewHandler::GetInstance() {
 
 void WebviewHandler::OnTitleChange(CefRefPtr<CefBrowser> browser,
                                   const CefString& title) {
-    CEF_REQUIRE_UI_THREAD();
-    
-    if (use_views_) {
-        // Set the title of the window using the Views framework.
-        CefRefPtr<CefBrowserView> browser_view =
-        CefBrowserView::GetForBrowser(browser);
-        if (browser_view) {
-            CefRefPtr<CefWindow> window = browser_view->GetWindow();
-            if (window)
-                window->SetTitle(title);
-        }
-    } else if (!IsChromeRuntimeEnabled()) {
-        // Set the title of the window using platform APIs.
-        PlatformTitleChange(browser, title);
-    }
+    //todo: title change
 }
 
 void WebviewHandler::OnAfterCreated(CefRefPtr<CefBrowser> browser) {
@@ -71,16 +56,7 @@ void WebviewHandler::OnAfterCreated(CefRefPtr<CefBrowser> browser) {
 }
 
 bool WebviewHandler::DoClose(CefRefPtr<CefBrowser> browser) {
-    CEF_REQUIRE_UI_THREAD();
-    
-    // Closing the main window requires special handling. See the DoClose()
-    // documentation in the CEF header for a detailed destription of this
-    // process.
-    if (browser_list_.size() == 1) {
-        // Set a flag to indicate that the window close should be allowed.
-        is_closing_ = true;
-    }
-    
+    CEF_REQUIRE_UI_THREAD();    
     // Allow the close. For windowed browsers this will result in the OS close
     // event being sent.
     return false;
@@ -310,8 +286,4 @@ bool WebviewHandler::GetScreenInfo(CefRefPtr<CefBrowser> browser, CefScreenInfo&
 void WebviewHandler::OnPaint(CefRefPtr<CefBrowser> browser, CefRenderHandler::PaintElementType type,
                             const CefRenderHandler::RectList &dirtyRects, const void *buffer, int w, int h) {
     onPaintCallback(buffer, w, h);
-}
-
-void WebviewHandler::PlatformTitleChange(CefRefPtr<CefBrowser> browser,
-                                        const CefString& title) {
 }

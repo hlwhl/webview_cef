@@ -14,7 +14,7 @@
 
 #include <thread>
 
-CefRefPtr<WebviewHandler> handler(new WebviewHandler(true));
+CefRefPtr<WebviewHandler> handler(new WebviewHandler());
 CefRefPtr<WebviewApp> app(new WebviewApp(handler));
 CefMainArgs mainArgs;
 
