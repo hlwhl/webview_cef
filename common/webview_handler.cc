@@ -154,7 +154,12 @@ void WebviewHandler::sendScrollEvent(int x, int y, int deltaX, int deltaY) {
         CefMouseEvent ev;
         ev.x = x;
         ev.y = y;
-        (*it)->GetHost()->SendMouseWheelEvent(ev, deltaX, deltaY);
+
+#ifndef __APPLE__
+        // The scrolling direction on Windows and Linux is different from MacOS
+        deltaY = -deltaY;
+#endif
+    (*it)->GetHost()->SendMouseWheelEvent(ev, deltaX, deltaY);
     }
 }
 
