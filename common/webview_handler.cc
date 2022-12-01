@@ -159,7 +159,9 @@ void WebviewHandler::sendScrollEvent(int x, int y, int deltaX, int deltaY) {
         // The scrolling direction on Windows and Linux is different from MacOS
         deltaY = -deltaY;
 #endif
-    (*it)->GetHost()->SendMouseWheelEvent(ev, deltaX, deltaY);
+
+        // Flutter scrolls too slowly, it looks more normal by 10x default speed.
+        (*it)->GetHost()->SendMouseWheelEvent(ev, deltaX * 10, deltaY * 10);
     }
 }
 
