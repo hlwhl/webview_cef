@@ -39,6 +39,8 @@ extern int64_t textureId;
 
 + (void) openDevTools;
 
++ (void) setMethodChannel: (FlutterMethodChannel*)channel;
+
 @end
 
 #endif /* CefWrapper_h */

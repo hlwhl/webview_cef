@@ -17,6 +17,8 @@ public CefLoadHandler,
 public CefRenderHandler{
 public:
     std::function<void(const void*, int32_t width, int32_t height)> onPaintCallback;
+    std::function<void(std::string url)> onUrlChangedCb;
+    std::function<void(std::string title)> onTitleChangedCb;
     
     explicit WebviewHandler();
     ~WebviewHandler();
@@ -37,6 +39,9 @@ public:
     // CefDisplayHandler methods:
     virtual void OnTitleChange(CefRefPtr<CefBrowser> browser,
                                const CefString& title) override;
+    virtual void OnAddressChange(CefRefPtr<CefBrowser> browser,
+                                 CefRefPtr<CefFrame> frame,
+                                 const CefString& url) override;
     
     // CefLifeSpanHandler methods:
     virtual void OnAfterCreated(CefRefPtr<CefBrowser> browser) override;

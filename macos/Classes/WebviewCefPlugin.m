@@ -11,6 +11,7 @@
     WebviewCefPlugin *instance = [[WebviewCefPlugin alloc] init];
     
     [registrar addMethodCallDelegate:instance channel:channel];
+    [CefWrapper setMethodChannel:channel];
     
     tr = registrar.textures;
 }

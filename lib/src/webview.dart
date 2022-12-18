@@ -5,12 +5,15 @@ import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
 import 'package:flutter/widgets.dart';
 
+import 'webview_events_listener.dart';
+
 const MethodChannel _pluginChannel = MethodChannel("webview_cef");
 
 class WebViewController extends ValueNotifier<bool> {
   late Completer<void> _creatingCompleter;
   int _textureId = 0;
   bool _isDisposed = false;
+  WebviewEventsListener? _listener;
 
   Future<void> get ready => _creatingCompleter.future;
 
@@ -24,7 +27,7 @@ class WebViewController extends ValueNotifier<bool> {
     _creatingCompleter = Completer<void>();
     try {
       _textureId = await _pluginChannel.invokeMethod<int>('init') ?? 0;
-
+      _pluginChannel.setMethodCallHandler(_methodCallhandler);
       value = true;
       _creatingCompleter.complete();
     } on PlatformException catch (e) {
@@ -32,6 +35,23 @@ class WebViewController extends ValueNotifier<bool> {
     }
 
     return _creatingCompleter.future;
+  }
+
+  Future<void> _methodCallhandler(MethodCall call) async {
+    if (_listener == null) return;
+    switch (call.method) {
+      case "urlChanged":
+        _listener?.onUrlChanged?.call(call.arguments);
+        return;
+      case "titleChanged":
+        _listener?.onTitleChanged?.call(call.arguments);
+        return;
+      default:
+    }
+  }
+
+  setWebviewListener(WebviewEventsListener listener) {
+    _listener = listener;
   }
 
   @override

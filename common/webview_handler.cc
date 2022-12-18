@@ -46,6 +46,17 @@ WebviewHandler* WebviewHandler::GetInstance() {
 void WebviewHandler::OnTitleChange(CefRefPtr<CefBrowser> browser,
                                   const CefString& title) {
     //todo: title change
+    if(onTitleChangedCb) {
+        onTitleChangedCb(title);
+    }
+}
+
+void WebviewHandler::OnAddressChange(CefRefPtr<CefBrowser> browser,
+                             CefRefPtr<CefFrame> frame,
+                     const CefString& url) {
+    if(onUrlChangedCb) {
+        onUrlChangedCb(url);
+    }
 }
 
 void WebviewHandler::OnAfterCreated(CefRefPtr<CefBrowser> browser) {

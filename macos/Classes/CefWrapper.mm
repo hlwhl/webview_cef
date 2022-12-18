@@ -28,6 +28,8 @@ dispatch_semaphore_t lock = dispatch_semaphore_create(1);
 
 int64_t textureId;
 
+FlutterMethodChannel* f_channel;
+
 @implementation CefWrapper
 
 + (void)init {
@@ -82,6 +84,16 @@ int64_t textureId;
         dispatch_semaphore_signal(lock);
         [tr textureFrameAvailable:textureId];
     };
+    
+    //url change cb
+    handler.get()->onUrlChangedCb = [](std::string url) {
+        [f_channel invokeMethod:@"urlChanged" arguments:[NSString stringWithCString:url.c_str() encoding:NSUTF8StringEncoding]];
+    };
+    //title change cb
+    handler.get()->onTitleChangedCb = [](std::string title) {
+        [f_channel invokeMethod:@"titleChanged" arguments:[NSString stringWithCString:title.c_str() encoding:NSUTF8StringEncoding]];
+    };
+    
     CefSettings settings;
     settings.windowless_rendering_enabled = true;
     settings.external_message_pump = true;
@@ -230,6 +242,10 @@ int64_t textureId;
     CVPixelBufferRetain(buf_temp);
     dispatch_semaphore_signal(lock);
     return buf_temp;
+}
+
++ (void)setMethodChannel: (FlutterMethodChannel*)channel {
+    f_channel = channel;
 }
 
 @end
