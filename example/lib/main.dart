@@ -108,7 +108,7 @@ class _MyAppState extends State<MyApp> {
                     } else if (url.startsWith('https://')) {
                       _textController.text = url;
                       _controller.loadUrl(url);
-                    } else if (url.startsWith('www')) {
+                    } else if (url.startsWith('www.')) {
                       _textController.text = 'https://$url';
                       _controller.loadUrl('https://$url');
                     } else {
