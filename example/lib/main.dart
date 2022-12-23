@@ -51,6 +51,7 @@ class _MyAppState extends State<MyApp> {
   @override
   Widget build(BuildContext context) {
     return MaterialApp(
+      debugShowCheckedModeBanner: false,
       theme: ThemeData(useMaterial3: true),
       home: Scaffold(
           body: Column(
@@ -101,8 +102,19 @@ class _MyAppState extends State<MyApp> {
                 child: TextField(
                   controller: _textController,
                   onSubmitted: (url) {
-                    _textController.text = url;
-                    _controller.loadUrl(url);
+                    if (url.startsWith('http://')) {
+                      _textController.text = url;
+                      _controller.loadUrl(url);
+                    } else if (url.startsWith('https://')) {
+                      _textController.text = url;
+                      _controller.loadUrl(url);
+                    } else if (url.startsWith('www')) {
+                      _textController.text = 'https://$url';
+                      _controller.loadUrl('https://$url');
+                    } else {
+                      _textController.text = url;
+                      _controller.loadUrl('https://google.com/search?q=$url');
+                    }
                   },
                 ),
               ),
