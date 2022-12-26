@@ -38,7 +38,7 @@ When building the project for the first time, a prebuilt cef bin package (200MB,
 
 `**[HELP WANTED!]**` Finding a more elegant way to distribute the prebuilt package.
 
-> Note: Currently the project has not been enabled with multi process support due to debug convenience. If you want to enable multi process support, you may want enable multi process mode by changing the implementation and build your own helper bundle. (Finding a more elegant way in the future.)
+> Note: Currently the project has not been enabled with multi process support due to debug convenience. If you want to enable multi process support, you may want to enable multi process mode by changing the implementation and build your own helper bundle. (Finding a more elegant way in the future.)
 
 ## Todos
 
