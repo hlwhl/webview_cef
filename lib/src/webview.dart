@@ -8,12 +8,31 @@ import 'package:flutter/widgets.dart';
 import 'webview_events_listener.dart';
 
 const MethodChannel _pluginChannel = MethodChannel("webview_cef");
+bool _hasCallStartCEF = false;
+final _cefStarted = Completer();
+
+_startCEF() async {
+  if (!_hasCallStartCEF) {
+    _hasCallStartCEF = true;
+    _pluginChannel.invokeMethod("startCEF");
+    _pluginChannel.setMethodCallHandler((call) async {
+      if (call.method == 'onCEFInitialized') {
+        _cefStarted.complete();
+      }
+    });
+  }
+
+  await _cefStarted.future;
+}
 
 class WebViewController extends ValueNotifier<bool> {
-  late Completer<void> _creatingCompleter;
+  static int _id = 0;
+
+  final Completer<void> _creatingCompleter = Completer<void>();
   int _textureId = 0;
   bool _isDisposed = false;
   WebviewEventsListener? _listener;
+  late final MethodChannel _broswerChannel;
 
   Future<void> get ready => _creatingCompleter.future;
 
@@ -24,12 +43,14 @@ class WebViewController extends ValueNotifier<bool> {
     if (_isDisposed) {
       return Future<void>.value();
     }
-    _creatingCompleter = Completer<void>();
+
+    await _startCEF();
+
     try {
-      _textureId = await _pluginChannel.invokeMethod<int>('init') ?? 0;
-      _pluginChannel.setMethodCallHandler(_methodCallhandler);
-      value = true;
-      _creatingCompleter.complete();
+      final browserID = ++_id;
+      _broswerChannel = MethodChannel('webview_cef/$browserID');
+      _broswerChannel.setMethodCallHandler(_methodCallhandler);
+      _textureId = await _pluginChannel.invokeMethod<int>('createBrowser', browserID) ?? 0;
     } on PlatformException catch (e) {
       _creatingCompleter.completeError(e);
     }
@@ -38,8 +59,11 @@ class WebViewController extends ValueNotifier<bool> {
   }
 
   Future<void> _methodCallhandler(MethodCall call) async {
-    if (_listener == null) return;
     switch (call.method) {
+      case 'onBrowserCreated':
+        _creatingCompleter.complete();
+        value = true;
+        return;
       case "urlChanged":
         _listener?.onUrlChanged?.call(call.arguments);
         return;
@@ -59,7 +83,7 @@ class WebViewController extends ValueNotifier<bool> {
     await _creatingCompleter.future;
     if (!_isDisposed) {
       _isDisposed = true;
-      await _pluginChannel.invokeMethod('dispose', _textureId);
+      await _broswerChannel.invokeMethod('dispose');
     }
     super.dispose();
   }
@@ -70,7 +94,7 @@ class WebViewController extends ValueNotifier<bool> {
       return;
     }
     assert(value);
-    return _pluginChannel.invokeMethod('loadUrl', url);
+    return _broswerChannel.invokeMethod('loadUrl', url);
   }
 
   /// Reloads the current document.
@@ -79,7 +103,7 @@ class WebViewController extends ValueNotifier<bool> {
       return;
     }
     assert(value);
-    return _pluginChannel.invokeMethod('reload');
+    return _broswerChannel.invokeMethod('reload');
   }
 
   Future<void> goForward() async {
@@ -87,7 +111,7 @@ class WebViewController extends ValueNotifier<bool> {
       return;
     }
     assert(value);
-    return _pluginChannel.invokeMethod('goForward');
+    return _broswerChannel.invokeMethod('goForward');
   }
 
   Future<void> goBack() async {
@@ -95,7 +119,7 @@ class WebViewController extends ValueNotifier<bool> {
       return;
     }
     assert(value);
-    return _pluginChannel.invokeMethod('goBack');
+    return _broswerChannel.invokeMethod('goBack');
   }
 
   Future<void> openDevTools() async {
@@ -103,7 +127,7 @@ class WebViewController extends ValueNotifier<bool> {
       return;
     }
     assert(value);
-    return _pluginChannel.invokeMethod('openDevTools');
+    return _broswerChannel.invokeMethod('openDevTools');
   }
 
   /// Moves the virtual cursor to [position].
@@ -112,7 +136,7 @@ class WebViewController extends ValueNotifier<bool> {
       return;
     }
     assert(value);
-    return _pluginChannel
+    return _broswerChannel
         .invokeMethod('cursorMove', [position.dx.round(), position.dy.round()]);
   }
 
@@ -121,7 +145,7 @@ class WebViewController extends ValueNotifier<bool> {
       return;
     }
     assert(value);
-    return _pluginChannel.invokeMethod(
+    return _broswerChannel.invokeMethod(
         'cursorDragging', [position.dx.round(), position.dy.round()]);
   }
 
@@ -130,7 +154,7 @@ class WebViewController extends ValueNotifier<bool> {
       return;
     }
     assert(value);
-    return _pluginChannel.invokeMethod(
+    return _broswerChannel.invokeMethod(
         'cursorClickDown', [position.dx.round(), position.dy.round()]);
   }
 
@@ -139,7 +163,7 @@ class WebViewController extends ValueNotifier<bool> {
       return;
     }
     assert(value);
-    return _pluginChannel.invokeMethod(
+    return _broswerChannel.invokeMethod(
         'cursorClickUp', [position.dx.round(), position.dy.round()]);
   }
 
@@ -149,7 +173,7 @@ class WebViewController extends ValueNotifier<bool> {
       return;
     }
     assert(value);
-    return _pluginChannel.invokeMethod(
+    return _broswerChannel.invokeMethod(
         'setScrollDelta', [position.dx.round(), position.dy.round(), dx, dy]);
   }
 
@@ -159,7 +183,7 @@ class WebViewController extends ValueNotifier<bool> {
       return;
     }
     assert(value);
-    return _pluginChannel
+    return _broswerChannel
         .invokeMethod('setSize', [dpi, size.width, size.height]);
   }
 }
