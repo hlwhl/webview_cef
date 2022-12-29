@@ -15,9 +15,19 @@ class MyApp extends StatefulWidget {
   State<StatefulWidget> createState() => _MyAppState();
 }
 
+class TabTitle {
+  static int _tabID = 0;
+
+  final int tabID;
+  final ValueNotifier<String> titleNotifier;
+
+  TabTitle(String title)
+    : tabID = ++_tabID,
+    titleNotifier = ValueNotifier(title);
+}
+
 class _MyAppState extends State<MyApp> with SingleTickerProviderStateMixin {
-  static int tabID = 0;
-  final List<int> tabs = [++tabID, ++tabID]; 
+  final List<TabTitle> tabs = [TabTitle('Untitled')]; 
 
   @override
   void initState() {
@@ -32,16 +42,22 @@ class _MyAppState extends State<MyApp> with SingleTickerProviderStateMixin {
         child: Scaffold(
         appBar: AppBar(
           title: TabBar(
-            tabs: tabs.map((tid) {
+            indicator: null,
+            tabs: tabs.map((t) {
               return Tab(
                 child: Row(
                   children: [
-                    Expanded(child: Text('Tab - $tid')),
+                    Expanded(
+                      child: ValueListenableBuilder(
+                        valueListenable: t.titleNotifier,
+                        builder: (context, value, _) => Text(t.titleNotifier.value),
+                      ),
+                    ),
                     IconButton(
                       icon: const Icon(Icons.close),
                       onPressed: () {
                         setState(() {
-                          tabs.remove(tid);
+                          tabs.remove(t);
                         });
                       },
                     ),
@@ -55,15 +71,18 @@ class _MyAppState extends State<MyApp> with SingleTickerProviderStateMixin {
               icon: const Icon(Icons.add_to_photos_rounded),
               onPressed: () {
                 setState(() {
-                  tabs.add(++tabID);
+                  tabs.add(TabTitle('Untitled'));
                 });
               },
             )
           ],
         ),
         body: TabBarView(
-          children: tabs.map((e) {
-            return BrowserView(key: ValueKey(e));
+          children: tabs.map((t) {
+            return BrowserView(
+              key: ValueKey(t.tabID),
+              onTitleChanged: (newTitle) => t.titleNotifier.value = newTitle,
+            );
           }).toList(),
         ),
       ),
@@ -73,8 +92,10 @@ class _MyAppState extends State<MyApp> with SingleTickerProviderStateMixin {
 }
 
 class BrowserView extends StatefulWidget {
+  final Function(String) onTitleChanged;
   const BrowserView({
     super.key,
+    required this.onTitleChanged,
   });
 
   @override
@@ -87,7 +108,6 @@ class _BrowserViewState extends State<BrowserView> with AutomaticKeepAliveClient
 
   final _controller = WebViewController();
   final _textController = TextEditingController();
-  String title = "";
 
   @override
   void initState() {
@@ -106,11 +126,7 @@ class _BrowserViewState extends State<BrowserView> with AutomaticKeepAliveClient
     _textController.text = 'https://flutter.dev';
 
     _controller.setWebviewListener(WebviewEventsListener(
-      onTitleChanged: (t) {
-        setState(() {
-          title = t;
-        });
-      },
+      onTitleChanged: widget.onTitleChanged,
       onUrlChanged: (url) {
         _textController.text = url;
       },
@@ -129,10 +145,6 @@ class _BrowserViewState extends State<BrowserView> with AutomaticKeepAliveClient
   Widget build(BuildContext context) {
    return Column(
       children: [
-        SizedBox(
-          height: 20,
-          child: Text(title),
-        ),
         Row(
           children: [
             SizedBox(

@@ -11,6 +11,7 @@
 #include <flutter/method_channel.h>
 #include <flutter/method_result_functions.h>
 #include <flutter/standard_method_codec.h>
+#include <flutter/event_stream_handler_functions.h>
 
 #include "include/base/cef_callback.h"
 #include "include/cef_app.h"
@@ -21,6 +22,12 @@
 #include "include/wrapper/cef_helpers.h"
 
 namespace {
+
+constexpr auto kEventType = "type";
+constexpr auto kEventValue = "value";
+
+constexpr auto kEventTitleChanged = "titleChanged";
+constexpr auto kEventURLChanged = "urlChanged";
 
 // Returns a data: URI with the specified contents.
 std::string GetDataURI(const std::string& data, const std::string& mime_type) {
@@ -62,31 +69,53 @@ const std::optional<std::tuple<double, double, double>> GetPointAnDPIFromArgs(
 }
 
 WebviewHandler::WebviewHandler(flutter::BinaryMessenger* messenger, const int browser_id) {
-    const auto method_channel_name = "webview_cef/" + std::to_string(browser_id);
+    const auto browser_id_str = std::to_string(browser_id);
+    const auto method_channel_name = "webview_cef/" + browser_id_str;
     browser_channel_ = std::make_unique<flutter::MethodChannel<flutter::EncodableValue>>(
         messenger,
         method_channel_name,
-        &flutter::StandardMethodCodec::GetInstance());
+        &flutter::StandardMethodCodec::GetInstance()
+    );
     browser_channel_->SetMethodCallHandler([this](const auto& call, auto result) {
         HandleMethodCall(call, std::move(result));
     });
+
+    const auto event_channel_name = "webview_cef/" + browser_id_str + "/events";
+    event_channel_ = std::make_unique<flutter::EventChannel<flutter::EncodableValue>>(
+        messenger,
+        event_channel_name,
+        &flutter::StandardMethodCodec::GetInstance()
+    );
+
+    auto handler = std::make_unique<flutter::StreamHandlerFunctions<flutter::EncodableValue>>(
+        [this](
+            const flutter::EncodableValue* arguments,
+            std::unique_ptr<flutter::EventSink<flutter::EncodableValue>>&&
+            events
+        ) {
+            event_sink_ = std::move(events);
+            return nullptr;
+        },
+        [this](const flutter::EncodableValue* arguments) {
+            event_sink_ = nullptr;
+            return nullptr;
+        }
+    );
+
+    event_channel_->SetStreamHandler(std::move(handler));
 }
 
 WebviewHandler::~WebviewHandler() {}
 
-void WebviewHandler::OnTitleChange(CefRefPtr<CefBrowser> browser,
-                                  const CefString& title) {
-    //todo: title change
-    if(onTitleChangedCb) {
-        onTitleChangedCb(title);
-    }
+void WebviewHandler::OnTitleChange(CefRefPtr<CefBrowser> browser, const CefString& title) {
+    EmitEvent(kEventTitleChanged, title.ToString());
 }
 
 void WebviewHandler::OnAddressChange(CefRefPtr<CefBrowser> browser,
-                             CefRefPtr<CefFrame> frame,
-                     const CefString& url) {
-    if(onUrlChangedCb) {
-        onUrlChangedCb(url);
+                                    CefRefPtr<CefFrame> frame,
+                                    const CefString& url) {
+    if (frame->IsMain()) {
+        EmitEvent(kEventURLChanged, url.ToString());
     }
 }
 
@@ -103,8 +132,6 @@ bool WebviewHandler::DoClose(CefRefPtr<CefBrowser> browser) {
     this->browser_channel_ = nullptr;
     this->browser_ = nullptr;
     if (this->onBrowserClose) this->onBrowserClose();
-    // Allow the close. For windowed browsers this will result in the OS close
-    // event being sent.
     return false;
 }
 

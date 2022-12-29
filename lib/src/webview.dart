@@ -25,6 +25,9 @@ _startCEF() async {
   await _cefStarted.future;
 }
 
+const _kEventTitleChanged = "titleChanged";
+const _kEventURLChanged = "urlChanged";
+
 class WebViewController extends ValueNotifier<bool> {
   static int _id = 0;
 
@@ -33,6 +36,8 @@ class WebViewController extends ValueNotifier<bool> {
   bool _isDisposed = false;
   WebviewEventsListener? _listener;
   late final MethodChannel _broswerChannel;
+  late final EventChannel _eventChannel;
+  StreamSubscription? _eventStreamSubscription;
 
   Future<void> get ready => _creatingCompleter.future;
 
@@ -51,6 +56,8 @@ class WebViewController extends ValueNotifier<bool> {
       _broswerChannel = MethodChannel('webview_cef/$browserID');
       _broswerChannel.setMethodCallHandler(_methodCallhandler);
       _textureId = await _pluginChannel.invokeMethod<int>('createBrowser', browserID) ?? 0;
+      _eventChannel = EventChannel('webview_cef/$browserID/events');
+      _eventStreamSubscription = _eventChannel.receiveBroadcastStream().listen(_handleBrowserEvents);
     } on PlatformException catch (e) {
       _creatingCompleter.completeError(e);
     }
@@ -58,17 +65,25 @@ class WebViewController extends ValueNotifier<bool> {
     return _creatingCompleter.future;
   }
 
-  Future<void> _methodCallhandler(MethodCall call) async {
+  Future<dynamic> _methodCallhandler(MethodCall call) async {
     switch (call.method) {
       case 'onBrowserCreated':
         _creatingCompleter.complete();
         value = true;
+        return null;
+    }
+
+    return null;
+  }
+
+  _handleBrowserEvents(dynamic event) {
+    final m = event as Map<dynamic, dynamic>;
+    switch (m['type']) {
+      case _kEventURLChanged:
+        _listener?.onUrlChanged?.call(m['value'] as String);
         return;
-      case "urlChanged":
-        _listener?.onUrlChanged?.call(call.arguments);
-        return;
-      case "titleChanged":
-        _listener?.onTitleChanged?.call(call.arguments);
+      case _kEventTitleChanged:
+        _listener?.onTitleChanged?.call(m['value'] as String);
         return;
       default:
     }
@@ -84,6 +99,7 @@ class WebViewController extends ValueNotifier<bool> {
     if (!_isDisposed) {
       _isDisposed = true;
       await _broswerChannel.invokeMethod('dispose');
+      _eventStreamSubscription?.cancel();
     }
     super.dispose();
   }
