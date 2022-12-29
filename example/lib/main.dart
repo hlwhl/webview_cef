@@ -143,7 +143,8 @@ class _BrowserViewState extends State<BrowserView> with AutomaticKeepAliveClient
 
   @override
   Widget build(BuildContext context) {
-   return Column(
+    super.build(context);
+    return Column(
       children: [
         Row(
           children: [
@@ -187,8 +188,19 @@ class _BrowserViewState extends State<BrowserView> with AutomaticKeepAliveClient
               child: TextField(
                 controller: _textController,
                 onSubmitted: (url) {
-                  _textController.text = url;
-                  _controller.loadUrl(url);
+                  if (url.startsWith('http://')) {
+                    _textController.text = url;
+                    _controller.loadUrl(url);
+                  } else if (url.startsWith('https://')) {
+                    _textController.text = url;
+                    _controller.loadUrl(url);
+                  } else if (url.startsWith('www.')) {
+                    _textController.text = 'https://$url';
+                    _controller.loadUrl('https://$url');
+                  } else {
+                    _textController.text = url;
+                    _controller.loadUrl('https://google.com/search?q=$url');
+                  }
                 },
               ),
             ),
