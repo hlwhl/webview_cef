@@ -38,6 +38,10 @@ namespace webview_cef {
 	CefRefPtr<WebviewHandler> handler(new WebviewHandler());
 	CefRefPtr<WebviewApp> app(new WebviewApp(handler));
 	CefMainArgs mainArgs;
+	std::unique_ptr<
+		flutter::MethodChannel<flutter::EncodableValue>,
+		std::default_delete<flutter::MethodChannel<flutter::EncodableValue>>>
+		channel = nullptr;
 
 
 	void SwapBufferFromBgraToRgba(void* _dest, const void* _src, int width, int height) {
@@ -86,18 +90,16 @@ namespace webview_cef {
 			texture_registrar->MarkTextureFrameAvailable(texture_id);
 		};
 
+		handler.get()->onUrlChangedCb = [](std::string url) {
+			channel->InvokeMethod("urlChanged", std::make_unique<flutter::EncodableValue>(url));
+		};
+
+		handler.get()->onTitleChangedCb = [](std::string title) {
+			channel->InvokeMethod("titleChanged", std::make_unique<flutter::EncodableValue>(title));
+		};
+
 		CefSettings cefs;
 		cefs.windowless_rendering_enabled = true;
-		/*app.get()->handler->onPaintCallback = [tid](const void* buffer, int width, int height) {
-			if (!pixel_buffer.get()) {
-				pixel_buffer.reset(new FlutterDesktopPixelBuffer());
-				pixel_buffer->buffer = (uint8_t*)malloc(width * height * 4);
-				pixel_buffer->width = width;
-				pixel_buffer->height = height;
-			}
-			SwapBufferFromBgraToRgba((void*)pixel_buffer->buffer, buffer, width, height);
-			texture_registrar->MarkTextureFrameAvailable(tid);
-		};*/
 		CefInitialize(mainArgs, cefs, app.get(), nullptr);
 		CefRunMessageLoop();
 		CefShutdown();
@@ -135,7 +137,7 @@ namespace webview_cef {
 	void WebviewCefPlugin::RegisterWithRegistrar(
 		flutter::PluginRegistrarWindows* registrar) {
 		texture_registrar = registrar->texture_registrar();
-		auto channel =
+		channel =
 			std::make_unique<flutter::MethodChannel<flutter::EncodableValue>>(
 				registrar->messenger(), "webview_cef",
 				&flutter::StandardMethodCodec::GetInstance());
