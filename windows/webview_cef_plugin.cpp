@@ -30,16 +30,6 @@ namespace webview_cef {
 
 		CefSettings cefs;
 		cefs.windowless_rendering_enabled = true;
-		/*app.get()->handler->onPaintCallback = [tid](const void* buffer, int width, int height) {
-			if (!pixel_buffer.get()) {
-				pixel_buffer.reset(new FlutterDesktopPixelBuffer());
-				pixel_buffer->buffer = (uint8_t*)malloc(width * height * 4);
-				pixel_buffer->width = width;
-				pixel_buffer->height = height;
-			}
-			SwapBufferFromBgraToRgba((void*)pixel_buffer->buffer, buffer, width, height);
-			texture_registrar->MarkTextureFrameAvailable(tid);
-		};*/
 		CefInitialize(mainArgs, cefs, app.get(), nullptr);
 		CefRunMessageLoop();
 		CefShutdown();
