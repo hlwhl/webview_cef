@@ -1,7 +1,5 @@
 ﻿#include "webview_cef_plugin.h"
 
-// For getPlatformVersion; remove unless needed for your plugin implementation.
-#include <VersionHelpers.h>
 
 #include <flutter/method_channel.h>
 #include <flutter/plugin_registrar_windows.h>
@@ -9,7 +7,6 @@
 
 #include <memory>
 #include <thread>
-#include <mutex>
 
 #include "webview_app.h"
 #include "texture_handler.h"
