@@ -1,6 +1,7 @@
 import 'dart:async';
 
 import 'package:flutter/material.dart';
+import 'package:flutter/scheduler.dart';
 import 'package:webview_cef/webview_cef.dart';
 
 void main() {
@@ -67,14 +68,21 @@ class _MyAppState extends State<MyApp> with SingleTickerProviderStateMixin {
             }).toList(),
           ),
           actions: [
-            IconButton(
-              icon: const Icon(Icons.add_to_photos_rounded),
-              onPressed: () {
-                setState(() {
-                  tabs.add(TabTitle('Untitled'));
-                });
+            Builder(
+              builder: (context) {
+                return IconButton(
+                  icon: const Icon(Icons.add_to_photos_rounded),
+                  onPressed: () {
+                    setState(() {
+                      tabs.add(TabTitle('Untitled'));
+                      SchedulerBinding.instance.addPostFrameCallback((timeStamp) {
+                        DefaultTabController.of(context)!.animateTo(tabs.length - 1);
+                      });
+                    });
+                  },
+                );
               },
-            )
+            ),
           ],
         ),
         body: TabBarView(
