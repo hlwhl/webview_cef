@@ -30,6 +30,7 @@ doc/api/
 .buildlog/
 .history
 .svn/
+.vs/
 migrate_working_dir/
 
 # IntelliJ related

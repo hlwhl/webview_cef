@@ -6,9 +6,12 @@
 #define CEF_TESTS_CEFSIMPLE_SIMPLE_HANDLER_H_
 
 #include "include/cef_client.h"
+#include <flutter/method_channel.h>
+#include <flutter/standard_method_codec.h>
+#include <flutter/binary_messenger.h>
+#include <flutter/event_channel.h>
 
 #include <functional>
-#include <list>
 
 class WebviewHandler : public CefClient,
 public CefDisplayHandler,
@@ -17,15 +20,11 @@ public CefLoadHandler,
 public CefRenderHandler{
 public:
     std::function<void(const void*, int32_t width, int32_t height)> onPaintCallback;
-    std::function<void(std::string url)> onUrlChangedCb;
-    std::function<void(std::string title)> onTitleChangedCb;
-    
-    explicit WebviewHandler();
+    std::function<void()> onBrowserClose;
+
+    explicit WebviewHandler(flutter::BinaryMessenger* messenger, const int browser_id);
     ~WebviewHandler();
-    
-    // Provide access to the single global instance of this object.
-    static WebviewHandler* GetInstance();
-    
+
     // CefClient methods:
     virtual CefRefPtr<CefDisplayHandler> GetDisplayHandler() override {
         return this;
@@ -79,10 +78,10 @@ public:
     
     // Request that all existing browser windows close.
     void CloseAllBrowsers(bool force_close);
-    
+
     // Returns true if the Chrome runtime is enabled.
     static bool IsChromeRuntimeEnabled();
-    
+
     void sendScrollEvent(int x, int y, int deltaX, int deltaY);
     void changeSize(float a_dpi, int width, int height);
     void cursorClick(int x, int y, bool up);
@@ -93,17 +92,33 @@ public:
     void goBack();
     void reload();
     void openDevTools();
-    
+
 private:
-    uint32_t width = 1;
-    uint32_t height = 1;
-    float dpi = 1.0;
-    bool is_dragging = false;
-    
-    // List of existing browser windows. Only accessed on the CEF UI thread.
-    typedef std::list<CefRefPtr<CefBrowser>> BrowserList;
-    BrowserList browser_list_;
-    
+    uint32_t width_ = 1;
+    uint32_t height_ = 1;
+    float dpi_ = 1.0;
+    bool is_dragging_ = false;
+
+    CefRefPtr<CefBrowser> browser_;
+    std::unique_ptr<flutter::MethodChannel<flutter::EncodableValue>> browser_channel_;
+    std::unique_ptr<flutter::EventSink<flutter::EncodableValue>> event_sink_;
+    std::unique_ptr<flutter::EventChannel<flutter::EncodableValue>> event_channel_;
+
+    void HandleMethodCall(
+      const flutter::MethodCall<flutter::EncodableValue> &method_call,
+      std::unique_ptr<flutter::MethodResult<flutter::EncodableValue>> result);
+
+    template <typename T>
+    void EmitEvent(const std::string eventType, const T& value) {
+        if (event_sink_) {
+            const auto event = flutter::EncodableValue(flutter::EncodableMap{
+                {flutter::EncodableValue(kEventType), flutter::EncodableValue(eventType)},
+                {flutter::EncodableValue(kEventValue), flutter::EncodableValue(value)},
+            });
+            event_sink_->Success(event);
+        }
+    }
+
     // Include the default reference counting implementation.
     IMPLEMENT_REFCOUNTING(WebviewHandler);
 };

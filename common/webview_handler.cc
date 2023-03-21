@@ -7,6 +7,11 @@
 #include <sstream>
 #include <string>
 #include <iostream>
+#include <optional>
+#include <flutter/method_channel.h>
+#include <flutter/method_result_functions.h>
+#include <flutter/standard_method_codec.h>
+#include <flutter/event_stream_handler_functions.h>
 
 #include "include/base/cef_callback.h"
 #include "include/cef_app.h"
@@ -18,7 +23,11 @@
 
 namespace {
 
-WebviewHandler* g_instance = nullptr;
+constexpr auto kEventType = "type";
+constexpr auto kEventValue = "value";
+
+constexpr auto kEventTitleChanged = "titleChanged";
+constexpr auto kEventURLChanged = "urlChanged";
 
 // Returns a data: URI with the specified contents.
 std::string GetDataURI(const std::string& data, const std::string& mime_type) {
@@ -27,68 +36,107 @@ std::string GetDataURI(const std::string& data, const std::string& mime_type) {
         .ToString();
 }
 
-}  // namespace
-
-WebviewHandler::WebviewHandler() {
-    DCHECK(!g_instance);
-    g_instance = this;
-}
-
-WebviewHandler::~WebviewHandler() {
-    g_instance = nullptr;
-}
-
-// static
-WebviewHandler* WebviewHandler::GetInstance() {
-    return g_instance;
-}
-
-void WebviewHandler::OnTitleChange(CefRefPtr<CefBrowser> browser,
-                                  const CefString& title) {
-    //todo: title change
-    if(onTitleChangedCb) {
-        onTitleChangedCb(title);
+const std::optional<std::pair<int, int>> GetPointFromArgs(
+    const flutter::EncodableValue* args) {
+    const flutter::EncodableList* list =
+        std::get_if<flutter::EncodableList>(args);
+    if (!list || list->size() != 2) {
+        return std::nullopt;
     }
+    const auto x = std::get_if<int>(&(*list)[0]);
+    const auto y = std::get_if<int>(&(*list)[1]);
+    if (!x || !y) {
+        return std::nullopt;
+    }
+    return std::make_pair(*x, *y);
+}
+
+const std::optional<std::tuple<double, double, double>> GetPointAnDPIFromArgs(
+    const flutter::EncodableValue* args) {
+    const flutter::EncodableList* list = std::get_if<flutter::EncodableList>(args);
+    if (!list || list->size() != 3) {
+        return std::nullopt;
+    }
+    const auto x = std::get_if<double>(&(*list)[0]);
+    const auto y = std::get_if<double>(&(*list)[1]);
+    const auto z = std::get_if<double>(&(*list)[2]);
+    if (!x || !y || !z) {
+        return std::nullopt;
+    }
+    return std::make_tuple(*x, *y, *z);
+}
+
+}
+
+WebviewHandler::WebviewHandler(flutter::BinaryMessenger* messenger, const int browser_id) {
+    const auto browser_id_str = std::to_string(browser_id);
+    const auto method_channel_name = "webview_cef/" + browser_id_str;
+    browser_channel_ = std::make_unique<flutter::MethodChannel<flutter::EncodableValue>>(
+        messenger,
+        method_channel_name,
+        &flutter::StandardMethodCodec::GetInstance()
+    );
+    browser_channel_->SetMethodCallHandler([this](const auto& call, auto result) {
+        HandleMethodCall(call, std::move(result));
+    });
+
+    const auto event_channel_name = "webview_cef/" + browser_id_str + "/events";
+    event_channel_ = std::make_unique<flutter::EventChannel<flutter::EncodableValue>>(
+        messenger,
+        event_channel_name,
+        &flutter::StandardMethodCodec::GetInstance()
+    );
+
+    auto handler = std::make_unique<flutter::StreamHandlerFunctions<flutter::EncodableValue>>(
+        [this](
+            const flutter::EncodableValue* arguments,
+            std::unique_ptr<flutter::EventSink<flutter::EncodableValue>>&&
+            events
+        ) {
+            event_sink_ = std::move(events);
+            return nullptr;
+        },
+        [this](const flutter::EncodableValue* arguments) {
+            event_sink_ = nullptr;
+            return nullptr;
+        }
+    );
+
+    event_channel_->SetStreamHandler(std::move(handler));
+}
+
+WebviewHandler::~WebviewHandler() {}
+
+void WebviewHandler::OnTitleChange(CefRefPtr<CefBrowser> browser, const CefString& title) {
+    EmitEvent(kEventTitleChanged, title.ToString());
 }
 
 void WebviewHandler::OnAddressChange(CefRefPtr<CefBrowser> browser,
-                             CefRefPtr<CefFrame> frame,
-                     const CefString& url) {
-    if(onUrlChangedCb) {
-        onUrlChangedCb(url);
+                                    CefRefPtr<CefFrame> frame,
+                                    const CefString& url) {
+    if (frame->IsMain()) {
+        EmitEvent(kEventURLChanged, url.ToString());
     }
 }
 
 void WebviewHandler::OnAfterCreated(CefRefPtr<CefBrowser> browser) {
     CEF_REQUIRE_UI_THREAD();
-    
-    // Add to the list of existing browsers.
-    browser_list_.push_back(browser);
+    this->browser_ = browser;
+    this->browser_channel_->InvokeMethod("onBrowserCreated", nullptr);
 }
 
 bool WebviewHandler::DoClose(CefRefPtr<CefBrowser> browser) {
-    CEF_REQUIRE_UI_THREAD();    
-    // Allow the close. For windowed browsers this will result in the OS close
-    // event being sent.
+    CEF_REQUIRE_UI_THREAD();
+
+    this->browser_channel_->SetMethodCallHandler(nullptr);
+    this->browser_channel_ = nullptr;
+    this->browser_ = nullptr;
+    if (this->onBrowserClose) this->onBrowserClose();
     return false;
 }
 
 void WebviewHandler::OnBeforeClose(CefRefPtr<CefBrowser> browser) {
-    CEF_REQUIRE_UI_THREAD();
-    
-    // Remove from the list of existing browsers.
-    BrowserList::iterator bit = browser_list_.begin();
-    for (; bit != browser_list_.end(); ++bit) {
-        if ((*bit)->IsSame(browser)) {
-            browser_list_.erase(bit);
-            break;
-        }
-    }
-    
-    if (browser_list_.empty()) {
-        // All browser windows have closed. Quit the application message loop.
-        CefQuitMessageLoop();
-    }
+    // CEF_REQUIRE_UI_THREAD();
 }
 
 bool WebviewHandler::OnBeforePopup(CefRefPtr<CefBrowser> browser,
@@ -139,13 +187,8 @@ void WebviewHandler::CloseAllBrowsers(bool force_close) {
         //                                       force_close));
         return;
     }
-    
-    if (browser_list_.empty())
-        return;
-    
-    BrowserList::const_iterator it = browser_list_.begin();
-    for (; it != browser_list_.end(); ++it)
-        (*it)->GetHost()->CloseBrowser(force_close);
+std::cout << "CloseAllBrowsers" << std::endl;
+    this->browser_->GetHost()->CloseBrowser(force_close);
 }
 
 // static
@@ -160,69 +203,55 @@ bool WebviewHandler::IsChromeRuntimeEnabled() {
 }
 
 void WebviewHandler::sendScrollEvent(int x, int y, int deltaX, int deltaY) {
-    BrowserList::const_iterator it = browser_list_.begin();
-    if (it != browser_list_.end()) {
-        CefMouseEvent ev;
-        ev.x = x;
-        ev.y = y;
+    CefMouseEvent ev;
+    ev.x = x;
+    ev.y = y;
 
 #ifndef __APPLE__
-        // The scrolling direction on Windows and Linux is different from MacOS
-        deltaY = -deltaY;
-        // Flutter scrolls too slowly, it looks more normal by 10x default speed.
-        (*it)->GetHost()->SendMouseWheelEvent(ev, deltaX * 10, deltaY * 10);
+    // The scrolling direction on Windows and Linux is different from MacOS
+    deltaY = -deltaY;
+    // Flutter scrolls too slowly, it looks more normal by 10x default speed.
+    this->browser_->GetHost()->SendMouseWheelEvent(ev, deltaX * 10, deltaY * 10);
 #else
-        (*it)->GetHost()->SendMouseWheelEvent(ev, deltaX, deltaY);
+    this->browser_->GetHost()->SendMouseWheelEvent(ev, deltaX, deltaY);
 #endif
-
-
-    }
 }
 
 void WebviewHandler::changeSize(float a_dpi, int w, int h)
 {
-    this->dpi = a_dpi;
-    this->width = w;
-    this->height = h;
-    BrowserList::const_iterator it = browser_list_.begin();
-    if (it != browser_list_.end()) {
-        (*it)->GetHost()->WasResized();
-    }
+    this->dpi_ = a_dpi;
+    this->width_ = w;
+    this->height_ = h;
+    this->browser_->GetHost()->WasResized();
 }
 
 void WebviewHandler::cursorClick(int x, int y, bool up)
 {
-    BrowserList::const_iterator it = browser_list_.begin();
-    if (it != browser_list_.end()) {
-        CefMouseEvent ev;
-        ev.x = x;
-        ev.y = y;
-        ev.modifiers = EVENTFLAG_LEFT_MOUSE_BUTTON;
-        if(up && is_dragging) {
-            (*it)->GetHost()->DragTargetDrop(ev);
-            (*it)->GetHost()->DragSourceSystemDragEnded();
-            is_dragging = false;
-        } else {
-            (*it)->GetHost()->SendMouseClickEvent(ev, CefBrowserHost::MouseButtonType::MBT_LEFT, up, 1);
-        }
+    CefMouseEvent ev;
+    ev.x = x;
+    ev.y = y;
+    ev.modifiers = EVENTFLAG_LEFT_MOUSE_BUTTON;
+    if(up && is_dragging_) {
+        this->browser_->GetHost()->DragTargetDrop(ev);
+        this->browser_->GetHost()->DragSourceSystemDragEnded();
+        is_dragging_ = false;
+    } else {
+        this->browser_->GetHost()->SendMouseClickEvent(ev, CefBrowserHost::MouseButtonType::MBT_LEFT, up, 1);
     }
 }
 
 void WebviewHandler::cursorMove(int x , int y, bool dragging)
 {
-    BrowserList::const_iterator it = browser_list_.begin();
-    if (it != browser_list_.end()) {
-        CefMouseEvent ev;
-        ev.x = x;
-        ev.y = y;
-        if(dragging) {
-            ev.modifiers = EVENTFLAG_LEFT_MOUSE_BUTTON;
-        }
-        if(is_dragging && dragging) {
-            (*it)->GetHost()->DragTargetDragOver(ev, DRAG_OPERATION_EVERY);
-        } else {
-            (*it)->GetHost()->SendMouseMoveEvent(ev, false);
-        }
+    CefMouseEvent ev;
+    ev.x = x;
+    ev.y = y;
+    if(dragging) {
+        ev.modifiers = EVENTFLAG_LEFT_MOUSE_BUTTON;
+    }
+    if(is_dragging_ && dragging) {
+        this->browser_->GetHost()->DragTargetDragOver(ev, DRAG_OPERATION_EVERY);
+    } else {
+        this->browser_->GetHost()->SendMouseMoveEvent(ev, false);
     }
 }
 
@@ -231,91 +260,152 @@ bool WebviewHandler::StartDragging(CefRefPtr<CefBrowser> browser,
                                   DragOperationsMask allowed_ops,
                                   int x,
                                   int y){
-    BrowserList::const_iterator it = browser_list_.begin();
-    if (it != browser_list_.end()) {
-        CefMouseEvent ev;
-        ev.x = x;
-        ev.y = y;
-        ev.modifiers = EVENTFLAG_LEFT_MOUSE_BUTTON;
-        (*it)->GetHost()->DragTargetDragEnter(drag_data, ev, DRAG_OPERATION_EVERY);
-        is_dragging = true;
-    }
+    CefMouseEvent ev;
+    ev.x = x;
+    ev.y = y;
+    ev.modifiers = EVENTFLAG_LEFT_MOUSE_BUTTON;
+    this->browser_->GetHost()->DragTargetDragEnter(drag_data, ev, DRAG_OPERATION_EVERY);
+    is_dragging_ = true;
     return true;
 }
 
 void WebviewHandler::sendKeyEvent(CefKeyEvent ev)
 {
-    BrowserList::const_iterator it = browser_list_.begin();
-    if (it != browser_list_.end()) {
-        (*it)->GetHost()->SendKeyEvent(ev);
-    }
+    this->browser_->GetHost()->SendKeyEvent(ev);
 }
 
 void WebviewHandler::loadUrl(std::string url)
 {
-    BrowserList::const_iterator it = browser_list_.begin();
-    if (it != browser_list_.end()) {
-        (*it)->GetMainFrame()->LoadURL(url);
-    }
+    this->browser_->GetMainFrame()->LoadURL(url);
 }
 
 void WebviewHandler::goForward() {
-    BrowserList::const_iterator it = browser_list_.begin();
-    if (it != browser_list_.end()) {
-        (*it)->GetMainFrame()->GetBrowser()->GoForward();
-    }
+    this->browser_->GetMainFrame()->GetBrowser()->GoForward();
 }
 
 void WebviewHandler::goBack() {
-    BrowserList::const_iterator it = browser_list_.begin();
-    if (it != browser_list_.end()) {
-        (*it)->GetMainFrame()->GetBrowser()->GoBack();
-    }
+    this->browser_->GetMainFrame()->GetBrowser()->GoBack();
 }
 
 void WebviewHandler::reload() {
-    BrowserList::const_iterator it = browser_list_.begin();
-    if (it != browser_list_.end()) {
-        (*it)->GetMainFrame()->GetBrowser()->Reload();
-    }
+    this->browser_->GetMainFrame()->GetBrowser()->Reload();
 }
 
 void WebviewHandler::openDevTools() {
-    BrowserList::const_iterator it = browser_list_.begin();
-    if (it != browser_list_.end()) {
-        CefWindowInfo windowInfo;
+    CefWindowInfo windowInfo;
 #ifdef _WIN32
-        windowInfo.SetAsPopup(nullptr, "DevTools");
+    windowInfo.SetAsPopup(nullptr, "DevTools");
 #endif
-        (*it)->GetHost()->ShowDevTools(windowInfo, this, CefBrowserSettings(), CefPoint());
-    }
+    this->browser_->GetHost()->ShowDevTools(windowInfo, this, CefBrowserSettings(), CefPoint());
 }
 
 void WebviewHandler::GetViewRect(CefRefPtr<CefBrowser> browser, CefRect &rect) {
     CEF_REQUIRE_UI_THREAD();
-    
+
     rect.x = rect.y = 0;
-    
-    if (width < 1) {
+    if (width_ < 1) {
         rect.width = 1;
     } else {
-        rect.width = width;
+        rect.width = width_;
     }
-    
-    if (height < 1) {
+
+    if (height_ < 1) {
         rect.height = 1;
     } else {
-        rect.height = height;
+        rect.height = height_;
     }
 }
 
 bool WebviewHandler::GetScreenInfo(CefRefPtr<CefBrowser> browser, CefScreenInfo& screen_info) {
     //todo: hi dpi support
-    screen_info.device_scale_factor  = this->dpi;
+    screen_info.device_scale_factor  = this->dpi_;
     return false;
 }
 
 void WebviewHandler::OnPaint(CefRefPtr<CefBrowser> browser, CefRenderHandler::PaintElementType type,
                             const CefRenderHandler::RectList &dirtyRects, const void *buffer, int w, int h) {
     onPaintCallback(buffer, w, h);
+}
+
+void WebviewHandler::HandleMethodCall(
+		const flutter::MethodCall<flutter::EncodableValue>& method_call,
+		std::unique_ptr<flutter::MethodResult<flutter::EncodableValue>> result) {
+
+    if (!this->browser_) {
+        result->Error("browser not ready yet");
+        return;
+    }
+
+    if (method_call.method_name().compare("loadUrl") == 0) {
+        if (const auto url = std::get_if<std::string>(method_call.arguments())) {
+            this->loadUrl(*url);
+            return result->Success();
+        }
+    }
+    else if (method_call.method_name().compare("setSize") == 0) {
+        auto tuple = GetPointAnDPIFromArgs(method_call.arguments());
+        if (tuple) {
+            const auto [dpi, width, height] = tuple.value();
+            this->changeSize(
+                static_cast<float>(dpi),
+                static_cast<int>(width),
+                static_cast<int>(height)
+            );
+        }
+
+        result->Success();
+    }
+    else if (method_call.method_name().compare("cursorClickDown") == 0) {
+        const auto point = GetPointFromArgs(method_call.arguments());
+        this->cursorClick(point->first, point->second, false);
+        result->Success();
+    }
+    else if (method_call.method_name().compare("cursorClickUp") == 0) {
+        const auto point = GetPointFromArgs(method_call.arguments());
+        this->cursorClick(point->first, point->second, true);
+        result->Success();
+    }
+    else if (method_call.method_name().compare("cursorMove") == 0) {
+        const auto point = GetPointFromArgs(method_call.arguments());
+        this->cursorMove(point->first, point->second, false);
+        result->Success();
+    }
+    else if (method_call.method_name().compare("cursorDragging") == 0) {
+        const auto point = GetPointFromArgs(method_call.arguments());
+        this->cursorMove(point->first, point->second, true);
+        result->Success();
+    }
+    else if (method_call.method_name().compare("setScrollDelta") == 0) {
+        const flutter::EncodableList* list =
+            std::get_if<flutter::EncodableList>(method_call.arguments());
+        const auto x = *std::get_if<int>(&(*list)[0]);
+        const auto y = *std::get_if<int>(&(*list)[1]);
+        const auto deltaX = *std::get_if<int>(&(*list)[2]);
+        const auto deltaY = *std::get_if<int>(&(*list)[3]);
+        this->sendScrollEvent(x, y, deltaX, deltaY);
+        result->Success();
+    }
+    else if (method_call.method_name().compare("goForward") == 0) {
+        this->goForward();
+        result->Success();
+    }
+    else if (method_call.method_name().compare("goBack") == 0) {
+        this->goBack();
+        result->Success();
+    }
+    else if (method_call.method_name().compare("reload") == 0) {
+        this->reload();
+        result->Success();
+    }
+    else if (method_call.method_name().compare("openDevTools") == 0) {
+        this->openDevTools();
+        result->Success();
+    }
+    else if (method_call.method_name().compare("dispose") == 0) {
+        this->browser_->GetHost()->CloseBrowser(false);
+        result->Success();
+    }
+    else {
+        result->NotImplemented();
+    }
 }

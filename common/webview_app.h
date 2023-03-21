@@ -12,8 +12,8 @@
 // Implement application-level callbacks for the browser process.
 class WebviewApp : public CefApp, public CefBrowserProcessHandler {
 public:
-    WebviewApp(CefRefPtr<WebviewHandler> handler);
-    
+    WebviewApp(std::unique_ptr<flutter::MethodChannel<flutter::EncodableValue>> plugin_channel);
+
     // CefApp methods:
     CefRefPtr<CefBrowserProcessHandler> GetBrowserProcessHandler() override {
         return this;
@@ -32,9 +32,11 @@ public:
     // CefBrowserProcessHandler methods:
     void OnContextInitialized() override;
     CefRefPtr<CefClient> GetDefaultClient() override;
-    
+
+    void WebviewApp::CreateBrowser(CefRefPtr<WebviewHandler> handler);
+
 private:
-    CefRefPtr<WebviewHandler> m_handler;
+    std::unique_ptr<flutter::MethodChannel<flutter::EncodableValue>> plugin_channel_;
     // Include the default reference counting implementation.
     IMPLEMENT_REFCOUNTING(WebviewApp);
 };

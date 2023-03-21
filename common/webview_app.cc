@@ -3,6 +3,7 @@
 // can be found in the LICENSE file.
 
 #include "webview_app.h"
+#include "webview_handler.h"
 
 #include <string>
 
@@ -76,28 +77,28 @@ private:
 
 }  // namespace
 
-WebviewApp::WebviewApp(CefRefPtr<WebviewHandler> handler) {
-    m_handler = handler;
-}
+WebviewApp::WebviewApp(std::unique_ptr<flutter::MethodChannel<flutter::EncodableValue>> plugin_channel)
+    : plugin_channel_(std::move(plugin_channel)) {}
 
 void WebviewApp::OnContextInitialized() {
     CEF_REQUIRE_UI_THREAD();
-    
+    plugin_channel_->InvokeMethod("onCEFInitialized", nullptr);
+}
+
+void WebviewApp::CreateBrowser(CefRefPtr<WebviewHandler> handler) {
     // Specify CEF browser settings here.
     CefBrowserSettings browser_settings;
     browser_settings.windowless_frame_rate = 60;
-    
-    std::string url = "https://www.flutter.dev/";
-    
+
+    std::string url = "about:blank";
+
     CefWindowInfo window_info;
     window_info.SetAsWindowless(nullptr);
-    
-    // Create the first browser window.
-    CefBrowserHost::CreateBrowser(window_info, m_handler, url, browser_settings,
-                                  nullptr, nullptr);
+    CefBrowserHost::CreateBrowser(window_info, handler, url, browser_settings,
+                                nullptr, nullptr);
 }
 
 CefRefPtr<CefClient> WebviewApp::GetDefaultClient() {
     // Called when a new browser window is created via the Chrome runtime UI.
-    return WebviewHandler::GetInstance();
+    return nullptr;
 }
