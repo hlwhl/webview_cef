@@ -1,26 +1,32 @@
 ## 0.0.8
-1.add support for build macos universal app
-2.refine scrolling for different platform
-3.add url bar search feature for example project
-4.add title & url change aware for ui
+
+- Added support to build macOS universal app.
+- Refined scrolling for different platform.
+- Added search bar features in example project.
+- Added title & url change aware in UI.
 
 ## 0.0.7
-1.basic characters input support.
-2.add back, forward, reload api.
-3.mouse move events support.
-4.html5 drag&drop support.
+
+- Basic characters input support.
+- Added back, forward, reload APIs.
+- Mouse move events support.
+- HTML5 drag & drop support.
 
 ## 0.0.6
-fix macos compile
+
+- Fixed macOS compile issue.
 
 ## 0.0.5
-1.🎉initial support for macos
-2.touchpad support (based on flutter 3.3)
-3.Hi-DPI display support
+
+1. Initial support for macOS.
+2. Touchpad support (based on flutter 3.3).
+3. Hi-DPI display support.
 
 ## 0.0.3
-fix compile issue on non-utf8 machines
+
+- Fixed compile issue on non-utf8 machines.
 
 ## 0.0.1
 
-* TODO: Describe initial release.
+- Webview CEF plugin for Flutter Desktop.
+- Windows support only.
