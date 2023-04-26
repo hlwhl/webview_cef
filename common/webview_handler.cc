@@ -291,6 +291,88 @@ void WebviewHandler::openDevTools() {
     }
 }
 
+void WebviewHandler::setCookie(const std::string& domain, const std::string& key, const std::string& value){
+    CefRefPtr<CefCookieManager> manager = CefCookieManager::GetGlobalManager(nullptr);
+    if(manager){
+        CefCookie cookie;
+		CefString(&cookie.path).FromASCII("/");
+		CefString(&cookie.name).FromString(key.c_str());
+		CefString(&cookie.value).FromString(value.c_str());
+
+		if (!domain.empty()) {
+			CefString(&cookie.domain).FromString(domain.c_str());
+		}
+
+		cookie.httponly = true;
+		cookie.secure = false;
+		std::string httpDomain = "https://" + domain + "/setcookie";
+		manager->SetCookie(httpDomain, cookie, nullptr);
+    }
+}
+
+void WebviewHandler::deleteCookie(const std::string& domain, const std::string& key)
+{
+    CefRefPtr<CefCookieManager> manager = CefCookieManager::GetGlobalManager(nullptr);
+    if (manager) {
+        std::string httpDomain = "https://";
+        httpDomain.append(domain);
+        httpDomain.append("/deletecookie");
+        manager->DeleteCookies(httpDomain, key, nullptr);
+    }
+}
+
+bool WebviewHandler::visitAllCookies(){
+    CefRefPtr<CefCookieManager> manager = CefCookieManager::GetGlobalManager(nullptr);
+    if (!manager)
+	{
+		return false;
+	}
+
+    if(!m_CookieVisitor.get())
+    {
+        m_CookieVisitor = new WebviewCookieVisitor();
+        if (!m_CookieVisitor.get())
+		{
+			return false;
+		}
+    }
+
+    if (manager->VisitAllCookies(m_CookieVisitor))
+    {
+        if (onAllCookieVisitedCb) {
+            onAllCookieVisitedCb(m_CookieVisitor->getVisitedCookies());
+            return true;
+        }
+    }
+    return false;
+}
+
+bool WebviewHandler::visitUrlCookies(const std::string& domain, const bool& isHttpOnly){
+    CefRefPtr<CefCookieManager> manager = CefCookieManager::GetGlobalManager(nullptr);
+    if (!manager)
+	{
+		return false;
+	}
+
+    if(!m_CookieVisitor.get())
+    {
+        m_CookieVisitor = new WebviewCookieVisitor();
+        if (!m_CookieVisitor.get())
+		{
+			return false;
+		}
+    }
+
+    if (manager->VisitUrlCookies(domain, isHttpOnly, m_CookieVisitor))
+    {
+        if (onUrlCookieVisitedCb) {
+            onUrlCookieVisitedCb(m_CookieVisitor->getVisitedCookies());
+            return true;
+        }
+    }
+    return false;
+}
+
 void WebviewHandler::GetViewRect(CefRefPtr<CefBrowser> browser, CefRect &rect) {
     CEF_REQUIRE_UI_THREAD();
     

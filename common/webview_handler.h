@@ -10,6 +10,8 @@
 #include <functional>
 #include <list>
 
+#include "webview_cookieVisitor.h"
+
 class WebviewHandler : public CefClient,
 public CefDisplayHandler,
 public CefLifeSpanHandler,
@@ -19,6 +21,8 @@ public:
     std::function<void(const void*, int32_t width, int32_t height)> onPaintCallback;
     std::function<void(std::string url)> onUrlChangedCb;
     std::function<void(std::string title)> onTitleChangedCb;
+    std::function<void(std::map<std::string, std::map<std::string, std::string>>)> onAllCookieVisitedCb;
+    std::function<void(std::map<std::string, std::map<std::string, std::string>>)> onUrlCookieVisitedCb;
     
     explicit WebviewHandler();
     ~WebviewHandler();
@@ -94,6 +98,11 @@ public:
     void reload();
     void openDevTools();
     
+    void setCookie(const std::string& domain, const std::string& key, const std::string& value);
+    void deleteCookie(const std::string& domain, const std::string& key);
+    bool visitAllCookies();
+    bool visitUrlCookies(const std::string& domain, const bool& isHttpOnly);
+    
 private:
     uint32_t width = 1;
     uint32_t height = 1;
@@ -106,6 +115,8 @@ private:
     
     // Include the default reference counting implementation.
     IMPLEMENT_REFCOUNTING(WebviewHandler);
+
+    CefRefPtr<WebviewCookieVisitor> m_CookieVisitor;
 };
 
 #endif  // CEF_TESTS_CEFSIMPLE_SIMPLE_HANDLER_H_
