@@ -26,12 +26,12 @@ namespace webview_cef {
 	std::unique_ptr<uint8_t> backing_pixel_buffer;
 	std::mutex buffer_mutex_;
 	std::unique_ptr<flutter::TextureVariant> m_texture = std::make_unique<flutter::TextureVariant>(flutter::PixelBufferTexture([](size_t width, size_t height) -> const FlutterDesktopPixelBuffer* {
+		buffer_mutex_.lock();
 		auto buffer = pixel_buffer.get();
 		// Only lock the mutex if the buffer is not null
 		// (to ensure the release callback gets called)
-		if (buffer) {
-			// Gets unlocked in the FlutterDesktopPixelBuffer's release callback.
-			buffer_mutex_.lock();
+		if (!buffer) {
+			buffer_mutex_.unlock();
 		}
 		return buffer;
 		}));
