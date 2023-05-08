@@ -46,6 +46,12 @@ class WebViewController extends ValueNotifier<bool> {
       case "titleChanged":
         _listener?.onTitleChanged?.call(call.arguments);
         return;
+      case "allCookiesVisited":
+        _listener?.onAllCookiesVisited?.call(Map.from(call.arguments));
+        return;
+      case "urlCookiesVisited":
+        _listener?.onUrlCookiesVisited?.call(Map.from(call.arguments));
+        return;
       default:
     }
   }
@@ -104,6 +110,38 @@ class WebViewController extends ValueNotifier<bool> {
     }
     assert(value);
     return _pluginChannel.invokeMethod('openDevTools');
+  }
+
+  Future<void> setCookie(String domain, String key, String val) async {
+    if (_isDisposed) {
+      return;
+    }
+    assert(value);
+    return _pluginChannel.invokeMethod('setCookie', [domain, key, val]);
+  }
+
+  Future<void> deleteCookie(String domain, String key) async {
+    if (_isDisposed) {
+      return;
+    }
+    assert(value);
+    return _pluginChannel.invokeMethod('deleteCookie', [domain, key]);
+  }
+
+  Future<void> visitAllCookies() async {
+    if (_isDisposed) {
+      return;
+    }
+    assert(value);
+    return _pluginChannel.invokeMethod('visitAllCookies');
+  }
+
+  Future<void> visitUrlCookies(String domain, bool isHttpOnly) async {
+    if (_isDisposed) {
+      return;
+    }
+    assert(value);
+    return _pluginChannel.invokeMethod('visitUrlCookies', [domain, isHttpOnly]);
   }
 
   /// Moves the virtual cursor to [position].

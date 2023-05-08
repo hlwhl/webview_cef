@@ -11,6 +11,7 @@
 #import "include/cef_app.h"
 #import "../../common/webview_app.h"
 #import "../../common/webview_handler.h"
+#import "../../common/webview_cookieVisitor.h"
 
 #include <thread>
 
@@ -93,7 +94,42 @@ FlutterMethodChannel* f_channel;
     handler.get()->onTitleChangedCb = [](std::string title) {
         [f_channel invokeMethod:@"titleChanged" arguments:[NSString stringWithCString:title.c_str() encoding:NSUTF8StringEncoding]];
     };
+    //title change cb
+    handler.get()->onAllCookieVisitedCb = [](std::map<std::string, std::map<std::string, std::string>> cookies) {
+        NSMutableDictionary * dict = [NSMutableDictionary dictionary];
+        for(auto &cookie : cookies)
+        {
+            NSString * domain = [NSString stringWithCString:cookie.first.c_str() encoding:NSUTF8StringEncoding];
+            NSMutableDictionary * tempdict = [NSMutableDictionary dictionary];
+            for(auto &c : cookie.second)
+            {
+                NSString * key = [NSString stringWithCString:c.first.c_str() encoding:NSUTF8StringEncoding];
+                NSString * val = [NSString stringWithCString:c.second.c_str() encoding:NSUTF8StringEncoding];
+                tempdict[key] = val;
+            }
+            dict[domain] = tempdict;
+        }
+        [f_channel invokeMethod:@"allCookiesVisited" arguments:dict];
+    };
     
+    //title change cb
+    handler.get()->onUrlCookieVisitedCb = [](std::map<std::string, std::map<std::string, std::string>> cookies) {
+        NSMutableDictionary * dict = [NSMutableDictionary dictionary];
+        for(auto &cookie : cookies)
+        {
+            NSString * domain = [NSString stringWithCString:cookie.first.c_str() encoding:NSUTF8StringEncoding];
+            NSMutableDictionary * tempdict = [NSMutableDictionary dictionary];
+            for(auto &c : cookie.second)
+            {
+                NSString * key = [NSString stringWithCString:c.first.c_str() encoding:NSUTF8StringEncoding];
+                NSString * val = [NSString stringWithCString:c.second.c_str() encoding:NSUTF8StringEncoding];
+                tempdict[key] = val;
+            }
+            dict[domain] = tempdict;
+        }
+        [f_channel invokeMethod:@"urlCookiesVisited" arguments:dict];
+    };
+
     CefSettings settings;
     settings.windowless_rendering_enabled = true;
     settings.external_message_pump = true;
@@ -248,4 +284,19 @@ FlutterMethodChannel* f_channel;
     f_channel = channel;
 }
 
++ (void)setCookie: (NSString *)domain key:(NSString *) key value:(NSString *)value {
+    handler.get()->setCookie(std::string([domain cStringUsingEncoding:NSUTF8StringEncoding]), std::string([key cStringUsingEncoding:NSUTF8StringEncoding]), std::string([value cStringUsingEncoding:NSUTF8StringEncoding]));
+}
+
++ (void)deleteCookie: (NSString *)domain key:(NSString *) key {
+    handler.get()->deleteCookie(std::string([domain cStringUsingEncoding:NSUTF8StringEncoding]), std::string([key cStringUsingEncoding:NSUTF8StringEncoding]));
+}
+
++ (void)visitAllCookies {
+    handler.get()->visitAllCookies();
+}
+
++ (void)visitUrlCookies: (NSString *)domain isHttpOnly:(bool)isHttpOnly {
+    handler.get()->visitUrlCookies(std::string([domain cStringUsingEncoding:NSUTF8StringEncoding]), isHttpOnly);
+}
 @end

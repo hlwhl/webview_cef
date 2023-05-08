@@ -95,6 +95,32 @@
         [CefWrapper openDevTools];
         result(nil);
     }
+    else if([@"setCookie" isEqualToString:call.method]){
+        NSArray<NSString *> *_arg = call.arguments;
+        NSString * domain = [_arg objectAtIndex:0];
+        NSString * key = [_arg objectAtIndex:1];
+        NSString * value = [_arg objectAtIndex:2];
+        [CefWrapper setCookie:domain key:key value:value];
+        result(nil);
+    }
+    else if ([@"deleteCookie" isEqualToString:call.method]) {
+        NSArray<NSString *> *_arg = call.arguments;
+        NSString * domain = [_arg objectAtIndex:0];
+        NSString * key = [_arg objectAtIndex:1];
+        [CefWrapper deleteCookie:domain key:key];
+        result(nil);
+    }
+    else if ([@"visitAllCookies" isEqualToString:call.method]) {
+        [CefWrapper visitAllCookies];
+        result(nil);
+    }
+    else if ([@"visitUrlCookies" isEqualToString:call.method]) {
+        NSArray<NSString *> *_arg = call.arguments;
+        NSString * domain = [_arg objectAtIndex:0];
+        NSString * isHttpOnly = [_arg objectAtIndex:1];
+        [CefWrapper visitUrlCookies:domain isHttpOnly:[isHttpOnly boolValue]];
+        result(nil);
+    }
     else {
         result(FlutterMethodNotImplemented);
     }

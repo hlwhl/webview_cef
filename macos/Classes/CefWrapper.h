@@ -41,6 +41,14 @@ extern int64_t textureId;
 
 + (void) setMethodChannel: (FlutterMethodChannel*)channel;
 
++ (void) setCookie: (NSString *)domain key:(NSString *) key value:(NSString *)value;
+
++ (void) deleteCookie: (NSString *)domain key:(NSString *) key;
+
++ (void) visitAllCookies;
+
++ (void) visitUrlCookies: (NSString *)domain isHttpOnly:(bool)isHttpOnly;
+
 @end
 
 #endif /* CefWrapper_h */

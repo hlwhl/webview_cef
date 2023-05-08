@@ -12,7 +12,7 @@
 
 #include <memory>
 #include <thread>
-#include<iostream>
+#include <iostream>
 #include <mutex>
 
 #include "webview_app.h"
@@ -96,6 +96,34 @@ namespace webview_cef {
 
 		handler.get()->onTitleChangedCb = [](std::string title) {
 			channel->InvokeMethod("titleChanged", std::make_unique<flutter::EncodableValue>(title));
+		};
+
+		handler.get()->onAllCookieVisitedCb = [](std::map<std::string, std::map<std::string, std::string>> cookies) {
+			flutter::EncodableMap retMap;
+			for (auto& cookie : cookies)
+			{
+				flutter::EncodableMap tempMap;
+				for (auto& c : cookie.second)
+				{
+					tempMap[flutter::EncodableValue(c.first)] = flutter::EncodableValue(c.second);
+				}
+				retMap[flutter::EncodableValue(cookie.first)] = flutter::EncodableValue(tempMap);
+			}
+			channel->InvokeMethod("allCookiesVisited", std::make_unique<flutter::EncodableValue>(retMap));
+		};
+
+		handler.get()->onUrlCookieVisitedCb = [](std::map<std::string, std::map<std::string, std::string>> cookies) {
+			flutter::EncodableMap retMap;
+			for (auto& cookie : cookies)
+			{
+				flutter::EncodableMap tempMap;
+				for (auto& c : cookie.second)
+				{
+					tempMap[flutter::EncodableValue(c.first)] = flutter::EncodableValue(c.second);
+				}
+				retMap[flutter::EncodableValue(cookie.first)] = flutter::EncodableValue(tempMap);
+			}
+			channel->InvokeMethod("urlCookiesVisited", std::make_unique<flutter::EncodableValue>(retMap));
 		};
 
 		CefSettings cefs;
@@ -231,6 +259,35 @@ namespace webview_cef {
 		}
 		else if (method_call.method_name().compare("openDevTools") == 0) {
 			handler.get()->openDevTools();
+			result->Success();
+		}
+		else if(method_call.method_name().compare("setCookie") == 0){
+			const flutter::EncodableList* list =
+				std::get_if<flutter::EncodableList>(method_call.arguments());
+			const auto domain = *std::get_if<std::string>(&(*list)[0]);
+			const auto key = *std::get_if<std::string>(&(*list)[1]);
+			const auto value = *std::get_if<std::string>(&(*list)[2]);
+			handler.get()->setCookie(domain, key, value);
+			result->Success();
+		}
+		else if (method_call.method_name().compare("deleteCookie") == 0) {
+			const flutter::EncodableList* list =
+				std::get_if<flutter::EncodableList>(method_call.arguments());
+			const auto domain = *std::get_if<std::string>(&(*list)[0]);
+			const auto key = *std::get_if<std::string>(&(*list)[1]);
+			handler.get()->deleteCookie(domain, key);
+			result->Success();
+		}
+		else if (method_call.method_name().compare("visitAllCookies") == 0) {
+			handler.get()->visitAllCookies();
+			result->Success();
+		}
+		else if (method_call.method_name().compare("visitUrlCookies") == 0) {
+			const flutter::EncodableList* list =
+				std::get_if<flutter::EncodableList>(method_call.arguments());
+			const auto domain = *std::get_if<std::string>(&(*list)[0]);
+			const auto isHttpOnly = *std::get_if<bool>(&(*list)[1]);
+			handler.get()->visitUrlCookies(domain, isHttpOnly);
 			result->Success();
 		}
 		else {
