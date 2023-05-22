@@ -69,14 +69,37 @@ set(webview_cef_bundled_libraries
     "${CMAKE_CURRENT_SOURCE_DIR}/cefbins/resources/locales"
     "${CMAKE_CURRENT_SOURCE_DIR}/cefbins/resources/icudtl.dat"
     "${CMAKE_CURRENT_SOURCE_DIR}/cefbins/resources/resources.pak"
+    "${CMAKE_CURRENT_SOURCE_DIR}/cefbins/resources/chrome_100_percent.pak"
+    "${CMAKE_CURRENT_SOURCE_DIR}/cefbins/resources/chrome_200_percent.pak"
     $<$<CONFIG:Debug>:${CMAKE_CURRENT_SOURCE_DIR}/cefbins/debug/bin/chrome_elf.dll>
     $<$<CONFIG:Debug>:${CMAKE_CURRENT_SOURCE_DIR}/cefbins/debug/bin/libcef.dll>
     $<$<CONFIG:Debug>:${CMAKE_CURRENT_SOURCE_DIR}/cefbins/debug/bin/v8_context_snapshot.bin>
+    $<$<CONFIG:Debug>:${CMAKE_CURRENT_SOURCE_DIR}/cefbins/debug/bin/swiftshader>
+    $<$<CONFIG:Debug>:${CMAKE_CURRENT_SOURCE_DIR}/cefbins/debug/bin/d3dcompiler_47.dll>
+    $<$<CONFIG:Debug>:${CMAKE_CURRENT_SOURCE_DIR}/cefbins/debug/bin/libEGL.dll>
+    $<$<CONFIG:Debug>:${CMAKE_CURRENT_SOURCE_DIR}/cefbins/debug/bin/libGLESv2.dll>
+    $<$<CONFIG:Debug>:${CMAKE_CURRENT_SOURCE_DIR}/cefbins/debug/bin/vulkan-1.dll>
+    $<$<CONFIG:Debug>:${CMAKE_CURRENT_SOURCE_DIR}/cefbins/debug/bin/vk_swiftshader.dll>
+    $<$<CONFIG:Debug>:${CMAKE_CURRENT_SOURCE_DIR}/cefbins/debug/bin/vk_swiftshader_icd.json>
     $<$<CONFIG:Release>:${CMAKE_CURRENT_SOURCE_DIR}/cefbins/release/bin/chrome_elf.dll>
     $<$<CONFIG:Release>:${CMAKE_CURRENT_SOURCE_DIR}/cefbins/release/bin/libcef.dll>
     $<$<CONFIG:Release>:${CMAKE_CURRENT_SOURCE_DIR}/cefbins/release/bin/v8_context_snapshot.bin>
+    $<$<CONFIG:Release>:${CMAKE_CURRENT_SOURCE_DIR}/cefbins/release/bin/swiftshader>
+    $<$<CONFIG:Release>:${CMAKE_CURRENT_SOURCE_DIR}/cefbins/release/bin/d3dcompiler_47.dll>
+    $<$<CONFIG:Release>:${CMAKE_CURRENT_SOURCE_DIR}/cefbins/release/bin/libEGL.dll>
+    $<$<CONFIG:Release>:${CMAKE_CURRENT_SOURCE_DIR}/cefbins/release/bin/libGLESv2.dll>
+    $<$<CONFIG:Release>:${CMAKE_CURRENT_SOURCE_DIR}/cefbins/release/bin/vulkan-1.dll>
+    $<$<CONFIG:Release>:${CMAKE_CURRENT_SOURCE_DIR}/cefbins/release/bin/vk_swiftshader.dll>
+    $<$<CONFIG:Release>:${CMAKE_CURRENT_SOURCE_DIR}/cefbins/release/bin/vk_swiftshader_icd.json>
     $<$<CONFIG:Profile>:${CMAKE_CURRENT_SOURCE_DIR}/cefbins/release/bin/chrome_elf.dll>
     $<$<CONFIG:Profile>:${CMAKE_CURRENT_SOURCE_DIR}/cefbins/release/bin/libcef.dll>
     $<$<CONFIG:Profile>:${CMAKE_CURRENT_SOURCE_DIR}/cefbins/release/bin/v8_context_snapshot.bin>
+    $<$<CONFIG:Profile>:${CMAKE_CURRENT_SOURCE_DIR}/cefbins/release/bin/swiftshader>
+    $<$<CONFIG:Profile>:${CMAKE_CURRENT_SOURCE_DIR}/cefbins/release/bin/d3dcompiler_47.dll>
+    $<$<CONFIG:Profile>:${CMAKE_CURRENT_SOURCE_DIR}/cefbins/release/bin/libEGL.dll>
+    $<$<CONFIG:Profile>:${CMAKE_CURRENT_SOURCE_DIR}/cefbins/release/bin/libGLESv2.dll>
+    $<$<CONFIG:Profile>:${CMAKE_CURRENT_SOURCE_DIR}/cefbins/release/bin/vulkan-1.dll>
+    $<$<CONFIG:Profile>:${CMAKE_CURRENT_SOURCE_DIR}/cefbins/release/bin/vk_swiftshader.dll>
+    $<$<CONFIG:Profile>:${CMAKE_CURRENT_SOURCE_DIR}/cefbins/release/bin/vk_swiftshader_icd.json>
     PARENT_SCOPE)
 
