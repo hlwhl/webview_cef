@@ -23,6 +23,7 @@ public:
     std::function<void(std::string title)> onTitleChangedCb;
     std::function<void(std::map<std::string, std::map<std::string, std::string>>)> onAllCookieVisitedCb;
     std::function<void(std::map<std::string, std::map<std::string, std::string>>)> onUrlCookieVisitedCb;
+    std::function<void(std::string channelName, std::string message, std::string js_callback_id, std::string frameId)> onJavaScriptChannelMessage;
     
     explicit WebviewHandler();
     ~WebviewHandler();
@@ -39,6 +40,13 @@ public:
     }
     virtual CefRefPtr<CefLoadHandler> GetLoadHandler() override { return this; }
     virtual CefRefPtr<CefRenderHandler> GetRenderHandler() override { return this; }
+
+	bool OnProcessMessageReceived(
+        CefRefPtr<CefBrowser> browser,
+		CefRefPtr<CefFrame> frame,
+		CefProcessId source_process,
+		CefRefPtr<CefProcessMessage> message) override;
+
     
     // CefDisplayHandler methods:
     virtual void OnTitleChange(CefRefPtr<CefBrowser> browser,
@@ -102,6 +110,10 @@ public:
     void deleteCookie(const std::string& domain, const std::string& key);
     bool visitAllCookies();
     bool visitUrlCookies(const std::string& domain, const bool& isHttpOnly);
+
+    bool setJavaScriptChannels(const std::vector<std::string> channels);
+    bool sendJavaScriptChannelCallBack(const bool error, const std::string result, const std::string callbackId, const std::string frameId);
+    bool executeJavaScript(const std::string code);
     
 private:
     uint32_t width = 1;

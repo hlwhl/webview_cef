@@ -6,6 +6,7 @@ import 'package:flutter/services.dart';
 import 'package:flutter/widgets.dart';
 
 import 'webview_events_listener.dart';
+import 'webview_javascript.dart';
 
 const MethodChannel _pluginChannel = MethodChannel("webview_cef");
 
@@ -14,6 +15,9 @@ class WebViewController extends ValueNotifier<bool> {
   int _textureId = 0;
   bool _isDisposed = false;
   WebviewEventsListener? _listener;
+
+  final Map<String, JavascriptChannel> _javascriptChannels =
+      <String, JavascriptChannel>{};
 
   Future<void> get ready => _creatingCompleter.future;
 
@@ -52,6 +56,13 @@ class WebViewController extends ValueNotifier<bool> {
       case "urlCookiesVisited":
         _listener?.onUrlCookiesVisited?.call(Map.from(call.arguments));
         return;
+      case 'javascriptChannelMessage':
+        _handleJavascriptChannelMessage(
+            call.arguments['channel'],
+            call.arguments['message'],
+            call.arguments['callbackId'],
+            call.arguments['frameId']);
+        break;
       default:
     }
   }
@@ -65,6 +76,7 @@ class WebViewController extends ValueNotifier<bool> {
     await _creatingCompleter.future;
     if (!_isDisposed) {
       _isDisposed = true;
+      _javascriptChannels.clear();
       await _pluginChannel.invokeMethod('dispose', _textureId);
     }
     super.dispose();
@@ -144,6 +156,39 @@ class WebViewController extends ValueNotifier<bool> {
     return _pluginChannel.invokeMethod('visitUrlCookies', [domain, isHttpOnly]);
   }
 
+  Future<void> setJavaScriptChannels(Set<JavascriptChannel> channels) async {
+    if (_isDisposed) {
+      return;
+    }
+    assert(value);
+    _assertJavascriptChannelNamesAreUnique(channels);
+
+    channels.forEach((channel) {
+      _javascriptChannels[channel.name] = channel;
+    });
+
+    return _pluginChannel.invokeMethod('setJavaScriptChannels',
+        [_extractJavascriptChannelNames(channels).toList()]);
+  }
+
+  Future<void> sendJavaScriptChannelCallBack(
+      bool error, String result, String callbackId, String frameId) async {
+    if (_isDisposed) {
+      return;
+    }
+    assert(value);
+    return _pluginChannel.invokeMethod(
+        'sendJavaScriptChannelCallBack', [error, result, callbackId, frameId]);
+  }
+
+  Future<void> executeJavaScript(String code) async {
+    if (_isDisposed) {
+      return;
+    }
+    assert(value);
+    return _pluginChannel.invokeMethod('executeJavaScript', [code]);
+  }
+
   /// Moves the virtual cursor to [position].
   Future<void> _cursorMove(Offset position) async {
     if (_isDisposed) {
@@ -199,6 +244,30 @@ class WebViewController extends ValueNotifier<bool> {
     assert(value);
     return _pluginChannel
         .invokeMethod('setSize', [dpi, size.width, size.height]);
+  }
+
+  Set<String> _extractJavascriptChannelNames(Set<JavascriptChannel> channels) {
+    final Set<String> channelNames =
+        channels.map((JavascriptChannel channel) => channel.name).toSet();
+    return channelNames;
+  }
+
+  void _handleJavascriptChannelMessage(final String channelName,
+      final String message, final String callbackId, final String frameId) {
+    if (_javascriptChannels.containsKey(channelName)) {
+      _javascriptChannels[channelName]!
+          .onMessageReceived(JavascriptMessage(message, callbackId, frameId));
+    } else {
+      print('Channel "$channelName" is not exstis');
+    }
+  }
+
+  void _assertJavascriptChannelNamesAreUnique(
+      final Set<JavascriptChannel>? channels) {
+    if (channels == null || channels.isEmpty) {
+      return;
+    }
+    assert(_extractJavascriptChannelNames(channels).length == channels.length);
   }
 }
 

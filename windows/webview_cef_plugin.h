@@ -6,9 +6,12 @@
 
 #include <memory>
 
-#include "include/cef_app.h"
+#include "webview_app.h"
 
 namespace webview_cef {
+
+//Use WebviewApp for both CefExecuteProcess and CefInitialize.
+extern CefRefPtr<WebviewApp> app;
 
 class WebviewCefPlugin : public flutter::Plugin {
  public:

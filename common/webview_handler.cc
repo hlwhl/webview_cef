@@ -16,6 +16,8 @@
 #include "include/wrapper/cef_closure_task.h"
 #include "include/wrapper/cef_helpers.h"
 
+#include "webview_js_handler.h"
+
 namespace {
 
 WebviewHandler* g_instance = nullptr;
@@ -41,6 +43,28 @@ WebviewHandler::~WebviewHandler() {
 // static
 WebviewHandler* WebviewHandler::GetInstance() {
     return g_instance;
+}
+
+bool WebviewHandler::OnProcessMessageReceived(
+    CefRefPtr<CefBrowser> browser, CefRefPtr<CefFrame> frame,
+     CefProcessId source_process, CefRefPtr<CefProcessMessage> message)
+{
+	std::string message_name = message->GetName();
+
+    if(message_name == kJSCallCppFunctionMessage)
+    {
+        CefString fun_name = message->GetArgumentList()->GetString(0);
+		CefString param = message->GetArgumentList()->GetString(1);
+		int js_callback_id = message->GetArgumentList()->GetInt(2);
+
+        if (fun_name.empty() || !(browser.get())) {
+		    return false;
+	    }
+
+        onJavaScriptChannelMessage(
+            fun_name,param,std::to_string(js_callback_id),std::to_string(frame->GetIdentifier()));
+    }
+    return false;
 }
 
 void WebviewHandler::OnTitleChange(CefRefPtr<CefBrowser> browser,
@@ -368,6 +392,56 @@ bool WebviewHandler::visitUrlCookies(const std::string& domain, const bool& isHt
         if (onUrlCookieVisitedCb) {
             onUrlCookieVisitedCb(m_CookieVisitor->getVisitedCookies());
             return true;
+        }
+    }
+    return false;
+}
+
+bool WebviewHandler::setJavaScriptChannels(const std::vector<std::string> channels)
+{
+    std::string extensionCode = "";
+    for(auto& channel : channels)
+    {
+        extensionCode += channel;
+        extensionCode += " = (e,r) => {external.JavaScriptChannel('";
+        extensionCode += channel;
+        extensionCode += "',e,r)};";
+    }
+    return executeJavaScript(extensionCode);
+}
+
+bool WebviewHandler::sendJavaScriptChannelCallBack(const bool error, const std::string result, const std::string callbackId, const std::string frameId)
+{
+    CefRefPtr<CefProcessMessage> message = CefProcessMessage::Create(kExecuteJsCallbackMessage);
+    CefRefPtr<CefListValue> args = message->GetArgumentList();
+    args->SetInt(0, atoi(callbackId.c_str()));
+    args->SetBool(1, error);
+    args->SetString(2, result);
+    BrowserList::iterator bit = browser_list_.begin();
+    for (; bit != browser_list_.end(); ++bit) {
+        CefRefPtr<CefFrame> frame = (*bit)->GetMainFrame();
+        if (frame->GetIdentifier() == atoll(frameId.c_str()))
+        {
+            frame->SendProcessMessage(PID_RENDERER, message);
+            return true;
+        }
+    }
+    return false;
+}
+
+bool WebviewHandler::executeJavaScript(const std::string code)
+{
+    if(!code.empty())
+    {
+        BrowserList::iterator bit = browser_list_.begin();
+        for (; bit != browser_list_.end(); ++bit) {
+            if ((*bit).get()) {
+                CefRefPtr<CefFrame> frame = (*bit)->GetMainFrame();
+                if (frame) {
+			        frame->ExecuteJavaScript(code, frame->GetURL(), 0);
+			        return true;
+		        }
+            }
         }
     }
     return false;

@@ -15,8 +15,6 @@
 #include <iostream>
 #include <mutex>
 
-#include "webview_app.h"
-
 namespace webview_cef {
 	bool init = false;
 	int64_t texture_id;
@@ -38,6 +36,7 @@ namespace webview_cef {
 	CefRefPtr<WebviewHandler> handler(new WebviewHandler());
 	CefRefPtr<WebviewApp> app(new WebviewApp(handler));
 	CefMainArgs mainArgs;
+
 	std::unique_ptr<
 		flutter::MethodChannel<flutter::EncodableValue>,
 		std::default_delete<flutter::MethodChannel<flutter::EncodableValue>>>
@@ -124,6 +123,15 @@ namespace webview_cef {
 				retMap[flutter::EncodableValue(cookie.first)] = flutter::EncodableValue(tempMap);
 			}
 			channel->InvokeMethod("urlCookiesVisited", std::make_unique<flutter::EncodableValue>(retMap));
+		};
+
+		handler.get()->onJavaScriptChannelMessage = [](std::string channelName, std::string message, std::string callbackId, std::string frameId) {
+			flutter::EncodableMap retMap;
+			retMap[flutter::EncodableValue("channel")] = flutter::EncodableValue(channelName);
+			retMap[flutter::EncodableValue("message")] = flutter::EncodableValue(message);
+			retMap[flutter::EncodableValue("callbackId")] = flutter::EncodableValue(callbackId);
+			retMap[flutter::EncodableValue("frameId")] = flutter::EncodableValue(frameId);
+			channel->InvokeMethod("javascriptChannelMessage", std::make_unique<flutter::EncodableValue>(retMap));
 		};
 
 		CefSettings cefs;
@@ -289,6 +297,34 @@ namespace webview_cef {
 			const auto isHttpOnly = *std::get_if<bool>(&(*list)[1]);
 			handler.get()->visitUrlCookies(domain, isHttpOnly);
 			result->Success();
+		}
+		else if(method_call.method_name().compare("setJavaScriptChannels") == 0){
+			const flutter::EncodableList* list =
+				std::get_if<flutter::EncodableList>(method_call.arguments());
+			const auto jsChannels = *std::get_if<std::vector<flutter::EncodableValue>>(&(*list)[0]);
+			std::vector<std::string> channels;
+			for (auto& jsChannel : jsChannels) {
+				channels.push_back(*std::get_if<std::string>(&(jsChannel)));
+			}
+			handler.get()->setJavaScriptChannels(channels);
+			result->Success();
+		}
+		else if (method_call.method_name().compare("sendJavaScriptChannelCallBack") == 0) {
+			const flutter::EncodableList* list =
+				std::get_if<flutter::EncodableList>(method_call.arguments());
+			const auto error = *std::get_if<bool>(&(*list)[0]);
+			const auto ret = *std::get_if<std::string>(&(*list)[1]);
+			const auto callbackId = *std::get_if<std::string>(&(*list)[2]);
+			const auto frameId = *std::get_if<std::string>(&(*list)[3]);
+			handler.get()->sendJavaScriptChannelCallBack(error, ret,callbackId,frameId);
+			result->Success();
+		}
+		else if(method_call.method_name().compare("executeJavaScript") == 0){
+			const flutter::EncodableList* list =
+				std::get_if<flutter::EncodableList>(method_call.arguments());
+			const auto code = *std::get_if<std::string>(&(*list)[0]);
+			handler.get()->executeJavaScript(code);
+			result->Success();	
 		}
 		else {
 			result->NotImplemented();

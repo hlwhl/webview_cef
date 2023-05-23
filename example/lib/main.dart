@@ -41,6 +41,24 @@ class _MyAppState extends State<MyApp> {
         _textController.text = url;
       },
     ));
+
+    // ignore: prefer_collection_literals
+    final Set<JavascriptChannel> jsChannels = [
+      JavascriptChannel(
+          name: 'Print',
+          onMessageReceived: (JavascriptMessage message) {
+            print(message.message);
+            _controller.sendJavaScriptChannelCallBack(
+                false,
+                "{'code':'200','message':'print succeed!'}",
+                message.callbackId,
+                message.frameId);
+          }),
+    ].toSet();
+    //normal JavaScriptChannels
+    await _controller.setJavaScriptChannels(jsChannels);
+    //also you can build your own jssdk by execute JavaScript code to CEF
+    await _controller.executeJavaScript("function abc(e){console.log(e)}");
     // If the widget was removed from the tree while the asynchronous platform
     // message was in flight, we want to discard the reply rather than calling
     // setState to update our non-existent appearance.

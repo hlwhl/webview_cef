@@ -49,6 +49,12 @@ extern int64_t textureId;
 
 + (void) visitUrlCookies: (NSString *)domain isHttpOnly:(bool)isHttpOnly;
 
++ (void) setJavaScriptChannels: (NSArray *)channels;
+
++ (void) sendJavaScriptChannelCallBack: (bool)error  result:(NSString *)result callbackId:(NSString *)callbackId frameId:(NSString *)frameId;
+
++ (void) executeJavaScript: (NSString *)code;
+
 @end
 
 #endif /* CefWrapper_h */
