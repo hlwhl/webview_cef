@@ -1,3 +1,8 @@
+## 0.0.9
+
+- [Windows] Fixed crash caused by frame buffer lock.
+- [Windows] Fixed WebGL support.
+
 ## 0.0.8
 
 - Added support to build macOS universal app.

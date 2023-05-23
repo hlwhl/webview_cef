@@ -29,7 +29,7 @@ endfunction()
 
 function(preparePrebuiltFiles)
     if(NOT EXISTS "${CMAKE_CURRENT_SOURCE_DIR}/cefbins/debug")
-        download_file(https://github.com/hlwhl/webview_cef/releases/download/prebuilt_cef_bin/webview_cef_bin_0.0.1_101.0.18+chromium-101.0.4951.67_windows64.zip ${CMAKE_CURRENT_SOURCE_DIR}/prebuilt.zip)
+        download_file(https://github.com/hlwhl/webview_cef/releases/download/prebuilt_cef_bin_windows/webview_cef_bin_0.0.2_101.0.18+chromium-101.0.4951.67_windows64.zip ${CMAKE_CURRENT_SOURCE_DIR}/prebuilt.zip)
         file(MAKE_DIRECTORY ${CMAKE_CURRENT_SOURCE_DIR}/cefbins)
         extract_file(${CMAKE_CURRENT_SOURCE_DIR}/prebuilt.zip ${CMAKE_CURRENT_SOURCE_DIR}/cefbins)
         file(REMOVE_RECURSE ${CMAKE_CURRENT_SOURCE_DIR}/prebuilt.zip)
