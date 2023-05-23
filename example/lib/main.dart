@@ -102,19 +102,7 @@ class _MyAppState extends State<MyApp> {
                 child: TextField(
                   controller: _textController,
                   onSubmitted: (url) {
-                    if (url.startsWith('http://')) {
-                      _textController.text = url;
-                      _controller.loadUrl(url);
-                    } else if (url.startsWith('https://')) {
-                      _textController.text = url;
-                      _controller.loadUrl(url);
-                    } else if (url.startsWith('www.')) {
-                      _textController.text = 'https://$url';
-                      _controller.loadUrl('https://$url');
-                    } else {
-                      _textController.text = url;
-                      _controller.loadUrl('https://google.com/search?q=$url');
-                    }
+                    _controller.loadUrl(url);
                   },
                 ),
               ),
