@@ -11,6 +11,8 @@
 #import "include/cef_app.h"
 #import "../../common/webview_app.h"
 #import "../../common/webview_handler.h"
+#import "../../common/webview_cookieVisitor.h"
+#import "../../common/webview_js_handler.h"
 
 #include <thread>
 
@@ -93,7 +95,52 @@ FlutterMethodChannel* f_channel;
     handler.get()->onTitleChangedCb = [](std::string title) {
         [f_channel invokeMethod:@"titleChanged" arguments:[NSString stringWithCString:title.c_str() encoding:NSUTF8StringEncoding]];
     };
+    //allcookie visited cb
+    handler.get()->onAllCookieVisitedCb = [](std::map<std::string, std::map<std::string, std::string>> cookies) {
+        NSMutableDictionary * dict = [NSMutableDictionary dictionary];
+        for(auto &cookie : cookies)
+        {
+            NSString * domain = [NSString stringWithCString:cookie.first.c_str() encoding:NSUTF8StringEncoding];
+            NSMutableDictionary * tempdict = [NSMutableDictionary dictionary];
+            for(auto &c : cookie.second)
+            {
+                NSString * key = [NSString stringWithCString:c.first.c_str() encoding:NSUTF8StringEncoding];
+                NSString * val = [NSString stringWithCString:c.second.c_str() encoding:NSUTF8StringEncoding];
+                tempdict[key] = val;
+            }
+            dict[domain] = tempdict;
+        }
+        [f_channel invokeMethod:@"allCookiesVisited" arguments:dict];
+    };
     
+    //urlcookie visited cb
+    handler.get()->onUrlCookieVisitedCb = [](std::map<std::string, std::map<std::string, std::string>> cookies) {
+        NSMutableDictionary * dict = [NSMutableDictionary dictionary];
+        for(auto &cookie : cookies)
+        {
+            NSString * domain = [NSString stringWithCString:cookie.first.c_str() encoding:NSUTF8StringEncoding];
+            NSMutableDictionary * tempdict = [NSMutableDictionary dictionary];
+            for(auto &c : cookie.second)
+            {
+                NSString * key = [NSString stringWithCString:c.first.c_str() encoding:NSUTF8StringEncoding];
+                NSString * val = [NSString stringWithCString:c.second.c_str() encoding:NSUTF8StringEncoding];
+                tempdict[key] = val;
+            }
+            dict[domain] = tempdict;
+        }
+        [f_channel invokeMethod:@"urlCookiesVisited" arguments:dict];
+    };
+
+    //JavaScriptChannel called
+ 	handler.get()->onJavaScriptChannelMessage = [](std::string channelName, std::string message, std::string callbackId, std::string frameId) {
+        NSMutableDictionary * dict = [NSMutableDictionary dictionary];
+        dict[@"channel"] = [NSString stringWithCString:channelName.c_str() encoding:NSUTF8StringEncoding];
+        dict[@"message"]  = [NSString stringWithCString:message.c_str() encoding:NSUTF8StringEncoding];
+        dict[@"callbackId"]  = [NSString stringWithCString:callbackId.c_str() encoding:NSUTF8StringEncoding];
+        dict[@"frameId"]  = [NSString stringWithCString:frameId.c_str() encoding:NSUTF8StringEncoding];
+        [f_channel invokeMethod:@"javascriptChannelMessage" arguments:dict];
+	};   
+
     CefSettings settings;
     settings.windowless_rendering_enabled = true;
     settings.external_message_pump = true;
@@ -248,4 +295,38 @@ FlutterMethodChannel* f_channel;
     f_channel = channel;
 }
 
++ (void)setCookie: (NSString *)domain key:(NSString *) key value:(NSString *)value {
+    handler.get()->setCookie(std::string([domain cStringUsingEncoding:NSUTF8StringEncoding]), std::string([key cStringUsingEncoding:NSUTF8StringEncoding]), std::string([value cStringUsingEncoding:NSUTF8StringEncoding]));
+}
+
++ (void)deleteCookie: (NSString *)domain key:(NSString *) key {
+    handler.get()->deleteCookie(std::string([domain cStringUsingEncoding:NSUTF8StringEncoding]), std::string([key cStringUsingEncoding:NSUTF8StringEncoding]));
+}
+
++ (void)visitAllCookies {
+    handler.get()->visitAllCookies();
+}
+
++ (void)visitUrlCookies: (NSString *)domain isHttpOnly:(bool)isHttpOnly {
+    handler.get()->visitUrlCookies(std::string([domain cStringUsingEncoding:NSUTF8StringEncoding]), isHttpOnly);
+}
+
++ (void) setJavaScriptChannels: (NSArray *)channels {
+    std::vector<std::string> stdChannels;
+    NSEnumerator * enumerator = [channels objectEnumerator];
+    NSString * value;
+    while (value = [enumerator nextObject]) {
+        stdChannels.push_back(std::string([value cStringUsingEncoding:NSUTF8StringEncoding]));
+    }
+    handler.get()->setJavaScriptChannels(stdChannels);
+}
+
++ (void) sendJavaScriptChannelCallBack: (bool)error  result:(NSString *)result callbackId:(NSString *)callbackId frameId:(NSString *)frameId {
+    handler.get()->sendJavaScriptChannelCallBack(error, std::string([result cStringUsingEncoding:NSUTF8StringEncoding]), 
+        std::string([callbackId cStringUsingEncoding:NSUTF8StringEncoding]), std::string([frameId cStringUsingEncoding:NSUTF8StringEncoding]));
+}
+
++ (void) executeJavaScript: (NSString *)code {
+    handler.get()->executeJavaScript(std::string([code cStringUsingEncoding:NSUTF8StringEncoding]));
+}
 @end

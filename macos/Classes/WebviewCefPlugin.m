@@ -95,6 +95,53 @@
         [CefWrapper openDevTools];
         result(nil);
     }
+    else if([@"setCookie" isEqualToString:call.method]){
+        NSArray<NSString *> *_arg = call.arguments;
+        NSString * domain = [_arg objectAtIndex:0];
+        NSString * key = [_arg objectAtIndex:1];
+        NSString * value = [_arg objectAtIndex:2];
+        [CefWrapper setCookie:domain key:key value:value];
+        result(nil);
+    }
+    else if ([@"deleteCookie" isEqualToString:call.method]) {
+        NSArray<NSString *> *_arg = call.arguments;
+        NSString * domain = [_arg objectAtIndex:0];
+        NSString * key = [_arg objectAtIndex:1];
+        [CefWrapper deleteCookie:domain key:key];
+        result(nil);
+    }
+    else if ([@"visitAllCookies" isEqualToString:call.method]) {
+        [CefWrapper visitAllCookies];
+        result(nil);
+    }
+    else if ([@"visitUrlCookies" isEqualToString:call.method]) {
+        NSArray<NSString *> *_arg = call.arguments;
+        NSString * domain = [_arg objectAtIndex:0];
+        NSString * isHttpOnly = [_arg objectAtIndex:1];
+        [CefWrapper visitUrlCookies:domain isHttpOnly:[isHttpOnly boolValue]];
+        result(nil);
+    }
+    else if ([@"setJavaScriptChannels" isEqualToString:call.method])  {
+        NSArray<NSArray *> *_arg = call.arguments;
+        NSArray * channels = [_arg objectAtIndex:0];
+        [CefWrapper setJavaScriptChannels:channels];
+        result(nil);
+    }
+    else if ([@"sendJavaScriptChannelCallBack" isEqualToString:call.method])  {
+        NSArray<NSString *> *_arg = call.arguments;
+        NSString * error = [_arg objectAtIndex:0];
+        NSString * ret = [_arg objectAtIndex:1];
+        NSString * callbackId = [_arg objectAtIndex:2];
+        NSString * frameId = [_arg objectAtIndex:3];
+        [CefWrapper sendJavaScriptChannelCallBack:[error boolValue]  result:ret callbackId:callbackId frameId:frameId];
+        result(nil);
+    }
+    else if ([@"executeJavaScript" isEqualToString:call.method])  {
+        NSArray<NSString *> *_arg = call.arguments;
+        NSString * code = [_arg objectAtIndex:0];
+        [CefWrapper executeJavaScript:code];
+        result(nil);
+    }
     else {
         result(FlutterMethodNotImplemented);
     }

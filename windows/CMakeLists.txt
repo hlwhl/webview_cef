@@ -27,6 +27,10 @@ list(APPEND PLUGIN_SOURCES
   "${CMAKE_CURRENT_LIST_DIR}/../common/webview_app.h"
   "${CMAKE_CURRENT_LIST_DIR}/../common/webview_handler.cc"
   "${CMAKE_CURRENT_LIST_DIR}/../common/webview_handler.h"
+  "${CMAKE_CURRENT_LIST_DIR}/../common/webview_js_handler.cc"
+  "${CMAKE_CURRENT_LIST_DIR}/../common/webview_js_handler.h"
+  "${CMAKE_CURRENT_LIST_DIR}/../common/webview_cookieVisitor.cc"
+  "${CMAKE_CURRENT_LIST_DIR}/../common/webview_cookieVisitor.h"
 )
 
 # Define the plugin library target. Its name must not be changed (see comment
