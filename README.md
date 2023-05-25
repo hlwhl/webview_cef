@@ -63,7 +63,8 @@ When building the project for the first time, a prebuilt cef bin package (200MB,
 - [ ] Multi instance support
 - [ ] IME support
 - [x] Mouse events support
-- [ ] JS bridge support
+- [x] JS bridge support
+- [x] Cookie manipulation support
 - [x] Release to pub
 - [x] Trackpad support
 - [ ] Better macOS binary distribution
