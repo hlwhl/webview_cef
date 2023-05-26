@@ -53,9 +53,10 @@ FlutterMethodChannel* f_channel;
     textureId = [tr registerTexture:[CefWrapper alloc]];
     handler.get()->onPaintCallback = [](const void* buffer, int32_t width, int32_t height) {
         NSDictionary* dic = @{
+            (__bridge NSString*)kCVPixelBufferPixelFormatTypeKey: @(kCVPixelFormatType_32BGRA),
+            (__bridge NSString*)kCVPixelBufferIOSurfacePropertiesKey : @{},
+            (__bridge NSString*)kCVPixelBufferOpenGLCompatibilityKey : @YES,
             (__bridge NSString*)kCVPixelBufferMetalCompatibilityKey : @YES,
-            (__bridge NSString*)kCVPixelBufferCGBitmapContextCompatibilityKey : @YES,
-            (__bridge NSString*)kCVPixelBufferCGImageCompatibilityKey : @YES,
         };
         
         static CVPixelBufferRef buf = NULL;
