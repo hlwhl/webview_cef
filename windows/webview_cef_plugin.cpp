@@ -134,6 +134,17 @@ namespace webview_cef {
 			channel->InvokeMethod("javascriptChannelMessage", std::make_unique<flutter::EncodableValue>(retMap));
 		};
 
+		handler.get()->onFocusedNodeChangeMessage = [](bool editable) {
+			channel->InvokeMethod("onFocusedNodeChangeMessage", std::make_unique<flutter::EncodableValue>(editable));
+		};
+
+		handler.get()->onImeCompositionRangeChangedMessage = [](int32_t x, int32_t y) {
+			flutter::EncodableMap retMap;
+			retMap[flutter::EncodableValue("x")] = flutter::EncodableValue(x);
+			retMap[flutter::EncodableValue("y")] = flutter::EncodableValue(y);
+			channel->InvokeMethod("onImeCompositionRangeChangedMessage", std::make_unique<flutter::EncodableValue>(retMap));
+		};
+
 		CefSettings cefs;
 		cefs.windowless_rendering_enabled = true;
 		CefInitialize(mainArgs, cefs, app.get(), nullptr);
@@ -267,6 +278,27 @@ namespace webview_cef {
 		}
 		else if (method_call.method_name().compare("openDevTools") == 0) {
 			handler.get()->openDevTools();
+			result->Success();
+		}
+		else if (method_call.method_name().compare("imeSetComposition") == 0) {
+			const flutter::EncodableList* list =
+				std::get_if<flutter::EncodableList>(method_call.arguments());
+			const auto text = *std::get_if<std::string>(&(*list)[0]);
+			handler.get()->imeSetComposition(text);
+			result->Success();
+		} 
+		else if (method_call.method_name().compare("imeCommitText") == 0) {
+			const flutter::EncodableList* list =
+				std::get_if<flutter::EncodableList>(method_call.arguments());
+			const auto text = *std::get_if<std::string>(&(*list)[0]);
+			handler.get()->imeCommitText(text);
+			result->Success();
+		} 
+		else if (method_call.method_name().compare("setClientFocus") == 0) {
+			const flutter::EncodableList* list =
+				std::get_if<flutter::EncodableList>(method_call.arguments());
+			const auto focus = *std::get_if<bool>(&(*list)[0]);
+			handler.get()->setClientFocus(focus);
 			result->Success();
 		}
 		else if(method_call.method_name().compare("setCookie") == 0){

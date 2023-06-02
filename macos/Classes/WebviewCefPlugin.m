@@ -95,6 +95,24 @@
         [CefWrapper openDevTools];
         result(nil);
     }
+    else if ([@"imeSetComposition" isEqualToString:call.method]) {
+        NSArray<NSString *> *_arg = call.arguments;
+        NSString * text = [_arg objectAtIndex:0];
+        [CefWrapper imeSetComposition:text];
+        result(nil);
+	} 
+    else if ([@"imeCommitText" isEqualToString:call.method]) {
+        NSArray<NSString *> *_arg = call.arguments;
+        NSString * text = [_arg objectAtIndex:0];
+        [CefWrapper imeCommitText:text];
+        result(nil);
+	} 
+    else if ([@"setClientFocus" isEqualToString:call.method]) {
+        NSArray<NSString *> *_arg = call.arguments;
+        NSString * focus = [_arg objectAtIndex:0];
+        [CefWrapper setClientFocus:focus];
+        result(nil);
+	}
     else if([@"setCookie" isEqualToString:call.method]){
         NSArray<NSString *> *_arg = call.arguments;
         NSString * domain = [_arg objectAtIndex:0];

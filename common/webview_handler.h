@@ -12,9 +12,17 @@
 
 #include "webview_cookieVisitor.h"
 
+#define ColorUNDERLINE \
+  0xFF000000  // Black SkColor value for underline,
+              // same as Blink.
+#define ColorBKCOLOR \
+  0x00000000  // White SkColor value for background,
+              // same as Blink.
+
 class WebviewHandler : public CefClient,
 public CefDisplayHandler,
 public CefLifeSpanHandler,
+public CefFocusHandler,
 public CefLoadHandler,
 public CefRenderHandler{
 public:
@@ -23,8 +31,9 @@ public:
     std::function<void(std::string title)> onTitleChangedCb;
     std::function<void(std::map<std::string, std::map<std::string, std::string>>)> onAllCookieVisitedCb;
     std::function<void(std::map<std::string, std::map<std::string, std::string>>)> onUrlCookieVisitedCb;
-    std::function<void(std::string channelName, std::string message, std::string js_callback_id, std::string frameId)> onJavaScriptChannelMessage;
-    
+    std::function<void(std::string, std::string, std::string, std::string)> onJavaScriptChannelMessage;
+    std::function<void(bool editable)> onFocusedNodeChangeMessage;
+    std::function<void(int32_t x, int32_t y)> onImeCompositionRangeChangedMessage;
     explicit WebviewHandler();
     ~WebviewHandler();
     
@@ -36,6 +45,9 @@ public:
         return this;
     }
     virtual CefRefPtr<CefLifeSpanHandler> GetLifeSpanHandler() override {
+        return this;
+    }
+    virtual CefRefPtr<CefFocusHandler> GetFocusHandler() override {
         return this;
     }
     virtual CefRefPtr<CefLoadHandler> GetLoadHandler() override { return this; }
@@ -72,6 +84,10 @@ public:
                                CefRefPtr<CefDictionaryValue>& extra_info,
                                bool* no_javascript_access) override;
     
+    virtual void OnTakeFocus(CefRefPtr<CefBrowser> browser, bool next) override;
+    virtual bool OnSetFocus(CefRefPtr<CefBrowser> browser, FocusSource source) override;
+    virtual void OnGotFocus(CefRefPtr<CefBrowser> browser) override;
+
     // CefLoadHandler methods:
     virtual void OnLoadError(CefRefPtr<CefBrowser> browser,
                              CefRefPtr<CefFrame> frame,
@@ -88,7 +104,9 @@ public:
                                DragOperationsMask allowed_ops,
                                int x,
                                int y) override;
-    
+
+    virtual void OnImeCompositionRangeChanged(CefRefPtr<CefBrowser> browser,const CefRange& selection_range,const CefRenderHandler::RectList& character_bounds) override;
+
     // Request that all existing browser windows close.
     void CloseAllBrowsers(bool force_close);
     
@@ -105,7 +123,11 @@ public:
     void goBack();
     void reload();
     void openDevTools();
-    
+
+    void imeSetComposition(std::string text);
+    void imeCommitText(std::string text);
+    void setClientFocus(bool focus);
+
     void setCookie(const std::string& domain, const std::string& key, const std::string& value);
     void deleteCookie(const std::string& domain, const std::string& key);
     bool visitAllCookies();
@@ -120,6 +142,8 @@ private:
     uint32_t height = 1;
     float dpi = 1.0;
     bool is_dragging = false;
+    CefRect prev_ime_position = CefRect();
+    bool is_ime_commit = false;
     
     // List of existing browser windows. Only accessed on the CEF UI thread.
     typedef std::list<CefRefPtr<CefBrowser>> BrowserList;

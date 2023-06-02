@@ -199,17 +199,20 @@ void WebviewApp::OnUncaughtException(CefRefPtr<CefBrowser> browser, CefRefPtr<Ce
 }
 
 void WebviewApp::OnFocusedNodeChanged(CefRefPtr<CefBrowser> browser, CefRefPtr<CefFrame> frame, CefRefPtr<CefDOMNode> node)
-{
+{    
+    //Get node attribute
     bool is_editable = (node.get() && node->IsEditable());
-    if (is_editable != m_last_node_is_editable)
-    {
-        // Notify the browser of the change in focused element type.
-        m_last_node_is_editable = is_editable;
-        CefRefPtr<CefProcessMessage> message = CefProcessMessage::Create(kFocusedNodeChangedMessage);
 
-        message->GetArgumentList()->SetBool(0, is_editable);
-        frame->SendProcessMessage(PID_BROWSER, message);
+    // Notify the browser of the change in focused element type.
+    m_last_node_is_editable = is_editable;
+    CefRefPtr<CefProcessMessage> message = CefProcessMessage::Create(kFocusedNodeChangedMessage);
+    message->GetArgumentList()->SetBool(0, is_editable);
+    if (is_editable) {
+        CefRect rect = node->GetElementBounds();
+        message->GetArgumentList()->SetInt(1, rect.x);
+        message->GetArgumentList()->SetInt(2, rect.y + rect.height);
     }
+    frame->SendProcessMessage(PID_BROWSER, message);
 }
 
 bool WebviewApp::OnProcessMessageReceived(CefRefPtr<CefBrowser> browser, CefRefPtr<CefFrame> frame, CefProcessId source_process, CefRefPtr<CefProcessMessage> message)

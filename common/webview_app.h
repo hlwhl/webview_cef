@@ -32,10 +32,6 @@ public:
                                                 command_line->AppendSwitch("use-mock-keychain");
                                                 command_line->AppendSwitch("single-process");
                                            #endif
-                                           #ifdef _DEBUG
-                                                command_line->AppendSwitch("renderer-startup-dialog");
-                                                command_line->AppendSwitch("no-sandbox");
-                                           #endif
                                        }
     
     // CefBrowserProcessHandler methods:

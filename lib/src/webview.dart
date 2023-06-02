@@ -7,6 +7,7 @@ import 'package:flutter/widgets.dart';
 
 import 'webview_events_listener.dart';
 import 'webview_javascript.dart';
+import 'webview_textinput.dart';
 
 const MethodChannel _pluginChannel = MethodChannel("webview_cef");
 
@@ -15,6 +16,7 @@ class WebViewController extends ValueNotifier<bool> {
   int _textureId = 0;
   bool _isDisposed = false;
   WebviewEventsListener? _listener;
+  bool _focusEditable = false;
 
   final Map<String, JavascriptChannel> _javascriptChannels =
       <String, JavascriptChannel>{};
@@ -62,7 +64,15 @@ class WebViewController extends ValueNotifier<bool> {
             call.arguments['message'],
             call.arguments['callbackId'],
             call.arguments['frameId']);
-        break;
+        return;
+      case 'onFocusedNodeChangeMessage':
+        _onFocusedNodeChangeMessage?.call(call.arguments as bool);
+        return;
+      case 'onImeCompositionRangeChangedMessage':
+        _onImeCompositionRangeChangedMessage?.call(
+            (call.arguments['x'] as int).toDouble(),
+            (call.arguments['y'] as int).toDouble());
+        return;
       default:
     }
   }
@@ -122,6 +132,26 @@ class WebViewController extends ValueNotifier<bool> {
     }
     assert(value);
     return _pluginChannel.invokeMethod('openDevTools');
+  }
+
+  Future<void> imeSetComposition(String composingText) async {
+    if (_isDisposed) {
+      return;
+    }
+    assert(value);
+    return _pluginChannel.invokeMethod('imeSetComposition', [composingText]);
+  }
+
+  Future<void> imeCommitText(String composingText) async {
+    if (_isDisposed) {
+      return;
+    }
+    assert(value);
+    return _pluginChannel.invokeMethod('imeCommitText', [composingText]);
+  }
+
+  Future<void> setClientFocus(bool focus) {
+    return _pluginChannel.invokeListMethod('setClientFocus', [focus]);
   }
 
   Future<void> setCookie(String domain, String key, String val) async {
@@ -269,6 +299,10 @@ class WebViewController extends ValueNotifier<bool> {
     }
     assert(_extractJavascriptChannelNames(channels).length == channels.length);
   }
+
+  Function(bool)? _onFocusedNodeChangeMessage;
+
+  Function(double, double)? _onImeCompositionRangeChangedMessage;
 }
 
 class WebView extends StatefulWidget {
@@ -280,14 +314,66 @@ class WebView extends StatefulWidget {
   WebViewState createState() => WebViewState();
 }
 
-class WebViewState extends State<WebView> {
+class WebViewState extends State<WebView> with WebeViewTextInput {
   final GlobalKey _key = GlobalKey();
+  String _composingText = '';
+  late final _focusNode = FocusNode();
+  bool isPrimaryFocus = false;
 
   WebViewController get _controller => widget.controller;
 
   @override
+  updateEditingValueWithDeltas(List<TextEditingDelta> textEditingDeltas) {
+    /// Handles IME composition only
+    for (var d in textEditingDeltas) {
+      if (d is TextEditingDeltaInsertion) {
+        // composing text
+        if (d.composing.isValid) {
+          _composingText += d.textInserted;
+          _controller.imeSetComposition(_composingText);
+        }
+      } else if (d is TextEditingDeltaDeletion) {
+        if (d.composing.isValid) {
+          if (_composingText == d.textDeleted) {
+            _composingText = "";
+          }
+          _controller.imeSetComposition(_composingText);
+        }
+      } else if (d is TextEditingDeltaReplacement) {
+        if (d.composing.isValid) {
+          _composingText = d.replacementText;
+          _controller.imeSetComposition(_composingText);
+        }
+      } else if (d is TextEditingDeltaNonTextUpdate) {
+        if (_composingText.isNotEmpty) {
+          _controller.imeCommitText(_composingText);
+          _composingText = '';
+        }
+      }
+    }
+  }
+
+  @override
   void initState() {
     super.initState();
+
+    _controller._onFocusedNodeChangeMessage = (editable) {
+      _composingText = "";
+      editable ? attachTextInputClient() : detachTextInputClient();
+      _controller._focusEditable = editable;
+    };
+
+    _controller._onImeCompositionRangeChangedMessage = (x, y) {
+      final box = _key.currentContext!.findRenderObject() as RenderBox;
+      updateIMEComposionPosition(x, y, box.localToGlobal(Offset.zero));
+    };
+
+    _focusNode.addListener(() {
+      setState(() {
+        isPrimaryFocus = _focusNode.hasPrimaryFocus;
+      });
+    });
+
     // Report initial surface size
     WidgetsBinding.instance
         .addPostFrameCallback((_) => _reportSurfaceSize(context));
@@ -295,21 +381,50 @@ class WebViewState extends State<WebView> {
 
   @override
   Widget build(BuildContext context) {
-    return SizedBox.expand(key: _key, child: _buildInner());
+    return Focus(
+      autofocus: true,
+      focusNode: _focusNode,
+      canRequestFocus: true,
+      debugLabel: "webview_cef",
+      onFocusChange: (focused) {
+        _composingText = "";
+        if (focused) {
+          _controller.setClientFocus(true);
+          if (_controller._focusEditable) {
+            attachTextInputClient();
+          }
+        } else {
+          _controller.setClientFocus(false);
+          if (_controller._focusEditable) {
+            detachTextInputClient();
+          }
+        }
+      },
+      child: SizedBox.expand(key: _key, child: _buildInner()),
+    );
   }
 
   Widget _buildInner() {
     return NotificationListener<SizeChangedLayoutNotification>(
-        onNotification: (notification) {
-          _reportSurfaceSize(context);
-          return true;
-        },
-        child: SizeChangedLayoutNotifier(
-            child: Listener(
+      onNotification: (notification) {
+        _reportSurfaceSize(context);
+        return true;
+      },
+      child: SizeChangedLayoutNotifier(
+        child: Listener(
           onPointerHover: (ev) {
             _controller._cursorMove(ev.localPosition);
           },
           onPointerDown: (ev) {
+            if (!_focusNode.hasFocus) {
+              _controller._onImeCompositionRangeChangedMessage?.call(0, 0);
+              _focusNode.requestFocus();
+              Future.delayed(const Duration(milliseconds: 50), () {
+                if (!isPrimaryFocus) {
+                  _focusNode.requestFocus();
+                }
+              });
+            }
             _controller._cursorClickDown(ev.localPosition);
           },
           onPointerUp: (ev) {
@@ -329,7 +444,9 @@ class WebViewState extends State<WebView> {
                 event.panDelta.dx.round(), event.panDelta.dy.round());
           },
           child: Texture(textureId: _controller._textureId),
-        )));
+        ),
+      ),
+    );
   }
 
   void _reportSurfaceSize(BuildContext context) async {

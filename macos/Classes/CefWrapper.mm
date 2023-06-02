@@ -139,7 +139,17 @@ FlutterMethodChannel* f_channel;
         dict[@"callbackId"]  = [NSString stringWithCString:callbackId.c_str() encoding:NSUTF8StringEncoding];
         dict[@"frameId"]  = [NSString stringWithCString:frameId.c_str() encoding:NSUTF8StringEncoding];
         [f_channel invokeMethod:@"javascriptChannelMessage" arguments:dict];
-	};   
+	};
+
+    //onFocusedNodeChange called
+ 	handler.get()->onFocusedNodeChangeMessage = [](bool editable) {
+        [f_channel invokeMethod:@"onFocusedNodeChangeMessage" arguments:[editable]];
+	};
+
+    //onImeCompositionRangeChanged called
+ 	handler.get()->onImeCompositionRangeChangedMessage = [](int32_t x, int32_t y) {
+        [f_channel invokeMethod:@"onImeCompositionRangeChangedMessage" arguments:[x, y]];
+	};
 
     CefSettings settings;
     settings.windowless_rendering_enabled = true;
@@ -281,6 +291,18 @@ FlutterMethodChannel* f_channel;
 
 + (void)openDevTools {
     handler.get()->openDevTools();
+}
+
++ (void)imeSetComposition:(NSString *)text {
+    handler.get()->imeSetComposition(std::string([text cStringUsingEncoding:NSUTF8StringEncoding]);
+}
+
++ (void)imeCommitText:(NSString *)text {
+    handler.get()->imeCommitText(std::string([text cStringUsingEncoding:NSUTF8StringEncoding]);
+}
+
++ (void)setClientFocus:(bool)focus {
+    handler.get()->setClientFocus(focus);
 }
 
 - (CVPixelBufferRef _Nullable)copyPixelBuffer {
