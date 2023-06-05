@@ -110,7 +110,7 @@
     else if ([@"setClientFocus" isEqualToString:call.method]) {
         NSArray<NSString *> *_arg = call.arguments;
         NSString * focus = [_arg objectAtIndex:0];
-        [CefWrapper setClientFocus:focus];
+        [CefWrapper setClientFocus:[focus boolValue]];
         result(nil);
 	}
     else if([@"setCookie" isEqualToString:call.method]){

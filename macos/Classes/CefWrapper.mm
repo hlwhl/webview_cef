@@ -143,12 +143,15 @@ FlutterMethodChannel* f_channel;
 
     //onFocusedNodeChange called
  	handler.get()->onFocusedNodeChangeMessage = [](bool editable) {
-        [f_channel invokeMethod:@"onFocusedNodeChangeMessage" arguments:[editable]];
+        [f_channel invokeMethod:@"onFocusedNodeChangeMessage" arguments:@(editable)];
 	};
 
     //onImeCompositionRangeChanged called
  	handler.get()->onImeCompositionRangeChangedMessage = [](int32_t x, int32_t y) {
-        [f_channel invokeMethod:@"onImeCompositionRangeChangedMessage" arguments:[x, y]];
+        NSMutableDictionary * dict = [NSMutableDictionary dictionary];
+        dict[@"x"] = @(x);
+        dict[@"y"] = @(y);
+        [f_channel invokeMethod:@"onImeCompositionRangeChangedMessage" arguments:dict];
 	};
 
     CefSettings settings;
@@ -160,15 +163,15 @@ FlutterMethodChannel* f_channel;
     _timer = [NSTimer timerWithTimeInterval:0.016f target:self selector:@selector(doMessageLoopWork) userInfo:nil repeats:YES];
     [[NSRunLoop mainRunLoop] addTimer: _timer forMode:NSRunLoopCommonModes];
     
-    [NSEvent addLocalMonitorForEventsMatchingMask:NSEventMaskKeyDown handler:^NSEvent * _Nullable(NSEvent * _Nonnull event) {
-        [self processKeyboardEvent:event];
-        return event;
-    }];
-    
-    [NSEvent addLocalMonitorForEventsMatchingMask:NSEventMaskKeyUp handler:^NSEvent * _Nullable(NSEvent * _Nonnull event) {
-        [self processKeyboardEvent:event];
-        return event;
-    }];
+//    [NSEvent addLocalMonitorForEventsMatchingMask:NSEventMaskKeyDown handler:^NSEvent * _Nullable(NSEvent * _Nonnull event) {
+//        [self processKeyboardEvent:event];
+//        return event;
+//    }];
+//
+//    [NSEvent addLocalMonitorForEventsMatchingMask:NSEventMaskKeyUp handler:^NSEvent * _Nullable(NSEvent * _Nonnull event) {
+//        [self processKeyboardEvent:event];
+//        return event;
+//    }];
 }
 
 + (void)processKeyboardEvent: (NSEvent*) event {
@@ -294,11 +297,11 @@ FlutterMethodChannel* f_channel;
 }
 
 + (void)imeSetComposition:(NSString *)text {
-    handler.get()->imeSetComposition(std::string([text cStringUsingEncoding:NSUTF8StringEncoding]);
+    handler.get()->imeSetComposition(std::string([text cStringUsingEncoding:NSUTF8StringEncoding]));
 }
 
 + (void)imeCommitText:(NSString *)text {
-    handler.get()->imeCommitText(std::string([text cStringUsingEncoding:NSUTF8StringEncoding]);
+    handler.get()->imeCommitText(std::string([text cStringUsingEncoding:NSUTF8StringEncoding]));
 }
 
 + (void)setClientFocus:(bool)focus {

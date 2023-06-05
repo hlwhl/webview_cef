@@ -368,12 +368,6 @@ class WebViewState extends State<WebView> with WebeViewTextInput {
       updateIMEComposionPosition(x, y, box.localToGlobal(Offset.zero));
     };
 
-    _focusNode.addListener(() {
-      setState(() {
-        isPrimaryFocus = _focusNode.hasPrimaryFocus;
-      });
-    });
-
     // Report initial surface size
     WidgetsBinding.instance
         .addPostFrameCallback((_) => _reportSurfaceSize(context));
@@ -420,7 +414,7 @@ class WebViewState extends State<WebView> with WebeViewTextInput {
               _controller._onImeCompositionRangeChangedMessage?.call(0, 0);
               _focusNode.requestFocus();
               Future.delayed(const Duration(milliseconds: 50), () {
-                if (!isPrimaryFocus) {
+                if (!_focusNode.hasFocus) {
                   _focusNode.requestFocus();
                 }
               });

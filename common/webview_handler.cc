@@ -559,7 +559,6 @@ void WebviewHandler::OnImeCompositionRangeChanged(CefRefPtr<CefBrowser> browser,
             prev_ime_position = lastCharacter;
             onImeCompositionRangeChangedMessage(lastCharacter.x + lastCharacter.width, lastCharacter.y + lastCharacter.height);
             is_ime_commit = false;
-            OutputDebugString(L"commit");
         }
         else
         {
