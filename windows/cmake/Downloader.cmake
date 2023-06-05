@@ -24,14 +24,34 @@ endfunction()
 
 function(download_file url filename)
   message(STATUS "Download ${url} to ${filename} ...")
-  file(DOWNLOAD ${url} ${filename} SHOW_PROGRESS)
+  file(DOWNLOAD ${url} ${filename} STATUS status SHOW_PROGRESS)
 endfunction()
 
 function(preparePrebuiltFiles)
-    if(NOT EXISTS "${CMAKE_CURRENT_SOURCE_DIR}/cefbins/debug")
+    set(need_download FALSE)
+
+    if(NOT EXISTS "${CMAKE_CURRENT_SOURCE_DIR}/cefbins")
+        set(need_download TRUE)
+    else()
+        # check files avaliable
+        # todo: temp using files count to check bins version, use version number in the future
+        file (GLOB_RECURSE files "${CMAKE_CURRENT_SOURCE_DIR}/cefbins/*")
+        list(LENGTH files count)
+        message (\"Total files: ${count}\")
+        if(count EQUAL 85)
+            message("check pass")
+        else()
+            message("check failed, need redownload")
+            set(need_download TRUE)
+        endif()
+    endif()
+
+    if(need_download)
+        file(REMOVE_RECURSE ${CMAKE_CURRENT_SOURCE_DIR}/cefbins)
         download_file(https://github.com/hlwhl/webview_cef/releases/download/prebuilt_cef_bin_windows/webview_cef_bin_0.0.2_101.0.18+chromium-101.0.4951.67_windows64.zip ${CMAKE_CURRENT_SOURCE_DIR}/prebuilt.zip)
         file(MAKE_DIRECTORY ${CMAKE_CURRENT_SOURCE_DIR}/cefbins)
         extract_file(${CMAKE_CURRENT_SOURCE_DIR}/prebuilt.zip ${CMAKE_CURRENT_SOURCE_DIR}/cefbins)
         file(REMOVE_RECURSE ${CMAKE_CURRENT_SOURCE_DIR}/prebuilt.zip)
     endif()
+
 endfunction()
