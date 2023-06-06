@@ -6,55 +6,72 @@
 
 #include <cstring>
 
-#define WEBVIEW_CEF_PLUGIN(obj) \
+#define WEBVIEW_CEF_PLUGIN(obj)                                     \
   (G_TYPE_CHECK_INSTANCE_CAST((obj), webview_cef_plugin_get_type(), \
                               WebviewCefPlugin))
 
-struct _WebviewCefPlugin {
+struct _WebviewCefPlugin
+{
   GObject parent_instance;
 };
 
 G_DEFINE_TYPE(WebviewCefPlugin, webview_cef_plugin, g_object_get_type())
 
+CefRefPtr<WebviewHandler> handler(new WebviewHandler());
+CefRefPtr<WebviewApp> app(new WebviewApp(handler));
+
 // Called when a method call is received from Flutter.
 static void webview_cef_plugin_handle_method_call(
-    WebviewCefPlugin* self,
-    FlMethodCall* method_call) {
+    WebviewCefPlugin *self,
+    FlMethodCall *method_call)
+{
   g_autoptr(FlMethodResponse) response = nullptr;
 
-  const gchar* method = fl_method_call_get_name(method_call);
+  const gchar *method = fl_method_call_get_name(method_call);
 
-  if (strcmp(method, "getPlatformVersion") == 0) {
+  if (strcmp(method, "getPlatformVersion") == 0)
+  {
     struct utsname uname_data = {};
     uname(&uname_data);
     g_autofree gchar *version = g_strdup_printf("Linux %s", uname_data.version);
     g_autoptr(FlValue) result = fl_value_new_string(version);
     response = FL_METHOD_RESPONSE(fl_method_success_response_new(result));
-  } else {
+  }
+  else if (strcmp(method, "init") == 0)
+  {
+    // CefMainArgs mainArgs;
+    // CefExecuteProcess(mainArgs, nullptr, nullptr);
+  }
+  else
+  {
     response = FL_METHOD_RESPONSE(fl_method_not_implemented_response_new());
   }
 
   fl_method_call_respond(method_call, response, nullptr);
 }
 
-static void webview_cef_plugin_dispose(GObject* object) {
+static void webview_cef_plugin_dispose(GObject *object)
+{
   G_OBJECT_CLASS(webview_cef_plugin_parent_class)->dispose(object);
 }
 
-static void webview_cef_plugin_class_init(WebviewCefPluginClass* klass) {
+static void webview_cef_plugin_class_init(WebviewCefPluginClass *klass)
+{
   G_OBJECT_CLASS(klass)->dispose = webview_cef_plugin_dispose;
 }
 
-static void webview_cef_plugin_init(WebviewCefPlugin* self) {}
+static void webview_cef_plugin_init(WebviewCefPlugin *self) {}
 
-static void method_call_cb(FlMethodChannel* channel, FlMethodCall* method_call,
-                           gpointer user_data) {
-  WebviewCefPlugin* plugin = WEBVIEW_CEF_PLUGIN(user_data);
+static void method_call_cb(FlMethodChannel *channel, FlMethodCall *method_call,
+                           gpointer user_data)
+{
+  WebviewCefPlugin *plugin = WEBVIEW_CEF_PLUGIN(user_data);
   webview_cef_plugin_handle_method_call(plugin, method_call);
 }
 
-void webview_cef_plugin_register_with_registrar(FlPluginRegistrar* registrar) {
-  WebviewCefPlugin* plugin = WEBVIEW_CEF_PLUGIN(
+void webview_cef_plugin_register_with_registrar(FlPluginRegistrar *registrar)
+{
+  WebviewCefPlugin *plugin = WEBVIEW_CEF_PLUGIN(
       g_object_new(webview_cef_plugin_get_type(), nullptr));
 
   g_autoptr(FlStandardMethodCodec) codec = fl_standard_method_codec_new();
@@ -67,4 +84,10 @@ void webview_cef_plugin_register_with_registrar(FlPluginRegistrar* registrar) {
                                             g_object_unref);
 
   g_object_unref(plugin);
+}
+
+void startCef()
+{
+  CefMainArgs mainArgs;
+  CefExecuteProcess(mainArgs, nullptr, nullptr);
 }
