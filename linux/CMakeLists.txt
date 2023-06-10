@@ -5,7 +5,11 @@ cmake_minimum_required(VERSION 3.10)
 
 # Project-level configuration.
 set(PROJECT_NAME "webview_cef")
-project(${PROJECT_NAME} LANGUAGES CXX)
+project(${PROJECT_NAME} LANGUAGES CXX C)
+
+set(CEF_ROOT "${CMAKE_CURRENT_SOURCE_DIR}/third/cef")
+set(CMAKE_MODULE_PATH ${CMAKE_MODULE_PATH} "${CEF_ROOT}/cmake")
+find_package(CEF REQUIRED)
 
 # This value is used when generating builds using this plugin, so it must
 # not be changed.
@@ -44,15 +48,51 @@ target_link_libraries(${PLUGIN_NAME} PRIVATE PkgConfig::GTK)
 
 target_include_directories(${PLUGIN_NAME} PUBLIC "${CMAKE_CURRENT_SOURCE_DIR}/../common")
 
-#cef
-target_include_directories(${PLUGIN_NAME} PUBLIC "${CMAKE_CURRENT_SOURCE_DIR}/third/cef")
-target_link_libraries(${PLUGIN_NAME} PUBLIC "${CMAKE_CURRENT_SOURCE_DIR}/third/cef/bins/libcef_dll_wrapper.a")
-target_link_libraries(${PLUGIN_NAME} PUBLIC "${CMAKE_CURRENT_SOURCE_DIR}/third/cef/bins/libcef.so")
+#########################################cef#########################################
+set(CEF_TARGET ${PLUGIN_NAME})
+ADD_LOGICAL_TARGET("libcef_lib" "${CEF_LIB_DEBUG}" "${CEF_LIB_RELEASE}")
+SET_CEF_TARGET_OUT_DIR()
+add_subdirectory(${CEF_LIBCEF_DLL_WRAPPER_PATH} libcef_dll_wrapper)
+
+# Find required libraries and update compiler/linker variables.
+FIND_LINUX_LIBRARIES("gmodule-2.0 gtk+-3.0 gthread-2.0 gtk+-unix-print-3.0 xi")
+
+# Executable target.
+# add_executable(${CEF_TARGET} ${CEFCLIENT_SRCS})
+SET_EXECUTABLE_TARGET_PROPERTIES(${CEF_TARGET})
+add_dependencies(${CEF_TARGET} libcef_dll_wrapper)
+target_link_libraries(${CEF_TARGET} PUBLIC libcef_lib libcef_dll_wrapper "GL" ${CEF_STANDARD_LIBS})
+
+# Set rpath so that libraries can be placed next to the executable.
+set_target_properties(${CEF_TARGET} PROPERTIES INSTALL_RPATH "$ORIGIN")
+set_target_properties(${CEF_TARGET} PROPERTIES BUILD_WITH_INSTALL_RPATH TRUE)
+set_target_properties(${CEF_TARGET} PROPERTIES RUNTIME_OUTPUT_DIRECTORY ${CEF_TARGET_OUT_DIR})
+
+# We don't call deprecated GTK functions, and they can cause build failures, so disable them.
+add_definitions("-DGTK_DISABLE_DEPRECATED")
+
+# Set SUID permissions on the chrome-sandbox target.
+SET_LINUX_SUID_PERMISSIONS("${CEF_TARGET}" "${CEF_TARGET_OUT_DIR}/chrome-sandbox")
+
+#set CEF binary and resource files which need to copy to the target output directory
+set(cef_library_list "")
+foreach(FILE ${CEF_BINARY_FILES})
+  list(APPEND cef_library_list ${CEF_BINARY_DIR}/${FILE})
+endforeach()
+foreach(FILE ${CEF_RESOURCE_FILES})
+  # locales folder cause build error,need another way to copy this folder
+  if(${FILE} STREQUAL "locales")
+  else()
+  list(APPEND cef_library_list ${CEF_RESOURCE_DIR}/${FILE})
+  endif()
+endforeach(FILE)
+#######################################cef end#######################################
 
 # List of absolute paths to libraries that should be bundled with the plugin.
 # This list could contain prebuilt libraries, or libraries created by an
 # external build triggered from this build file.
 set(webview_cef_bundled_libraries
   ""
+  ${cef_library_list}
   PARENT_SCOPE
 )
