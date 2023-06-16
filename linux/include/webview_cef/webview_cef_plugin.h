@@ -3,8 +3,6 @@
 
 #include <flutter_linux/flutter_linux.h>
 
-#include "webview_app.h"
-
 G_BEGIN_DECLS
 
 #ifdef FLUTTER_PLUGIN_IMPL
@@ -25,6 +23,6 @@ FLUTTER_PLUGIN_EXPORT void webview_cef_plugin_register_with_registrar(
 
 G_END_DECLS
 
-FLUTTER_PLUGIN_EXPORT void startCef();
+FLUTTER_PLUGIN_EXPORT void initCEFProcesses(int argc, char** argv);
 
 #endif  // FLUTTER_PLUGIN_WEBVIEW_CEF_PLUGIN_H_

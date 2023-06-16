@@ -27,8 +27,8 @@
 // (INCLUDING NEGLIGENCE OR OTHERWISE) ARISING IN ANY WAY OUT OF THE USE
 // OF THIS SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.
 
-#ifndef CEF_INCLUDE_INTERNAL_CEF_STRING_LIST_H_
-#define CEF_INCLUDE_INTERNAL_CEF_STRING_LIST_H_
+#ifndef CEF_INCLUDE_INTERNAL_CEF_STRING_MAP_H_
+#define CEF_INCLUDE_INTERNAL_CEF_STRING_MAP_H_
 #pragma once
 
 #include "include/internal/cef_export.h"
@@ -41,49 +41,59 @@ extern "C" {
 ///
 /// CEF string maps are a set of key/value string pairs.
 ///
-typedef void* cef_string_list_t;
+typedef struct _cef_string_map_t* cef_string_map_t;
 
 ///
 /// Allocate a new string map.
 ///
-CEF_EXPORT cef_string_list_t cef_string_list_alloc(void);
+CEF_EXPORT cef_string_map_t cef_string_map_alloc(void);
 
 ///
-/// Return the number of elements in the string list.
+/// Return the number of elements in the string map.
 ///
-CEF_EXPORT size_t cef_string_list_size(cef_string_list_t list);
+CEF_EXPORT size_t cef_string_map_size(cef_string_map_t map);
 
 ///
-/// Retrieve the value at the specified zero-based string list index. Returns
-/// true (1) if the value was successfully retrieved.
+/// Return the value assigned to the specified key.
 ///
-CEF_EXPORT int cef_string_list_value(cef_string_list_t list,
-                                     size_t index,
-                                     cef_string_t* value);
+CEF_EXPORT int cef_string_map_find(cef_string_map_t map,
+                                   const cef_string_t* key,
+                                   cef_string_t* value);
 
 ///
-/// Append a new value at the end of the string list.
+/// Return the key at the specified zero-based string map index.
 ///
-CEF_EXPORT void cef_string_list_append(cef_string_list_t list,
-                                       const cef_string_t* value);
+CEF_EXPORT int cef_string_map_key(cef_string_map_t map,
+                                  size_t index,
+                                  cef_string_t* key);
 
 ///
-/// Clear the string list.
+/// Return the value at the specified zero-based string map index.
 ///
-CEF_EXPORT void cef_string_list_clear(cef_string_list_t list);
+CEF_EXPORT int cef_string_map_value(cef_string_map_t map,
+                                    size_t index,
+                                    cef_string_t* value);
 
 ///
-/// Free the string list.
+/// Append a new key/value pair at the end of the string map. If the key exists,
+/// overwrite the existing value with a new value w/o changing the pair order.
 ///
-CEF_EXPORT void cef_string_list_free(cef_string_list_t list);
+CEF_EXPORT int cef_string_map_append(cef_string_map_t map,
+                                     const cef_string_t* key,
+                                     const cef_string_t* value);
 
 ///
-/// Creates a copy of an existing string list.
+/// Clear the string map.
 ///
-CEF_EXPORT cef_string_list_t cef_string_list_copy(cef_string_list_t list);
+CEF_EXPORT void cef_string_map_clear(cef_string_map_t map);
+
+///
+/// Free the string map.
+///
+CEF_EXPORT void cef_string_map_free(cef_string_map_t map);
 
 #ifdef __cplusplus
 }
 #endif
 
-#endif  // CEF_INCLUDE_INTERNAL_CEF_STRING_LIST_H_
+#endif  // CEF_INCLUDE_INTERNAL_CEF_STRING_MAP_H_

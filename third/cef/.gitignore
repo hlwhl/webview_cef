@@ -1,0 +1,6 @@
+cmake
+Debug
+libcef_dll
+libcef_dll_wrapper
+Release
+Resources
