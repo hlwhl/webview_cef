@@ -7,7 +7,7 @@ cmake_minimum_required(VERSION 3.10)
 set(PROJECT_NAME "webview_cef")
 project(${PROJECT_NAME} LANGUAGES CXX C)
 
-set(CEF_ROOT "${CMAKE_CURRENT_SOURCE_DIR}/third/cef")
+set(CEF_ROOT "${CMAKE_CURRENT_SOURCE_DIR}/../third/cef")
 set(CMAKE_MODULE_PATH ${CMAKE_MODULE_PATH} "${CEF_ROOT}/cmake")
 find_package(CEF REQUIRED)
 
@@ -21,10 +21,13 @@ set(PLUGIN_NAME "webview_cef_plugin")
 # Any new source files that you add to the plugin should be added here.
 add_library(${PLUGIN_NAME} SHARED
   "webview_cef_plugin.cc"
+  "webview_cef_texture.h"
   "${CMAKE_CURRENT_SOURCE_DIR}/../common/webview_app.cc"
   "${CMAKE_CURRENT_SOURCE_DIR}/../common/webview_app.h"
   "${CMAKE_CURRENT_SOURCE_DIR}/../common/webview_handler.cc"
   "${CMAKE_CURRENT_SOURCE_DIR}/../common/webview_handler.h"
+  "${CMAKE_CURRENT_SOURCE_DIR}/../common/webview_plugin.cc"
+  "${CMAKE_CURRENT_SOURCE_DIR}/../common/webview_plugin.h"
 )
 
 # Apply a standard set of build settings that are configured in the
