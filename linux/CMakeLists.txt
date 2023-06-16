@@ -7,6 +7,9 @@ cmake_minimum_required(VERSION 3.10)
 set(PROJECT_NAME "webview_cef")
 project(${PROJECT_NAME} LANGUAGES CXX C)
 
+include(${CMAKE_CURRENT_SOURCE_DIR}/../third/download.cmake)
+prepare_prebuilt_files(${CMAKE_CURRENT_SOURCE_DIR}/../third/cef)
+
 set(CEF_ROOT "${CMAKE_CURRENT_SOURCE_DIR}/../third/cef")
 set(CMAKE_MODULE_PATH ${CMAKE_MODULE_PATH} "${CEF_ROOT}/cmake")
 find_package(CEF REQUIRED)
