@@ -86,11 +86,8 @@ foreach(FILE ${CEF_BINARY_FILES})
   list(APPEND cef_library_list ${CEF_BINARY_DIR}/${FILE})
 endforeach()
 foreach(FILE ${CEF_RESOURCE_FILES})
-  # locales folder cause build error,need another way to copy this folder
-  if(${FILE} STREQUAL "locales")
-  else()
+
   list(APPEND cef_library_list ${CEF_RESOURCE_DIR}/${FILE})
-  endif()
 endforeach(FILE)
 #######################################cef end#######################################
 

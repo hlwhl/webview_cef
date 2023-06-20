@@ -20,7 +20,6 @@ struct _WebviewCefPlugin
 G_DEFINE_TYPE(WebviewCefPlugin, webview_cef_plugin, g_object_get_type())
 
 static FlTextureRegistrar* texture_register;
-auto m_texture = webview_cef_texture_new();
 
 static FlValue* encode_pluginvalue_to_flvalue(webview_cef::PluginValue *args){
   int index = args->index();
@@ -166,18 +165,34 @@ static void webview_cef_plugin_handle_method_call(
 
   const gchar *method = fl_method_call_get_name(method_call);
   FlValue *args = fl_method_call_get_args(method_call);
-  webview_cef::PluginValue encodeArgs = encode_flvalue_to_pluginvalue(args);
-  webview_cef::PluginValue responseArgs;
-  int ret = webview_cef::HandleMethodCall(method, &encodeArgs, &responseArgs);
-  if (ret > 0){
-    response = FL_METHOD_RESPONSE(fl_method_success_response_new(encode_pluginvalue_to_flvalue(&responseArgs)));
+  if(strcmp(method, "init") == 0){
+    auto texture = webview_cef_texture_new();
+    fl_texture_registrar_register_texture(texture_register, FL_TEXTURE(texture));
+		auto callback = [=](const void* buffer, int32_t width, int32_t height) {
+			texture->width = width;
+      texture->height = height;
+			const auto size = width * height * 4;
+			texture->buffer = new uint8_t[size];
+			webview_cef::SwapBufferFromBgraToRgba((void*)texture->buffer, buffer, width, height);
+      fl_texture_registrar_mark_texture_frame_available(texture_register, FL_TEXTURE(texture));
+		};
+    webview_cef::setPaintCallBack(callback);
+    response = FL_METHOD_RESPONSE(fl_method_success_response_new(fl_value_new_int((int64_t)texture)));
+  }else{
+    webview_cef::PluginValue encodeArgs = encode_flvalue_to_pluginvalue(args);
+    webview_cef::PluginValue responseArgs;
+    int ret = webview_cef::HandleMethodCall(method, &encodeArgs, &responseArgs);
+    if (ret > 0){
+      response = FL_METHOD_RESPONSE(fl_method_success_response_new(encode_pluginvalue_to_flvalue(&responseArgs)));
+    }
+    else if (ret < 0){
+      response = FL_METHOD_RESPONSE(fl_method_error_response_new("error", "error", encode_pluginvalue_to_flvalue(&responseArgs)));
+    }
+    else{
+      response = FL_METHOD_RESPONSE(fl_method_not_implemented_response_new());
+    }
   }
-  else if (ret < 0){
-    response = FL_METHOD_RESPONSE(fl_method_error_response_new("error", "error", encode_pluginvalue_to_flvalue(&responseArgs)));
-  }
-  else{
-    response = FL_METHOD_RESPONSE(fl_method_not_implemented_response_new());
-  }
+
   fl_method_call_respond(method_call, response, nullptr);
 }
 
@@ -206,8 +221,6 @@ void webview_cef_plugin_register_with_registrar(FlPluginRegistrar *registrar)
       g_object_new(webview_cef_plugin_get_type(), nullptr));
 
   texture_register = fl_plugin_registrar_get_texture_registrar(registrar);
-  fl_texture_registrar_register_texture(texture_register, FL_TEXTURE(m_texture));
-  webview_cef::setTextureId((int64_t)m_texture);
 
   g_autoptr(FlStandardMethodCodec) codec = fl_standard_method_codec_new();
   g_autoptr(FlMethodChannel) channel =
@@ -217,6 +230,11 @@ void webview_cef_plugin_register_with_registrar(FlPluginRegistrar *registrar)
   fl_method_channel_set_method_call_handler(channel, method_call_cb,
                                             g_object_ref(plugin),
                                             g_object_unref);
+
+  auto invoke = [=](std::string method, webview_cef::PluginValue* arguments) {
+    fl_method_channel_invoke_method(channel, method.c_str(), encode_pluginvalue_to_flvalue(arguments), NULL, NULL, NULL);
+  };
+  webview_cef::setInvokeMethodFunc(invoke);
 
   g_object_unref(plugin);
 }
