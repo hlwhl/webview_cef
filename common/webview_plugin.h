@@ -1,8 +1,7 @@
 #ifndef WEBVIEW_PLUGIN_H
 #define WEBVIEW_PLUGIN_H
 
-// #include <functional>
-
+#include <functional>
 #include <any>
 #include <cassert>
 #include <cstdint>
@@ -63,12 +62,13 @@ namespace webview_cef {
         
     };
 
-
     void initCEFProcesses(CefMainArgs args);
+    void startCEF();
     void sendKeyEvent(CefKeyEvent ev);
     int HandleMethodCall(std::string name, PluginValue* values, PluginValue* response);
-    void setTextureId(int textureId);
-
+    void SwapBufferFromBgraToRgba(void* _dest, const void* _src, int width, int height);
+    void setPaintCallBack(std::function<void(const void*, int32_t , int32_t )> callback);
+    void setInvokeMethodFunc(std::function<void(std::string, PluginValue*)> func);
 }
 
 #endif //WEBVIEW_PLUGIN_H

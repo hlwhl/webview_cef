@@ -6,46 +6,15 @@
 #include <memory>
 #include <thread>
 #include <iostream>
-#include <mutex>
+// #include <mutex>
 
 namespace webview_cef {
 	bool init = false;
-	int64_t texture_id;
-// 	std::unique_ptr<uint8_t> backing_pixel_buffer;
-// 	std::mutex buffer_mutex_;
+	std::function<void(std::string, PluginValue*)> invokeFunc;
     
     CefRefPtr<WebviewHandler> handler(new WebviewHandler());
     CefRefPtr<WebviewApp> app(new WebviewApp(handler));
     CefMainArgs mainArgs;
-
-// 	void SwapBufferFromBgraToRgba(void* _dest, const void* _src, int width, int height) {
-// 		int32_t* dest = (int32_t*)_dest;
-// 		int32_t* src = (int32_t*)_src;
-// 		int32_t rgba;
-// 		int32_t bgra;
-// 		int length = width * height;
-// 		for (int i = 0; i < length; i++) {
-// 			bgra = src[i];
-// 			// BGRA in hex = 0xAARRGGBB.
-// 			rgba = (bgra & 0x00ff0000) >> 16 // Red >> Blue.
-// 				| (bgra & 0xff00ff00) // Green Alpha.
-// 				| (bgra & 0x000000ff) << 16; // Blue >> Red.
-// 			dest[i] = rgba;
-// 		}
-// 	}
-
-//     	template <typename T>
-// 	std::optional<T> GetOptionalValue(const flutter::EncodableMap& map,
-// 		const std::string& key) {
-// 		const auto it = map.find(flutter::EncodableValue(key));
-// 		if (it != map.end()) {
-// 			const auto val = std::get_if<T>(&it->second);
-// 			if (val) {
-// 				return *val;
-// 			}
-// 		}
-// 		return std::nullopt;
-// 	}
 
 	static const std::optional<std::pair<int, int>> GetPointFromArgs(
 		const PluginValue *args) {
@@ -72,42 +41,17 @@ namespace webview_cef {
     }
 
     void startCEF() {
-		CefWindowInfo window_info;
-		CefBrowserSettings settings;
-		window_info.SetAsWindowless(0);
+		handler.get()->onUrlChangedCb = [](std::string url) {
+			if(invokeFunc){
+				invokeFunc("urlChanged", new PluginValue(url));
+			}
+		};
 
-		// handler.get()->onPaintCallback = [](const void* buffer, int32_t width, int32_t height) {
-		// 	const std::lock_guard<std::mutex> lock(buffer_mutex_);
-		// 	if (!pixel_buffer.get() || pixel_buffer.get()->width != width || pixel_buffer.get()->height != height) {
-		// 		if (!pixel_buffer.get()) {
-		// 			pixel_buffer = std::make_unique<FlutterDesktopPixelBuffer>();
-		// 			pixel_buffer->release_context = &buffer_mutex_;
-		// 			// Gets invoked after the FlutterDesktopPixelBuffer's
-		// 			// backing buffer has been uploaded.
-		// 			pixel_buffer->release_callback = [](void* opaque) {
-		// 				auto mutex = reinterpret_cast<std::mutex*>(opaque);
-		// 				// Gets locked just before |CopyPixelBuffer| returns.
-		// 				mutex->unlock();
-		// 			};
-		// 		}
-		// 		pixel_buffer->width = width;
-		// 		pixel_buffer->height = height;
-		// 		const auto size = width * height * 4;
-		// 		backing_pixel_buffer.reset(new uint8_t[size]);
-		// 		pixel_buffer->buffer = backing_pixel_buffer.get();
-		// 	}
-
-		// 	SwapBufferFromBgraToRgba((void*)pixel_buffer->buffer, buffer, width, height);
-		// 	texture_registrar->MarkTextureFrameAvailable(texture_id);
-		// };
-
-		// handler.get()->onUrlChangedCb = [](std::string url) {
-		// 	channel->InvokeMethod("urlChanged", std::make_unique<flutter::EncodableValue>(url));
-		// };
-
-		// handler.get()->onTitleChangedCb = [](std::string title) {
-		// 	channel->InvokeMethod("titleChanged", std::make_unique<flutter::EncodableValue>(title));
-		// };
+		handler.get()->onTitleChangedCb = [](std::string title) {
+			if(invokeFunc){
+				invokeFunc("titleChanged", new PluginValue(title));
+			}
+		};
 
 		CefSettings cefs;
 		cefs.windowless_rendering_enabled = true;
@@ -119,17 +63,7 @@ namespace webview_cef {
 
 	int HandleMethodCall(std::string name, PluginValue* values, PluginValue* response) {
         int result = -1;
-        if(name.compare("init") == 0)
-        {
-            if(!init)
-            {
-				response = new PluginValue(texture_id);
-                new std::thread(startCEF);
-                init = true;
-                result = 1;
-            }
-        }
-		else if (name.compare("loadUrl") == 0) {
+		if (name.compare("loadUrl") == 0) {
 			if (const auto url = std::get_if<std::string>(values)) {
 				handler.get()->loadUrl(*url);
 				result = 1;
@@ -197,8 +131,30 @@ namespace webview_cef {
         return result;
 	}
 
-    void setTextureId(int textureId)
+	void SwapBufferFromBgraToRgba(void* _dest, const void* _src, int width, int height) {
+		int32_t* dest = (int32_t*)_dest;
+		int32_t* src = (int32_t*)_src;
+		int32_t rgba;
+		int32_t bgra;
+		int length = width * height;
+		for (int i = 0; i < length; i++) {
+			bgra = src[i];
+			// BGRA in hex = 0xAARRGGBB.
+			rgba = (bgra & 0x00ff0000) >> 16 // Red >> Blue.
+				| (bgra & 0xff00ff00) // Green Alpha.
+				| (bgra & 0x000000ff) << 16; // Blue >> Red.
+			dest[i] = rgba;
+		}
+	}
+
+    void setPaintCallBack(std::function<void(const void*, int32_t , int32_t )> callback)
     {
-		texture_id = textureId;
+		handler.get()->onPaintCallback = callback;
+		new std::thread(startCEF);
     }
+
+	void setInvokeMethodFunc(std::function<void(std::string, PluginValue*)> func){
+		invokeFunc = func;
+	}
+
 }

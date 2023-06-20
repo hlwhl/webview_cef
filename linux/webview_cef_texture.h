@@ -36,14 +36,13 @@ static gboolean webview_cef_texture_copy_pixels(FlPixelBufferTexture *texture,
     // So you may do some format conversion first if your original pixel
     // buffer is not in RGBA format.
     WebviewCefTexture *_texture = WEBVIEW_CEF_TEXTURE(texture);
-    if(_texture != nullptr){
-        *out_buffer = _texture->buffer;
-        *width = _texture->width;
-        *height = _texture->height;
+    if(_texture == nullptr){
         return TRUE;
-    }else{
-        return FALSE;
     }
+    *out_buffer = _texture->buffer;
+    *width = _texture->width;
+    *height = _texture->height;
+    return TRUE;
 }
 static WebviewCefTexture* webview_cef_texture_new(){
     return WEBVIEW_CEF_TEXTURE(g_object_new(webview_cef_texture_get_type(), nullptr));
