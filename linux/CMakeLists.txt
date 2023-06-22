@@ -3,9 +3,13 @@
 # the plugin to fail to compile for some customers of the plugin.
 cmake_minimum_required(VERSION 3.10)
 
+#supass warning
+cmake_policy(SET CMP0074 NEW)
+
 # Project-level configuration.
 set(PROJECT_NAME "webview_cef")
 project(${PROJECT_NAME} LANGUAGES CXX C)
+set(CMAKE_CXX_STANDARD 17)
 
 include(${CMAKE_CURRENT_SOURCE_DIR}/../third/download.cmake)
 prepare_prebuilt_files(${CMAKE_CURRENT_SOURCE_DIR}/../third/cef)
