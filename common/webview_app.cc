@@ -90,7 +90,7 @@ void WebviewApp::OnContextInitialized() {
     std::string url = "https://www.flutter.dev/";
     
     CefWindowInfo window_info;
-    window_info.SetAsWindowless(nullptr);
+    window_info.SetAsWindowless(0);
     
     // Create the first browser window.
     CefBrowserHost::CreateBrowser(window_info, m_handler, url, browser_settings,
