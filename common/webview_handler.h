@@ -10,6 +10,8 @@
 #include <functional>
 #include <list>
 
+#include "webview_cookieVisitor.h"
+
 class WebviewHandler : public CefClient,
 public CefDisplayHandler,
 public CefLifeSpanHandler,
@@ -19,6 +21,9 @@ public:
     std::function<void(const void*, int32_t width, int32_t height)> onPaintCallback;
     std::function<void(std::string url)> onUrlChangedCb;
     std::function<void(std::string title)> onTitleChangedCb;
+    std::function<void(std::map<std::string, std::map<std::string, std::string>>)> onAllCookieVisitedCb;
+    std::function<void(std::map<std::string, std::map<std::string, std::string>>)> onUrlCookieVisitedCb;
+    std::function<void(std::string channelName, std::string message, std::string js_callback_id, std::string frameId)> onJavaScriptChannelMessage;
     
     explicit WebviewHandler();
     ~WebviewHandler();
@@ -35,6 +40,13 @@ public:
     }
     virtual CefRefPtr<CefLoadHandler> GetLoadHandler() override { return this; }
     virtual CefRefPtr<CefRenderHandler> GetRenderHandler() override { return this; }
+
+	bool OnProcessMessageReceived(
+        CefRefPtr<CefBrowser> browser,
+		CefRefPtr<CefFrame> frame,
+		CefProcessId source_process,
+		CefRefPtr<CefProcessMessage> message) override;
+
     
     // CefDisplayHandler methods:
     virtual void OnTitleChange(CefRefPtr<CefBrowser> browser,
@@ -94,6 +106,15 @@ public:
     void reload();
     void openDevTools();
     
+    void setCookie(const std::string& domain, const std::string& key, const std::string& value);
+    void deleteCookie(const std::string& domain, const std::string& key);
+    bool visitAllCookies();
+    bool visitUrlCookies(const std::string& domain, const bool& isHttpOnly);
+
+    bool setJavaScriptChannels(const std::vector<std::string> channels);
+    bool sendJavaScriptChannelCallBack(const bool error, const std::string result, const std::string callbackId, const std::string frameId);
+    bool executeJavaScript(const std::string code);
+    
 private:
     uint32_t width = 1;
     uint32_t height = 1;
@@ -106,6 +127,8 @@ private:
     
     // Include the default reference counting implementation.
     IMPLEMENT_REFCOUNTING(WebviewHandler);
+
+    CefRefPtr<WebviewCookieVisitor> m_CookieVisitor;
 };
 
 #endif  // CEF_TESTS_CEFSIMPLE_SIMPLE_HANDLER_H_

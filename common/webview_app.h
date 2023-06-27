@@ -5,12 +5,12 @@
 #ifndef CEF_TESTS_CEFSIMPLE_SIMPLE_APP_H_
 #define CEF_TESTS_CEFSIMPLE_SIMPLE_APP_H_
 
-#include "include/cef_app.h"
 #include <functional>
 #include "webview_handler.h"
+#include "webview_js_handler.h"
 
 // Implement application-level callbacks for the browser process.
-class WebviewApp : public CefApp, public CefBrowserProcessHandler {
+class WebviewApp : public CefApp, public CefBrowserProcessHandler, public CefRenderProcessHandler{
 public:
     WebviewApp(CefRefPtr<WebviewHandler> handler);
     
@@ -18,6 +18,11 @@ public:
     CefRefPtr<CefBrowserProcessHandler> GetBrowserProcessHandler() override {
         return this;
     }
+
+    CefRefPtr<CefRenderProcessHandler> GetRenderProcessHandler() override { 
+        return this; 
+    }
+
     void OnBeforeCommandLineProcessing(
                                        const CefString& process_type,
                                        CefRefPtr<CefCommandLine> command_line) override {
@@ -35,9 +40,43 @@ public:
     // CefBrowserProcessHandler methods:
     void OnContextInitialized() override;
     CefRefPtr<CefClient> GetDefaultClient() override;
+
+    // CefRenderProcessHandler methods.
+    void OnWebKitInitialized() override;
+    void OnBrowserCreated(
+        CefRefPtr<CefBrowser> browser,
+        CefRefPtr<CefDictionaryValue> extra_info) override;
+    void OnBrowserDestroyed(CefRefPtr<CefBrowser> browser) override;
+    void OnContextCreated(
+        CefRefPtr<CefBrowser> browser,
+        CefRefPtr<CefFrame> frame, 
+        CefRefPtr<CefV8Context> context) override;
+    void OnContextReleased(
+        CefRefPtr<CefBrowser> browser, 
+        CefRefPtr<CefFrame> frame,
+        CefRefPtr<CefV8Context> context) override;
+    void OnUncaughtException(
+        CefRefPtr<CefBrowser> browser,
+        CefRefPtr<CefFrame> frame,
+        CefRefPtr<CefV8Context> context,
+        CefRefPtr<CefV8Exception> exception,
+        CefRefPtr<CefV8StackTrace> stackTrace) override;
+    void OnFocusedNodeChanged(
+        CefRefPtr<CefBrowser> browser,
+        CefRefPtr<CefFrame> frame,
+        CefRefPtr<CefDOMNode> node) override;
+    bool OnProcessMessageReceived(
+        CefRefPtr<CefBrowser> browser,
+        CefRefPtr<CefFrame> frame,
+        CefProcessId source_process,
+        CefRefPtr<CefProcessMessage> message) override;
     
 private:
     CefRefPtr<WebviewHandler> m_handler;
+
+    std::shared_ptr<CefJSBridge>	m_render_js_bridge;
+    bool							m_last_node_is_editable = false;
+
     // Include the default reference counting implementation.
     IMPLEMENT_REFCOUNTING(WebviewApp);
 };

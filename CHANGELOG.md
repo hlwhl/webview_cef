@@ -1,3 +1,13 @@
+## 0.1.0
+- JS bridge support (Thanks to @SinyimZhi)
+- Cookie manipulation support (Thanks to @SinyimZhi)
+- [Windows] fix compile error after upgrade from a lower version
+
+## 0.0.9
+
+- [Windows] Fixed crash caused by frame buffer lock.
+- [Windows] Fixed WebGL support.
+
 ## 0.0.8
 
 - Added support to build macOS universal app.

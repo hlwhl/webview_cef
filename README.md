@@ -41,13 +41,31 @@ When building the project for the first time, a prebuilt cef bin package (200MB,
 
 ### macOS <img src="https://seeklogo.com/images/A/apple-logo-52C416BDDD-seeklogo.com.png" width="15">
 
+To use the plugin in macOS, you'll need to clone the repository onto your project location, prefereably inside a `packages/` folder on the root of your project. 
+Update your `pubspec.yaml` file to accomodate the change.
+```
+...
+
+dependencies:
+  # Webview
+  webview_cef:
+    path: ./packages/webview_cef     # Or wherever you cloned the repo
+    
+    
+...
+```
+
+Then follow the below steps inside the `macos/` folder <b>of the cloned repository</b>.<br/><br/>
+
 1. Download prebuilt cef bundles from [arm64](https://github.com/hlwhl/webview_cef/releases/download/prebuilt_cef_bin_mac_arm64/CEFbins-mac103.0.12-arm64.zip) or [intel](https://github.com/hlwhl/webview_cef/releases/download/prebuilt_cef_bin_mac_intel/mac103.0.12-Intel.zip) depends on your target machine arch.
 
 > Note: You can also download [universal binary](https://github.com/hlwhl/webview_cef/releases/download/prebuilt_cef_bin_mac_universal/mac103.0.12-universal.zip) for build an mac-universal app if you want to build an mac universal app. See [#30](/../../issues/30). Thanks to [@okiabrian123](https://github.com/okiabrian123).
 
-2. Unzip the archive and put all files into `macos/third/cef`.
+2. Unzip the archive and put all files into `macos/third/cef`. (Inside the cloned repository, not your project)
 
-3 Run the example app.
+3. Run the example app.
+
+<br/><br/>
 
 `**[HELP WANTED!]**` Finding a more elegant way to distribute the prebuilt package.
 
@@ -63,7 +81,8 @@ When building the project for the first time, a prebuilt cef bin package (200MB,
 - [ ] Multi instance support
 - [ ] IME support
 - [x] Mouse events support
-- [ ] JS bridge support
+- [x] JS bridge support
+- [x] Cookie manipulation support
 - [x] Release to pub
 - [x] Trackpad support
 - [ ] Better macOS binary distribution

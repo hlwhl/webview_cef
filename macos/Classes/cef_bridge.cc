@@ -4,5 +4,7 @@
 
 #include "../../common/webview_app.cc"
 #include "../../common/webview_handler.cc"
+#include "../../common/webview_cookieVisitor.cc"
+#include "../../common/webview_js_handler.cc"
 
 #endif
