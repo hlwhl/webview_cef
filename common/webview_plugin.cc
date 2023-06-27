@@ -6,6 +6,7 @@
 #include <memory>
 #include <thread>
 #include <iostream>
+#include <optional>
 // #include <mutex>
 
 namespace webview_cef {
