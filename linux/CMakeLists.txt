@@ -24,6 +24,7 @@ set(PLUGIN_NAME "webview_cef_plugin")
 # Any new source files that you add to the plugin should be added here.
 add_library(${PLUGIN_NAME} SHARED
   "webview_cef_plugin.cc"
+  "webview_cef_keyevent.h"
   "webview_cef_texture.h"
   "${CMAKE_CURRENT_SOURCE_DIR}/../common/webview_app.cc"
   "${CMAKE_CURRENT_SOURCE_DIR}/../common/webview_app.h"

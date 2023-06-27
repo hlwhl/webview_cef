@@ -64,7 +64,7 @@ namespace webview_cef {
 
     void initCEFProcesses(CefMainArgs args);
     void startCEF();
-    void sendKeyEvent(CefKeyEvent ev);
+    void sendKeyEvent(CefKeyEvent& ev);
     int HandleMethodCall(std::string name, PluginValue* values, PluginValue* response);
     void SwapBufferFromBgraToRgba(void* _dest, const void* _src, int width, int height);
     void setPaintCallBack(std::function<void(const void*, int32_t , int32_t )> callback);

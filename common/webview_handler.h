@@ -87,7 +87,7 @@ public:
     void changeSize(float a_dpi, int width, int height);
     void cursorClick(int x, int y, bool up);
     void cursorMove(int x, int y, bool dragging);
-    void sendKeyEvent(CefKeyEvent ev);
+    void sendKeyEvent(CefKeyEvent& ev);
     void loadUrl(std::string url);
     void goForward();
     void goBack();

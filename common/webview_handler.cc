@@ -243,7 +243,7 @@ bool WebviewHandler::StartDragging(CefRefPtr<CefBrowser> browser,
     return true;
 }
 
-void WebviewHandler::sendKeyEvent(CefKeyEvent ev)
+void WebviewHandler::sendKeyEvent(CefKeyEvent& ev)
 {
     BrowserList::const_iterator it = browser_list_.begin();
     if (it != browser_list_.end()) {

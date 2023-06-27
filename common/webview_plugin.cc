@@ -35,7 +35,7 @@ namespace webview_cef {
 	    CefExecuteProcess(mainArgs, app, nullptr);
     }
 
-    void sendKeyEvent(CefKeyEvent ev)
+    void sendKeyEvent(CefKeyEvent& ev)
     {
         handler.get()->sendKeyEvent(ev);
     }

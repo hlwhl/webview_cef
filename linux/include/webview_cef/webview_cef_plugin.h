@@ -25,4 +25,6 @@ G_END_DECLS
 
 FLUTTER_PLUGIN_EXPORT void initCEFProcesses(int argc, char** argv);
 
+FLUTTER_PLUGIN_EXPORT gboolean processKeyEventForCEF(GtkWidget* widget, GdkEventKey* event, gpointer data);
+
 #endif  // FLUTTER_PLUGIN_WEBVIEW_CEF_PLUGIN_H_

@@ -6,6 +6,7 @@
 
 #include <cstring>
 #include "../../common/webview_plugin.h"
+#include "webview_cef_keyevent.h"
 #include "webview_cef_texture.h"
 
 #define WEBVIEW_CEF_PLUGIN(obj)                                     \
@@ -243,4 +244,51 @@ FLUTTER_PLUGIN_EXPORT void initCEFProcesses(int argc, char** argv)
 {
   CefMainArgs main_args(argc, argv);
   webview_cef::initCEFProcesses(main_args);
+}
+
+FLUTTER_PLUGIN_EXPORT gboolean processKeyEventForCEF(GtkWidget *widget, GdkEventKey *event, gpointer data)
+{
+  CefKeyEvent key_event;
+  KeyboardCode windows_key_code = GdkEventToWindowsKeyCode(event);
+  key_event.windows_key_code =
+      GetWindowsKeyCodeWithoutLocation(windows_key_code);
+  key_event.native_key_code = event->hardware_keycode;
+
+  key_event.modifiers = GetCefStateModifiers(event->state);
+  if (event->keyval >= GDK_KP_Space && event->keyval <= GDK_KP_9) {
+    key_event.modifiers |= EVENTFLAG_IS_KEY_PAD;
+  }
+  if (key_event.modifiers & EVENTFLAG_ALT_DOWN) {
+    key_event.is_system_key = true;
+  }
+
+  if (windows_key_code == VKEY_RETURN) {
+    // We need to treat the enter key as a key press of character \r.  This
+    // is apparently just how webkit handles it and what it expects.
+    key_event.unmodified_character = '\r';
+  } else {
+    // FIXME: fix for non BMP chars
+    key_event.unmodified_character =
+        static_cast<int>(gdk_keyval_to_unicode(event->keyval));
+  }
+
+  // If ctrl key is pressed down, then control character shall be input.
+  if (key_event.modifiers & EVENTFLAG_CONTROL_DOWN) {
+    key_event.character = GetControlCharacter(
+        windows_key_code, key_event.modifiers & EVENTFLAG_SHIFT_DOWN);
+  } else {
+    key_event.character = key_event.unmodified_character;
+  }
+
+  if (event->type == GDK_KEY_PRESS) {
+    key_event.type = KEYEVENT_RAWKEYDOWN;
+    webview_cef::sendKeyEvent(key_event);
+    key_event.type = KEYEVENT_CHAR;
+  } else {
+    key_event.type = KEYEVENT_KEYUP;
+  }
+  webview_cef::sendKeyEvent(key_event);
+  
+  //processKeyEventForFlutter need return FALSE
+  return FALSE;
 }
