@@ -3,7 +3,6 @@
 #include <flutter/plugin_registrar_windows.h>
 
 #include "webview_cef_plugin.h"
-//#include "include/cef_app.h"
 
 void WebviewCefPluginCApiRegisterWithRegistrar(
 	FlutterDesktopPluginRegistrarRef registrar) {
@@ -13,9 +12,7 @@ void WebviewCefPluginCApiRegisterWithRegistrar(
 }
 
 FLUTTER_PLUGIN_EXPORT void initCEFProcesses() {
-	CefMainArgs mainArgs;
-	//Post class WebviewApp can run the override functions which support JSBridge/JSSDK
-	CefExecuteProcess(mainArgs, webview_cef::app, nullptr);
+  	webview_cef::initCEFProcesses(CefMainArgs());
 }
 
 bool IsKeyDown(WPARAM wparam) {
@@ -139,5 +136,5 @@ FLUTTER_PLUGIN_EXPORT void processKeyEventForCEF(unsigned int message, unsigned 
 			event.modifiers |= EVENTFLAG_ALTGR_DOWN;
 		}
 	}
-	webview_cef::WebviewCefPlugin::sendKeyEvent(event);
+	webview_cef::sendKeyEvent(event);
 }

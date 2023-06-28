@@ -23,12 +23,12 @@ namespace webview_cef {
 		if (!list || list->size() != 2) {
 			return std::nullopt;
 		}
-		const auto x = std::get_if<int64_t>(&(*list)[0]);
-		const auto y = std::get_if<int64_t>(&(*list)[1]);
-		if (!x || !y) {
+		auto x = (*list)[0].LongValue();
+		auto y = (*list)[1].LongValue();
+		if (!x && !y) {
 			return std::nullopt;
 		}
-		return std::make_pair(*x, *y);
+		return std::make_pair((int)x, (int)y);
 	}
 
     void initCEFProcesses(CefMainArgs args){
@@ -51,6 +51,49 @@ namespace webview_cef {
 		handler.get()->onTitleChangedCb = [](std::string title) {
 			if(invokeFunc){
 				invokeFunc("titleChanged", new PluginValue(title));
+			}
+		};
+
+		handler.get()->onAllCookieVisitedCb = [](std::map<std::string, std::map<std::string, std::string>> cookies) {
+			if(invokeFunc){
+				PluginValueMap retMap;
+				for (auto& cookie : cookies)
+				{
+					PluginValueMap tempMap;
+					for (auto& c : cookie.second)
+					{
+						tempMap[PluginValue(c.first)] = PluginValue(c.second);
+					}
+					retMap[PluginValue(cookie.first)] = PluginValue(tempMap);
+				}
+				invokeFunc("allCookiesVisited", new PluginValue(retMap));
+			}
+		};
+
+		handler.get()->onUrlCookieVisitedCb = [](std::map<std::string, std::map<std::string, std::string>> cookies) {
+			if(invokeFunc){
+				PluginValueMap retMap;
+				for (auto& cookie : cookies)
+				{
+					PluginValueMap tempMap;
+					for (auto& c : cookie.second)
+					{
+						tempMap[PluginValue(c.first)] = PluginValue(c.second);
+					}
+					retMap[PluginValue(cookie.first)] = PluginValue(tempMap);
+				}
+				invokeFunc("urlCookiesVisited", new PluginValue(retMap));
+			}
+		};
+
+		handler.get()->onJavaScriptChannelMessage = [](std::string channelName, std::string message, std::string callbackId, std::string frameId) {
+			if(invokeFunc){
+				PluginValueMap retMap;
+				retMap[PluginValue("channel")] = PluginValue(channelName);
+				retMap[PluginValue("message")] = PluginValue(message);
+				retMap[PluginValue("callbackId")] = PluginValue(callbackId);
+				retMap[PluginValue("frameId")] = PluginValue(frameId);
+				invokeFunc("javascriptChannelMessage", new PluginValue(retMap));
 			}
 		};
 
@@ -100,11 +143,11 @@ namespace webview_cef {
 		}
 		else if (name.compare("setScrollDelta") == 0) {
 			const PluginValueList* list = std::get_if<PluginValueList>(values);
-			const auto x = *std::get_if<int64_t>(&(*list)[0]);
-			const auto y = *std::get_if<int64_t>(&(*list)[1]);
-			const auto deltaX = *std::get_if<int64_t>(&(*list)[2]);
-			const auto deltaY = *std::get_if<int64_t>(&(*list)[3]);
-			handler.get()->sendScrollEvent(x, y, deltaX, deltaY);
+			auto x = (*list)[0].LongValue();
+			auto y = (*list)[1].LongValue();
+			auto deltaX = (*list)[2].LongValue();
+			auto deltaY = (*list)[3].LongValue();
+			handler.get()->sendScrollEvent((int)x, (int)y, (int)deltaX, (int)deltaY);
 			result = 1;
 		}
 		else if (name.compare("goForward") == 0) {
@@ -122,6 +165,57 @@ namespace webview_cef {
 		else if (name.compare("openDevTools") == 0) {
 			handler.get()->openDevTools();
 			result = 1;
+		}
+		else if(name.compare("setCookie") == 0){
+			const PluginValueList* list = std::get_if<PluginValueList>(values);
+			const auto domain = *std::get_if<std::string>(&(*list)[0]);
+			const auto key = *std::get_if<std::string>(&(*list)[1]);
+			const auto value = *std::get_if<std::string>(&(*list)[2]);
+			handler.get()->setCookie(domain, key, value);
+			result = 1;	
+		}
+		else if (name.compare("deleteCookie") == 0) {
+			const PluginValueList* list = std::get_if<PluginValueList>(values);
+			const auto domain = *std::get_if<std::string>(&(*list)[0]);
+			const auto key = *std::get_if<std::string>(&(*list)[1]);
+			handler.get()->deleteCookie(domain, key);
+			result = 1;	
+		}
+		else if (name.compare("visitAllCookies") == 0) {
+			handler.get()->visitAllCookies();
+			result = 1;	
+		}
+		else if (name.compare("visitUrlCookies") == 0) {
+			const PluginValueList* list = std::get_if<PluginValueList>(values);
+			const auto domain = *std::get_if<std::string>(&(*list)[0]);
+			const auto isHttpOnly = *std::get_if<bool>(&(*list)[1]);
+			handler.get()->visitUrlCookies(domain, isHttpOnly);
+			result = 1;	
+		}
+		else if(name.compare("setJavaScriptChannels") == 0){
+			const PluginValueList* list = std::get_if<PluginValueList>(values);
+			const auto jsChannels = *std::get_if<PluginValueList>(&(*list)[0]);
+			std::vector<std::string> channels;
+			for (auto& jsChannel : jsChannels) {
+				channels.push_back(*std::get_if<std::string>(&(jsChannel)));
+			}
+			handler.get()->setJavaScriptChannels(channels);
+			result = 1;	
+		}
+		else if (name.compare("sendJavaScriptChannelCallBack") == 0) {
+			const PluginValueList* list = std::get_if<PluginValueList>(values);
+			const auto error = *std::get_if<bool>(&(*list)[0]);
+			const auto ret = *std::get_if<std::string>(&(*list)[1]);
+			const auto callbackId = *std::get_if<std::string>(&(*list)[2]);
+			const auto frameId = *std::get_if<std::string>(&(*list)[3]);
+			handler.get()->sendJavaScriptChannelCallBack(error, ret,callbackId,frameId);
+			result = 1;	
+		}
+		else if(name.compare("executeJavaScript") == 0){
+			const PluginValueList* list = std::get_if<PluginValueList>(values);
+			const auto code = *std::get_if<std::string>(&(*list)[0]);
+			handler.get()->executeJavaScript(code);
+			result = 1;	
 		}
 		else {
 			result = 0;
@@ -150,8 +244,11 @@ namespace webview_cef {
 
     void setPaintCallBack(std::function<void(const void*, int32_t , int32_t )> callback)
     {
+		if(!init){
 		handler.get()->onPaintCallback = callback;
 		new std::thread(startCEF);
+			init = true;
+		}
     }
 
 	void setInvokeMethodFunc(std::function<void(std::string, PluginValue*)> func){

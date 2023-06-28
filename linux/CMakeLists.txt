@@ -36,6 +36,10 @@ add_library(${PLUGIN_NAME} SHARED
   "${CMAKE_CURRENT_SOURCE_DIR}/../common/webview_handler.h"
   "${CMAKE_CURRENT_SOURCE_DIR}/../common/webview_plugin.cc"
   "${CMAKE_CURRENT_SOURCE_DIR}/../common/webview_plugin.h"
+  "${CMAKE_CURRENT_SOURCE_DIR}/../common/webview_js_handler.cc"
+  "${CMAKE_CURRENT_SOURCE_DIR}/../common/webview_js_handler.h"
+  "${CMAKE_CURRENT_SOURCE_DIR}/../common/webview_cookieVisitor.cc"
+  "${CMAKE_CURRENT_SOURCE_DIR}/../common/webview_cookieVisitor.h"
 )
 
 # Apply a standard set of build settings that are configured in the

@@ -10,8 +10,7 @@
 #include <utility>
 #include <variant>
 #include <vector>
-#include <../third/cef/include/internal/cef_types_wrappers.h>
-#include <../third/cef/include/internal/cef_linux.h>
+#include <include/cef_base.h>
 
 namespace webview_cef {
 
