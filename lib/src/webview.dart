@@ -151,7 +151,7 @@ class WebViewController extends ValueNotifier<bool> {
   }
 
   Future<void> setClientFocus(bool focus) {
-    return _pluginChannel.invokeListMethod('setClientFocus', [focus]);
+    return _pluginChannel.invokeMethod('setClientFocus', [focus]);
   }
 
   Future<void> setCookie(String domain, String key, String val) async {

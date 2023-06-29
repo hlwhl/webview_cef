@@ -90,7 +90,7 @@ void WebviewApp::OnContextInitialized() {
     std::string url = "https://www.flutter.dev/";
     
     CefWindowInfo window_info;
-    window_info.SetAsWindowless(nullptr);
+    window_info.SetAsWindowless(0);
     
     // Create the first browser window.
     CefBrowserHost::CreateBrowser(window_info, m_handler, url, browser_settings,
@@ -199,7 +199,7 @@ void WebviewApp::OnUncaughtException(CefRefPtr<CefBrowser> browser, CefRefPtr<Ce
 }
 
 void WebviewApp::OnFocusedNodeChanged(CefRefPtr<CefBrowser> browser, CefRefPtr<CefFrame> frame, CefRefPtr<CefDOMNode> node)
-{    
+ {    
     //Get node attribute
     bool is_editable = (node.get() && node->IsEditable());
 
