@@ -68,6 +68,7 @@ namespace webview_cef {
     void SwapBufferFromBgraToRgba(void* _dest, const void* _src, int width, int height);
     void setPaintCallBack(std::function<void(const void*, int32_t , int32_t )> callback);
     void setInvokeMethodFunc(std::function<void(std::string, PluginValue*)> func);
+    bool getPluginIsFocused();
 }
 
 #endif //WEBVIEW_PLUGIN_H

@@ -23,8 +23,8 @@ public:
     std::function<void(std::string title)> onTitleChangedCb;
     std::function<void(std::map<std::string, std::map<std::string, std::string>>)> onAllCookieVisitedCb;
     std::function<void(std::map<std::string, std::map<std::string, std::string>>)> onUrlCookieVisitedCb;
-    std::function<void(std::string channelName, std::string message, std::string js_callback_id, std::string frameId)> onJavaScriptChannelMessage;
-    
+    std::function<void(std::string, std::string, std::string, std::string)> onJavaScriptChannelMessage;
+
     explicit WebviewHandler();
     ~WebviewHandler();
     

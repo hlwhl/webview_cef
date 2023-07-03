@@ -15,6 +15,7 @@ class WebViewController extends ValueNotifier<bool> {
   int _textureId = 0;
   bool _isDisposed = false;
   WebviewEventsListener? _listener;
+  bool _focusEditable = false;
 
   final Map<String, JavascriptChannel> _javascriptChannels =
       <String, JavascriptChannel>{};
@@ -122,6 +123,10 @@ class WebViewController extends ValueNotifier<bool> {
     }
     assert(value);
     return _pluginChannel.invokeMethod('openDevTools');
+  }
+
+  Future<void> setClientFocus(bool focus) {
+    return _pluginChannel.invokeMethod('setClientFocus', [focus]);
   }
 
   Future<void> setCookie(String domain, String key, String val) async {
@@ -282,6 +287,7 @@ class WebView extends StatefulWidget {
 
 class WebViewState extends State<WebView> {
   final GlobalKey _key = GlobalKey();
+  late final _focusNode = FocusNode();
 
   WebViewController get _controller => widget.controller;
 
@@ -295,21 +301,38 @@ class WebViewState extends State<WebView> {
 
   @override
   Widget build(BuildContext context) {
-    return SizedBox.expand(key: _key, child: _buildInner());
+    return Focus(
+      autofocus: true,
+      focusNode: _focusNode,
+      canRequestFocus: true,
+      debugLabel: "webview_cef",
+      onFocusChange: (focused) {
+        _controller.setClientFocus(focused);
+      },
+      child: SizedBox.expand(key: _key, child: _buildInner()),
+    );
   }
 
   Widget _buildInner() {
     return NotificationListener<SizeChangedLayoutNotification>(
-        onNotification: (notification) {
-          _reportSurfaceSize(context);
-          return true;
-        },
-        child: SizeChangedLayoutNotifier(
-            child: Listener(
+      onNotification: (notification) {
+        _reportSurfaceSize(context);
+        return true;
+      },
+      child: SizeChangedLayoutNotifier(
+        child: Listener(
           onPointerHover: (ev) {
             _controller._cursorMove(ev.localPosition);
           },
           onPointerDown: (ev) {
+            if (!_focusNode.hasFocus) {
+              _focusNode.requestFocus();
+              Future.delayed(const Duration(milliseconds: 50), () {
+                if (!_focusNode.hasFocus) {
+                  _focusNode.requestFocus();
+                }
+              });
+            }
             _controller._cursorClickDown(ev.localPosition);
           },
           onPointerUp: (ev) {
@@ -329,7 +352,9 @@ class WebViewState extends State<WebView> {
                 event.panDelta.dx.round(), event.panDelta.dy.round());
           },
           child: Texture(textureId: _controller._textureId),
-        )));
+        ),
+      ),
+    );
   }
 
   void _reportSurfaceSize(BuildContext context) async {

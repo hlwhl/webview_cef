@@ -38,6 +38,118 @@ namespace webview_cef {
 		std::default_delete<flutter::MethodChannel<flutter::EncodableValue>>>
 		channel = nullptr;
 
+	static flutter::EncodableValue encode_pluginvalue_to_flvalue(webview_cef::PluginValue* args) {
+		size_t index = args->index();
+		if (index == 1) {
+			return flutter::EncodableValue(*std::get_if<bool>(args));
+		}
+		else if (index == 2) {
+			return flutter::EncodableValue(*std::get_if<int32_t>(args));
+		}
+		else if (index == 3) {
+			return flutter::EncodableValue(*std::get_if<int64_t>(args));
+		}
+		else if (index == 4) {
+			return flutter::EncodableValue(*std::get_if<double>(args));
+		}
+		else if (index == 5) {
+			return flutter::EncodableValue(*std::get_if<std::string>(args));
+		}
+		else if (index == 6) {
+			return flutter::EncodableValue(*std::get_if<std::vector<uint8_t>>(args));
+		}
+		else if (index == 7) {
+			return flutter::EncodableValue(*std::get_if<std::vector<int32_t>>(args));
+		}
+		else if (index == 8) {
+			return flutter::EncodableValue(*std::get_if<std::vector<int64_t>>(args));
+		}
+		else if (index == 9) {
+			return flutter::EncodableValue(*std::get_if<std::vector<float>>(args));
+		}
+		else if (index == 10) {
+			return flutter::EncodableValue(*std::get_if<std::vector<double>>(args));
+		}
+		else if (index == 11) {
+			flutter::EncodableList ret;
+			webview_cef::PluginValueList vec = *std::get_if<webview_cef::PluginValueList>(args);
+			for (size_t i = 0; i < vec.size(); i++) {
+				ret.push_back(encode_pluginvalue_to_flvalue(&vec[i]));
+			}
+			return ret;
+		}
+		else if (index == 12) {
+			flutter::EncodableMap ret;
+			webview_cef::PluginValueMap maps = *std::get_if<webview_cef::PluginValueMap>(args);
+			for (webview_cef::PluginValueMap::iterator it = maps.begin(); it != maps.end(); it++)
+			{
+				webview_cef::PluginValue key = it->first;
+				webview_cef::PluginValue val = it->second;
+				ret[encode_pluginvalue_to_flvalue(&key)] = encode_pluginvalue_to_flvalue(&val);
+			}
+			return ret;
+		}
+		return flutter::EncodableValue(nullptr);
+	}
+
+	static webview_cef::PluginValue encode_flvalue_to_pluginvalue(flutter::EncodableValue* args) {
+		webview_cef::PluginValue ret;
+		size_t index = args->index();
+		if (index == 1) {
+			ret = webview_cef::PluginValue(*std::get_if<bool>(args));
+		}
+		else if (index == 2) {
+			ret = webview_cef::PluginValue(*std::get_if<int32_t>(args));
+		}
+		else if (index == 3) {
+			ret = webview_cef::PluginValue(*std::get_if<int64_t>(args));
+		}
+		else if (index == 4) {
+			ret = webview_cef::PluginValue(*std::get_if<double>(args));
+		}
+		else if (index == 5) {
+			ret = webview_cef::PluginValue(*std::get_if<std::string>(args));
+		}
+		else if (index == 6) {
+			ret = webview_cef::PluginValue(*std::get_if<std::vector<uint8_t>>(args));
+		}
+		else if (index == 7) {
+			ret = webview_cef::PluginValue(*std::get_if<std::vector<int32_t>>(args));
+		}
+		else if (index == 8) {
+			ret = webview_cef::PluginValue(*std::get_if<std::vector<int64_t>>(args));
+		}
+		else if (index == 9) {
+			ret = webview_cef::PluginValue(*std::get_if<std::vector<double>>(args));
+		}
+		else if (index == 10) {
+			webview_cef::PluginValueList vec;
+			flutter::EncodableList list = *std::get_if<flutter::EncodableList>(args);
+			for (size_t i = 0; i < list.size(); i++) {
+				vec.push_back(encode_flvalue_to_pluginvalue(&list[i]));
+			}
+			ret = webview_cef::PluginValue(vec);
+		}
+		else if (index == 11) {
+			webview_cef::PluginValueMap maps;
+			flutter::EncodableMap map = *std::get_if<flutter::EncodableMap>(args);
+			for (flutter::EncodableMap::iterator it = map.begin(); it != map.end(); it++)
+			{
+				flutter::EncodableValue key = it->first;
+				flutter::EncodableValue val = it->second;
+				maps[encode_flvalue_to_pluginvalue(&key)] = encode_flvalue_to_pluginvalue(&val);
+			}
+			ret = webview_cef::PluginValue(maps);
+		}
+		else if (index == 12) {
+
+		}
+		else if (index == 13) {
+			ret = webview_cef::PluginValue(*std::get_if<std::vector<float>>(args));
+		}
+		return ret;
+	}
+
 	// static
 	void WebviewCefPlugin::RegisterWithRegistrar(
 		flutter::PluginRegistrarWindows* registrar) {
@@ -54,111 +166,18 @@ namespace webview_cef {
 				plugin_pointer->HandleMethodCall(call, std::move(result));
 			});
 
+		auto invoke = [=](std::string method, webview_cef::PluginValue* arguments) {
+			flutter::EncodableValue args = encode_pluginvalue_to_flvalue(arguments);
+			channel->InvokeMethod(method, std::make_unique<flutter::EncodableValue>(args));
+  		};
+  		webview_cef::setInvokeMethodFunc(invoke);
+
 		registrar->AddPlugin(std::move(plugin));
 	}
 
 	WebviewCefPlugin::WebviewCefPlugin() {}
 
 	WebviewCefPlugin::~WebviewCefPlugin() {}
-
-	static flutter::EncodableValue encode_pluginvalue_to_flvalue(webview_cef::PluginValue *args){
-		size_t index = args->index();
-		if(index == 1){
-			return flutter::EncodableValue(std::get_if<bool>(args));
-		}else if(index == 2 || index == 3){
-			return flutter::EncodableValue((int64_t)std::get_if<int>(args));
-		}else if(index == 4){
-			return flutter::EncodableValue(*std::get_if<double>(args));
-		}else if(index == 5){
-			std::string str = *std::get_if<std::string>(args);
-			return flutter::EncodableValue(str.c_str());
-		}else if(index == 6){
-			std::vector<uint8_t> vec = *std::get_if<std::vector<uint8_t>>(args);
-			return flutter::EncodableValue(vec);
-		}else if(index == 7){
-			std::vector<int32_t> vec = *std::get_if<std::vector<int32_t>>(args);
-			return flutter::EncodableValue(vec);
-		}else if(index == 8){
-			std::vector<int64_t> vec = *std::get_if<std::vector<int64_t>>(args);
-			return flutter::EncodableValue(vec);
-		}else if(index == 9){
-			std::vector<float> vec = *std::get_if<std::vector<float>>(args);
-			return flutter::EncodableValue(vec);
-		}else if(index == 10){
-			std::vector<double> vec = *std::get_if<std::vector<double>>(args);
-			return flutter::EncodableValue(vec);
-		}else if(index == 11){
-			flutter::EncodableList ret;
-			webview_cef::PluginValueList vec = *std::get_if<webview_cef::PluginValueList>(args);
-			for(size_t i=0;i<vec.size();i++){
-				ret.push_back(encode_pluginvalue_to_flvalue(&vec[i]));
-			}
-			return ret;
-		}else if(index == 12){
-			flutter::EncodableMap ret;
-			webview_cef::PluginValueMap maps = *std::get_if<webview_cef::PluginValueMap>(args);
-			for(webview_cef::PluginValueMap::iterator it = maps.begin(); it != maps.end(); it++ )
-			{
-				webview_cef::PluginValue key = it->first;
-				webview_cef::PluginValue val = it->second;
-				ret[encode_pluginvalue_to_flvalue(&key)] = encode_pluginvalue_to_flvalue(&val);
-			}
-			return ret;
-		}
-		return flutter::EncodableValue(nullptr);
-	}
-
-	static webview_cef::PluginValue encode_flvalue_to_pluginvalue(flutter::EncodableValue *args){
-		webview_cef::PluginValue ret;
-		size_t index = args->index();
-		if(index == 1){
-			ret = webview_cef::PluginValue(std::get_if<bool>(args));
-		}else if(index == 2){
-			ret = webview_cef::PluginValue((int)*std::get_if<int32_t>(args));
-		}else if(index == 3){
-			ret = webview_cef::PluginValue((int)*std::get_if<int64_t>(args));
-		}else if(index == 4){
-			ret = webview_cef::PluginValue(*std::get_if<double>(args));
-		}else if(index == 5){
-			ret =  webview_cef::PluginValue(*std::get_if<std::string>(args));
-		}else if(index == 6){
-			std::vector<uint8_t> vec = *std::get_if<std::vector<uint8_t>>(args);
-			ret = webview_cef::PluginValue(vec);
-		}else if(index == 7){
-			std::vector<int32_t> vec = *std::get_if<std::vector<int32_t>>(args);
-			ret = webview_cef::PluginValue(vec);
-		}else if(index == 8){
-			std::vector<int64_t> vec = *std::get_if<std::vector<int64_t>>(args);
-			ret = webview_cef::PluginValue(vec);
-		}else if(index == 9){
-			std::vector<double> vec = *std::get_if<std::vector<double>>(args);
-			ret = webview_cef::PluginValue(vec);
-		}else if(index == 10){
-			webview_cef::PluginValueList vec;
-			flutter::EncodableList list = *std::get_if<flutter::EncodableList>(args);
-			for(size_t i=0;i<list.size();i++){
-				vec.push_back(encode_flvalue_to_pluginvalue(&list[i]));
-			}
-			ret = webview_cef::PluginValue(vec);
-		}else if(index == 11){
-			webview_cef::PluginValueMap maps;
-			flutter::EncodableMap map = *std::get_if<flutter::EncodableMap>(args);
-			for(flutter::EncodableMap::iterator it = map.begin(); it != map.end(); it++ )
-			{
-				flutter::EncodableValue key = it->first;
-				flutter::EncodableValue val = it->second;
-				maps[encode_flvalue_to_pluginvalue(&key)] = encode_flvalue_to_pluginvalue(&val);
-			}
-			ret = webview_cef::PluginValue(maps);
-		}else if(index == 12){
-
-		}else if(index == 13){
-			std::vector<float> vec = *std::get_if<std::vector<float>>(args);
-			ret = webview_cef::PluginValue(vec);
-		}
-		return ret;
-	}
-
 
 	void WebviewCefPlugin::HandleMethodCall(
 		const flutter::MethodCall<flutter::EncodableValue>& method_call,
