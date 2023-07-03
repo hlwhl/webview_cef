@@ -11,6 +11,7 @@
 
 namespace webview_cef {
 	bool init = false;
+	bool isFocused = false;
 	std::function<void(std::string, PluginValue*)> invokeFunc;
     
     CefRefPtr<WebviewHandler> handler(new WebviewHandler());
@@ -41,77 +42,7 @@ namespace webview_cef {
         handler.get()->sendKeyEvent(ev);
     }
 
-    void startCEF() {
-		handler.get()->onUrlChangedCb = [](std::string url) {
-			if(invokeFunc){
-				invokeFunc("urlChanged", new PluginValue(url));
-			}
-		};
-
-		handler.get()->onTitleChangedCb = [](std::string title) {
-			if(invokeFunc){
-				invokeFunc("titleChanged", new PluginValue(title));
-			}
-		};
-
-		handler.get()->onAllCookieVisitedCb = [](std::map<std::string, std::map<std::string, std::string>> cookies) {
-			if(invokeFunc){
-				PluginValueMap retMap;
-				for (auto& cookie : cookies)
-				{
-					PluginValueMap tempMap;
-					for (auto& c : cookie.second)
-					{
-						tempMap[PluginValue(c.first)] = PluginValue(c.second);
-					}
-					retMap[PluginValue(cookie.first)] = PluginValue(tempMap);
-				}
-				invokeFunc("allCookiesVisited", new PluginValue(retMap));
-			}
-		};
-
-		handler.get()->onUrlCookieVisitedCb = [](std::map<std::string, std::map<std::string, std::string>> cookies) {
-			if(invokeFunc){
-				PluginValueMap retMap;
-				for (auto& cookie : cookies)
-				{
-					PluginValueMap tempMap;
-					for (auto& c : cookie.second)
-					{
-						tempMap[PluginValue(c.first)] = PluginValue(c.second);
-					}
-					retMap[PluginValue(cookie.first)] = PluginValue(tempMap);
-				}
-				invokeFunc("urlCookiesVisited", new PluginValue(retMap));
-			}
-		};
-
-		handler.get()->onJavaScriptChannelMessage = [](std::string channelName, std::string message, std::string callbackId, std::string frameId) {
-			if(invokeFunc){
-				PluginValueMap retMap;
-				retMap[PluginValue("channel")] = PluginValue(channelName);
-				retMap[PluginValue("message")] = PluginValue(message);
-				retMap[PluginValue("callbackId")] = PluginValue(callbackId);
-				retMap[PluginValue("frameId")] = PluginValue(frameId);
-				invokeFunc("javascriptChannelMessage", new PluginValue(retMap));
-			}
-		};
-
-		handler.get()->onFocusedNodeChangeMessage = [](bool editable) {
-			if(invokeFunc){
-				invokeFunc("onFocusedNodeChangeMessage", new PluginValue(editable));
-			}
-		};
-
-		handler.get()->onImeCompositionRangeChangedMessage = [](int32_t x, int32_t y) {
-			if(invokeFunc){
-				PluginValueMap retMap;
-				retMap[PluginValue("x")] = PluginValue(x);
-				retMap[PluginValue("y")] = PluginValue(y);
-				invokeFunc("onImeCompositionRangeChangedMessage", new PluginValue(retMap));
-			}
-		};
-
+	void startCEF() {
 		CefSettings cefs;
 		cefs.windowless_rendering_enabled = true;
 		cefs.no_sandbox = true;
@@ -195,8 +126,8 @@ namespace webview_cef {
 		} 
 		else if (name.compare("setClientFocus") == 0) {
 			const PluginValueList* list = std::get_if<PluginValueList>(values);
-			const auto focus = *std::get_if<bool>(&(*list)[0]);
-			handler.get()->setClientFocus(focus);
+			isFocused = *std::get_if<bool>(&(*list)[0]);
+			handler.get()->setClientFocus(isFocused);
 			result = 1;
 		}
 		else if(name.compare("setCookie") == 0){
@@ -275,11 +206,94 @@ namespace webview_cef {
 		}
 	}
 
-    void setPaintCallBack(std::function<void(const void*, int32_t , int32_t )> callback)
-    {
-		if(!init){
-		handler.get()->onPaintCallback = callback;
-		new std::thread(startCEF);
+	void setPaintCallBack(std::function<void(const void *, int32_t, int32_t)> callback)	{
+		if (!init)
+		{
+			handler.get()->onPaintCallback = callback;
+			handler.get()->onUrlChangedCb = [](std::string url)
+			{
+				if (invokeFunc)
+				{
+					invokeFunc("urlChanged", new PluginValue(url));
+				}
+			};
+
+			handler.get()->onTitleChangedCb = [](std::string title)
+			{
+				if (invokeFunc)
+				{
+					invokeFunc("titleChanged", new PluginValue(title));
+				}
+			};
+
+			handler.get()->onAllCookieVisitedCb = [](std::map<std::string, std::map<std::string, std::string>> cookies)
+			{
+				if (invokeFunc)
+				{
+					PluginValueMap retMap;
+					for (auto &cookie : cookies)
+					{
+						PluginValueMap tempMap;
+						for (auto &c : cookie.second)
+						{
+							tempMap[PluginValue(c.first)] = PluginValue(c.second);
+						}
+						retMap[PluginValue(cookie.first)] = PluginValue(tempMap);
+					}
+					invokeFunc("allCookiesVisited", new PluginValue(retMap));
+				}
+			};
+
+			handler.get()->onUrlCookieVisitedCb = [](std::map<std::string, std::map<std::string, std::string>> cookies)
+			{
+				if (invokeFunc)
+				{
+					PluginValueMap retMap;
+					for (auto &cookie : cookies)
+					{
+						PluginValueMap tempMap;
+						for (auto &c : cookie.second)
+						{
+							tempMap[PluginValue(c.first)] = PluginValue(c.second);
+						}
+						retMap[PluginValue(cookie.first)] = PluginValue(tempMap);
+					}
+					invokeFunc("urlCookiesVisited", new PluginValue(retMap));
+				}
+			};
+
+			handler.get()->onJavaScriptChannelMessage = [](std::string channelName, std::string message, std::string callbackId, std::string frameId)
+			{
+				if (invokeFunc)
+				{
+					PluginValueMap retMap;
+					retMap[PluginValue("channel")] = PluginValue(channelName);
+					retMap[PluginValue("message")] = PluginValue(message);
+					retMap[PluginValue("callbackId")] = PluginValue(callbackId);
+					retMap[PluginValue("frameId")] = PluginValue(frameId);
+					invokeFunc("javascriptChannelMessage", new PluginValue(retMap));
+				}
+			};
+
+			handler.get()->onFocusedNodeChangeMessage = [](bool editable)
+			{
+				if (invokeFunc)
+				{
+					invokeFunc("onFocusedNodeChangeMessage", new PluginValue(editable));
+				}
+			};
+
+			handler.get()->onImeCompositionRangeChangedMessage = [](int32_t x, int32_t y)
+			{
+				if (invokeFunc)
+				{
+					PluginValueMap retMap;
+					retMap[PluginValue("x")] = PluginValue(x);
+					retMap[PluginValue("y")] = PluginValue(y);
+					invokeFunc("onImeCompositionRangeChangedMessage", new PluginValue(retMap));
+				}
+			};
+			new std::thread(startCEF);
 			init = true;
 		}
     }
@@ -288,4 +302,7 @@ namespace webview_cef {
 		invokeFunc = func;
 	}
 
+	bool getPluginIsFocused() {
+		return isFocused;
+	}
 }
