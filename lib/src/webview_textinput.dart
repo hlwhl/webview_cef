@@ -1,3 +1,5 @@
+import 'dart:io';
+
 import 'package:flutter/services.dart';
 
 mixin WebeViewTextInput implements DeltaTextInputClient {
@@ -13,6 +15,10 @@ mixin WebeViewTextInput implements DeltaTextInputClient {
     _textInputConnection?.close();
     _textInputConnection = TextInput.attach(
         this, const TextInputConfiguration(enableDeltaModel: true));
+    if (!Platform.isWindows) {
+      _textInputConnection?.show();
+    }
+    // _textInputConnection
   }
 
   detachTextInputClient() {
@@ -20,9 +26,9 @@ mixin WebeViewTextInput implements DeltaTextInputClient {
   }
 
   updateIMEComposionPosition(double x, double y, Offset offset) {
-    /// It always displays at the last position, which should be a bug in the Flutter engine.
-    /// If switch windows and switch back, this function can run well once.
-    /// I think there must have a flush function called when switching windows
+    /// 1.It always displays at the last position, which should be a bug in the Flutter engine.
+    /// 2.If switch windows and switch back, this function can run well once.I think there must have a flush function called when switching windows
+    /// 3.Windows can run well, but Linux can't.
     _textInputConnection?.setEditableSizeAndTransform(const Size(0, 0),
         Matrix4.translationValues(offset.dx + x, offset.dy + y, 0));
   }

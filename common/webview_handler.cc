@@ -376,8 +376,14 @@ void WebviewHandler::imeCommitText(std::string text)
     CefString cTextStr = CefString(text);
     is_ime_commit = true;
 
-    browser->GetHost()->ImeCommitText(cTextStr,
-        CefRange(UINT32_MAX, UINT32_MAX), 0);
+    std::vector<CefCompositionUnderline> underlines;
+    auto selection_range_end = static_cast<int>(0 + cTextStr.length());
+    CefRange selection_range = CefRange(selection_range_end, selection_range_end);
+#ifndef _WIN32
+        browser->GetHost()->ImeSetComposition(cTextStr, underlines, CefRange(UINT32_MAX, UINT32_MAX), selection_range);
+#endif
+    browser->GetHost()->ImeCommitText(cTextStr, CefRange(UINT32_MAX, UINT32_MAX), 0);
+
 }
 
 void WebviewHandler::setClientFocus(bool focus)

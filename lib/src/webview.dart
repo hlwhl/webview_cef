@@ -1,4 +1,5 @@
 import 'dart:async';
+import 'dart:io';
 
 import 'package:flutter/gestures.dart';
 import 'package:flutter/material.dart';
@@ -331,6 +332,8 @@ class WebViewState extends State<WebView> with WebeViewTextInput {
         if (d.composing.isValid) {
           _composingText += d.textInserted;
           _controller.imeSetComposition(_composingText);
+        } else if (!Platform.isWindows) {
+          _controller.imeCommitText(d.textInserted);
         }
       } else if (d is TextEditingDeltaDeletion) {
         if (d.composing.isValid) {
@@ -358,7 +361,7 @@ class WebViewState extends State<WebView> with WebeViewTextInput {
     super.initState();
 
     _controller._onFocusedNodeChangeMessage = (editable) {
-      _composingText = "";
+      _composingText = '';
       editable ? attachTextInputClient() : detachTextInputClient();
       _controller._focusEditable = editable;
     };
@@ -381,7 +384,7 @@ class WebViewState extends State<WebView> with WebeViewTextInput {
       canRequestFocus: true,
       debugLabel: "webview_cef",
       onFocusChange: (focused) {
-        _composingText = "";
+        _composingText = '';
         if (focused) {
           _controller.setClientFocus(true);
           if (_controller._focusEditable) {
