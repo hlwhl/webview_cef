@@ -309,6 +309,7 @@ namespace webview_cef {
 			startCEF();
 #endif
 			init = true;
+		}
 	}
 
 	void setInvokeMethodFunc(std::function<void(std::string, PluginValue*)> func){
