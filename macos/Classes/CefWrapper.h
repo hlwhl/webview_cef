@@ -39,6 +39,12 @@ extern int64_t textureId;
 
 + (void) openDevTools;
 
++ (void) imeSetComposition:(NSString *)text;
+
++ (void) imeCommitText:(NSString *)text;
+
++ (void) setClientFocus:(bool)focus;
+
 + (void) setMethodChannel: (FlutterMethodChannel*)channel;
 
 + (void) setCookie: (NSString *)domain key:(NSString *) key value:(NSString *)value;

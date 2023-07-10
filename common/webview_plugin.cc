@@ -119,9 +119,22 @@ namespace webview_cef {
 			handler.get()->openDevTools();
 			result = 1;
 		}
+		else if (name.compare("imeSetComposition") == 0) {
+			const PluginValueList* list = std::get_if<PluginValueList>(values);
+			const auto text = *std::get_if<std::string>(&(*list)[0]);
+			handler.get()->imeSetComposition(text);
+			result = 1;
+		} 
+		else if (name.compare("imeCommitText") == 0) {
+			const PluginValueList* list = std::get_if<PluginValueList>(values);
+			const auto text = *std::get_if<std::string>(&(*list)[0]);
+			handler.get()->imeCommitText(text);
+			result = 1;
+		} 
 		else if (name.compare("setClientFocus") == 0) {
 			const PluginValueList* list = std::get_if<PluginValueList>(values);
 			isFocused = *std::get_if<bool>(&(*list)[0]);
+			handler.get()->setClientFocus(isFocused);
 			result = 1;
 		}
 		else if(name.compare("setCookie") == 0){
@@ -268,7 +281,26 @@ namespace webview_cef {
 					invokeFunc("javascriptChannelMessage", new PluginValue(retMap));
 				}
 			};
+      
+			handler.get()->onFocusedNodeChangeMessage = [](bool editable)
+			{
+				if (invokeFunc)
+				{
+					invokeFunc("onFocusedNodeChangeMessage", new PluginValue(editable));
+				}
+			};
 
+			handler.get()->onImeCompositionRangeChangedMessage = [](int32_t x, int32_t y)
+			{
+				if (invokeFunc)
+				{
+					PluginValueMap retMap;
+					retMap[PluginValue("x")] = PluginValue(x);
+					retMap[PluginValue("y")] = PluginValue(y);
+					invokeFunc("onImeCompositionRangeChangedMessage", new PluginValue(retMap));
+				}
+			};
+      
 #if defined(OS_WIN)
 			//windows run in multi thread
 			new std::thread(startCEF);
@@ -277,8 +309,7 @@ namespace webview_cef {
 			startCEF();
 #endif
 			init = true;
-		}
-    }
+	}
 
 	void setInvokeMethodFunc(std::function<void(std::string, PluginValue*)> func){
 		invokeFunc = func;

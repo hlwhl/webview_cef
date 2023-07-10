@@ -22,6 +22,9 @@ namespace {
 
 WebviewHandler* g_instance = nullptr;
 
+// The only browser that currently get focused
+CefRefPtr<CefBrowser> current_focused_browser_ = nullptr;
+
 // Returns a data: URI with the specified contents.
 std::string GetDataURI(const std::string& data, const std::string& mime_type) {
     return "data:" + mime_type + ";base64," +
@@ -50,8 +53,16 @@ bool WebviewHandler::OnProcessMessageReceived(
      CefProcessId source_process, CefRefPtr<CefProcessMessage> message)
 {
 	std::string message_name = message->GetName();
-
-    if(message_name == kJSCallCppFunctionMessage)
+    if (message_name == kFocusedNodeChangedMessage)
+    {
+        current_focused_browser_ = browser;
+        bool editable = message->GetArgumentList()->GetBool(0);
+        onFocusedNodeChangeMessage(editable);
+        if (editable) {
+            onImeCompositionRangeChangedMessage(message->GetArgumentList()->GetInt(1), message->GetArgumentList()->GetInt(2));
+        }
+    }
+    else if(message_name == kJSCallCppFunctionMessage)
     {
         CefString fun_name = message->GetArgumentList()->GetString(0);
 		CefString param = message->GetArgumentList()->GetString(1);
@@ -129,6 +140,20 @@ bool WebviewHandler::OnBeforePopup(CefRefPtr<CefBrowser> browser,
                                   bool* no_javascript_access) {
     loadUrl(target_url);
     return true;
+}
+
+void WebviewHandler::OnTakeFocus(CefRefPtr<CefBrowser> browser, bool next)
+{
+    executeJavaScript("document.activeElement.blur()");
+}
+
+bool WebviewHandler::OnSetFocus(CefRefPtr<CefBrowser> browser, FocusSource source)
+{
+    return false;
+}
+
+void WebviewHandler::OnGotFocus(CefRefPtr<CefBrowser> browser)
+{
 }
 
 void WebviewHandler::OnLoadError(CefRefPtr<CefBrowser> browser,
@@ -315,6 +340,61 @@ void WebviewHandler::openDevTools() {
     }
 }
 
+void WebviewHandler::imeSetComposition(std::string text)
+{
+    auto browser = current_focused_browser_;
+
+    if (!browser.get()) {
+        return;
+    }
+
+    CefString cTextStr = CefString(text);
+
+    std::vector<CefCompositionUnderline> underlines;
+    cef_composition_underline_t underline = {};
+    underline.range.from = 0;
+    underline.range.to = static_cast<int>(0 + cTextStr.length());
+    underline.color = ColorUNDERLINE;
+    underline.background_color = ColorBKCOLOR;
+    underline.thick = 0;
+    underline.style = CEF_CUS_DOT;
+    underlines.push_back(underline);
+
+    // Keeps the caret at the end of the composition
+    auto selection_range_end = static_cast<int>(0 + cTextStr.length());
+    CefRange selection_range = CefRange(0, selection_range_end);
+    browser->GetHost()->ImeSetComposition(cTextStr, underlines, CefRange(UINT32_MAX, UINT32_MAX), selection_range);
+}
+
+void WebviewHandler::imeCommitText(std::string text)
+{
+    auto browser = current_focused_browser_;
+    if (!browser.get()) {
+        return;
+    }
+
+    CefString cTextStr = CefString(text);
+    is_ime_commit = true;
+
+    std::vector<CefCompositionUnderline> underlines;
+    auto selection_range_end = static_cast<int>(0 + cTextStr.length());
+    CefRange selection_range = CefRange(selection_range_end, selection_range_end);
+#ifndef _WIN32
+        browser->GetHost()->ImeSetComposition(cTextStr, underlines, CefRange(UINT32_MAX, UINT32_MAX), selection_range);
+#endif
+    browser->GetHost()->ImeCommitText(cTextStr, CefRange(UINT32_MAX, UINT32_MAX), 0);
+
+}
+
+void WebviewHandler::setClientFocus(bool focus)
+{
+    auto browser = current_focused_browser_;
+    if (!browser.get()) {
+        return;
+    }
+    browser->GetHost()->SetFocus(focus);
+}
+
 void WebviewHandler::setCookie(const std::string& domain, const std::string& key, const std::string& value){
     CefRefPtr<CefCookieManager> manager = CefCookieManager::GetGlobalManager(nullptr);
     if(manager){
@@ -474,4 +554,26 @@ bool WebviewHandler::GetScreenInfo(CefRefPtr<CefBrowser> browser, CefScreenInfo&
 void WebviewHandler::OnPaint(CefRefPtr<CefBrowser> browser, CefRenderHandler::PaintElementType type,
                             const CefRenderHandler::RectList &dirtyRects, const void *buffer, int w, int h) {
     onPaintCallback(buffer, w, h);
+}
+
+void WebviewHandler::OnImeCompositionRangeChanged(CefRefPtr<CefBrowser> browser, const CefRange &selection_range, const CefRenderHandler::RectList &character_bounds)
+{
+    CEF_REQUIRE_UI_THREAD();
+    if (!character_bounds.empty()) {
+        if (is_ime_commit) {
+            auto lastCharacter = character_bounds.back();
+            prev_ime_position = lastCharacter;
+            onImeCompositionRangeChangedMessage(lastCharacter.x + lastCharacter.width, lastCharacter.y + lastCharacter.height);
+            is_ime_commit = false;
+        }
+        else
+        {
+            auto firstCharacter = character_bounds.front();
+            if (firstCharacter != prev_ime_position) {
+                prev_ime_position = firstCharacter;
+                onImeCompositionRangeChangedMessage(firstCharacter.x, firstCharacter.y + firstCharacter.height);
+            }
+        }
+
+    }
 }
