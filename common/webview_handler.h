@@ -34,6 +34,7 @@ public:
     std::function<void(std::string, std::string, std::string, std::string)> onJavaScriptChannelMessage;
     std::function<void(bool editable)> onFocusedNodeChangeMessage;
     std::function<void(int32_t x, int32_t y)> onImeCompositionRangeChangedMessage;
+
     explicit WebviewHandler();
     ~WebviewHandler();
     

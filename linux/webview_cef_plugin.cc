@@ -22,6 +22,13 @@ G_DEFINE_TYPE(WebviewCefPlugin, webview_cef_plugin, g_object_get_type())
 
 static FlTextureRegistrar* texture_register;
 
+struct invoke_method_data
+{
+  gpointer channel;
+  const gchar* method;
+  gpointer arguments;
+};
+
 static FlValue* encode_pluginvalue_to_flvalue(webview_cef::PluginValue *args){
   int index = args->index();
   if(index == 1){
@@ -178,6 +185,10 @@ static void webview_cef_plugin_handle_method_call(
       fl_texture_registrar_mark_texture_frame_available(texture_register, FL_TEXTURE(texture));
 		};
     webview_cef::setPaintCallBack(callback);
+    g_timeout_add(20, [](gpointer data) -> gboolean {
+      webview_cef::doMessageLoopWork();
+      return TRUE;
+    }, NULL);
     response = FL_METHOD_RESPONSE(fl_method_success_response_new(fl_value_new_int((int64_t)texture)));
   }else{
     webview_cef::PluginValue encodeArgs = encode_flvalue_to_pluginvalue(args);
@@ -216,6 +227,18 @@ static void method_call_cb(FlMethodChannel *channel, FlMethodCall *method_call,
   webview_cef_plugin_handle_method_call(plugin, method_call);
 }
 
+static gboolean invokeMethod(gpointer data)
+{
+  struct invoke_method_data *invoke_data = (struct invoke_method_data *)data;
+  FlMethodChannel* channel = (FlMethodChannel*)invoke_data->channel;
+  const gchar* method = invoke_data->method;
+  FlValue* arguments = (FlValue*)invoke_data->arguments;
+  fl_method_channel_invoke_method(channel, method, arguments, NULL, NULL, NULL);
+  fl_value_unref(arguments);
+  free(invoke_data);
+  return FALSE;
+}
+
 void webview_cef_plugin_register_with_registrar(FlPluginRegistrar *registrar)
 {
   WebviewCefPlugin *plugin = WEBVIEW_CEF_PLUGIN(
@@ -233,7 +256,11 @@ void webview_cef_plugin_register_with_registrar(FlPluginRegistrar *registrar)
                                             g_object_unref);
 
   auto invoke = [=](std::string method, webview_cef::PluginValue* arguments) {
-    fl_method_channel_invoke_method(channel, method.c_str(), encode_pluginvalue_to_flvalue(arguments), NULL, NULL, NULL);
+    struct invoke_method_data *data = (struct invoke_method_data *)malloc(sizeof(struct invoke_method_data));
+    data->channel = channel;
+    data->method = method.c_str();
+    data->arguments = encode_pluginvalue_to_flvalue(arguments);
+    g_idle_add(invokeMethod, data);
   };
   webview_cef::setInvokeMethodFunc(invoke);
 

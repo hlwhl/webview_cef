@@ -47,11 +47,18 @@ namespace webview_cef {
 		cefs.windowless_rendering_enabled = true;
 		cefs.no_sandbox = true;
 		CefInitialize(mainArgs, cefs, app.get(), nullptr);
+#if defined(OS_WIN)
 		CefRunMessageLoop();
 		CefShutdown();
+#endif
 	}
 
-	int HandleMethodCall(std::string name, PluginValue* values, PluginValue* response) {
+    void doMessageLoopWork()
+    {
+		CefDoMessageLoopWork();
+    }
+
+    int HandleMethodCall(std::string name, PluginValue* values, PluginValue* response) {
         int result = -1;
 		if (name.compare("loadUrl") == 0) {
 			if (const auto url = std::get_if<std::string>(values)) {
@@ -274,7 +281,7 @@ namespace webview_cef {
 					invokeFunc("javascriptChannelMessage", new PluginValue(retMap));
 				}
 			};
-
+      
 			handler.get()->onFocusedNodeChangeMessage = [](bool editable)
 			{
 				if (invokeFunc)
@@ -293,10 +300,16 @@ namespace webview_cef {
 					invokeFunc("onImeCompositionRangeChangedMessage", new PluginValue(retMap));
 				}
 			};
+      
+#if defined(OS_WIN)
+			//windows run in multi thread
 			new std::thread(startCEF);
+#else
+			//mac、linux run in main thread 
+			startCEF();
+#endif
 			init = true;
-		}
-    }
+	}
 
 	void setInvokeMethodFunc(std::function<void(std::string, PluginValue*)> func){
 		invokeFunc = func;
