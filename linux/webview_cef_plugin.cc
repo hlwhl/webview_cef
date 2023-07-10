@@ -185,6 +185,10 @@ static void webview_cef_plugin_handle_method_call(
       fl_texture_registrar_mark_texture_frame_available(texture_register, FL_TEXTURE(texture));
 		};
     webview_cef::setPaintCallBack(callback);
+    g_timeout_add(20, [](gpointer data) -> gboolean {
+      webview_cef::doMessageLoopWork();
+      return TRUE;
+    }, NULL);
     response = FL_METHOD_RESPONSE(fl_method_success_response_new(fl_value_new_int((int64_t)texture)));
   }else{
     webview_cef::PluginValue encodeArgs = encode_flvalue_to_pluginvalue(args);
