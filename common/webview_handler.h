@@ -116,6 +116,8 @@ public:
     bool executeJavaScript(const std::string code);
     
 private:
+    bool getCookieVisitor();
+
     uint32_t width = 1;
     uint32_t height = 1;
     float dpi = 1.0;

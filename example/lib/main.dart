@@ -18,6 +18,7 @@ class _MyAppState extends State<MyApp> {
   final _controller = WebViewController();
   final _textController = TextEditingController();
   String title = "";
+  Map<String, dynamic> allCookies = {};
 
   @override
   void initState() {
@@ -39,6 +40,14 @@ class _MyAppState extends State<MyApp> {
       },
       onUrlChanged: (url) {
         _textController.text = url;
+      },
+      onAllCookiesVisited: (cookies) {
+        allCookies = cookies;
+      },
+      onUrlCookiesVisited: (cookies) {
+        for (final key in cookies.keys) {
+          allCookies[key] = cookies[key];
+        }
       },
     ));
 
@@ -121,6 +130,17 @@ class _MyAppState extends State<MyApp> {
                   controller: _textController,
                   onSubmitted: (url) {
                     _controller.loadUrl(url);
+                    _controller.visitAllCookies();
+                    Future.delayed(const Duration(milliseconds: 100), () {
+                      if (url == "baidu.com") {
+                        if (!allCookies.containsKey('.$url') ||
+                            !Map.of(allCookies['.$url']).containsKey('test')) {
+                          _controller.setCookie(url, 'test', 'test123');
+                        } else {
+                          _controller.deleteCookie(url, 'test');
+                        }
+                      }
+                    });
                   },
                 ),
               ),

@@ -7,6 +7,10 @@ WebviewCookieVisitor::WebviewCookieVisitor()
 WebviewCookieVisitor::~WebviewCookieVisitor()
 {
 }
+void WebviewCookieVisitor::setOnVisitComplete(std::function<void(std::map<std::string, std::map<std::string, std::string>>)> complete)
+{
+    onVisitComplete = complete;
+}
 
 bool WebviewCookieVisitor::Visit(const CefCookie &cookie, int count, int total, bool &deleteCookie)
 {
@@ -18,6 +22,11 @@ bool WebviewCookieVisitor::Visit(const CefCookie &cookie, int count, int total, 
 	    }
         		
         m_vecAllCookies.emplace_back(cookie);
+    }
+
+    if(count == total - 1)
+    {
+        onVisitComplete(getVisitedCookies());
     }
 
     return count != total;
