@@ -12,6 +12,11 @@
 
 #include "webview_cookieVisitor.h"
 
+enum CookieVisitedType {
+    ALL_COOKIE_VISITED,
+    URL_COOKIE_VISITED
+};
+
 class WebviewHandler : public CefClient,
 public CefDisplayHandler,
 public CefLifeSpanHandler,
@@ -131,6 +136,7 @@ private:
     IMPLEMENT_REFCOUNTING(WebviewHandler);
 
     CefRefPtr<WebviewCookieVisitor> m_CookieVisitor;
+    CookieVisitedType m_CookieVisitedType;
 };
 
 #endif  // CEF_TESTS_CEFSIMPLE_SIMPLE_HANDLER_H_

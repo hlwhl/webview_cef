@@ -348,11 +348,11 @@ bool WebviewHandler::getCookieVisitor(){
     {
         m_CookieVisitor = new WebviewCookieVisitor();
         m_CookieVisitor->setOnVisitComplete([=](std::map<std::string, std::map<std::string, std::string>> cookies){
-            if(cookies.size() == 1){
+            if(m_CookieVisitedType == CookieVisitedType::URL_COOKIE_VISITED){
                 if(onUrlCookieVisitedCb){
                     onUrlCookieVisitedCb(cookies);
                 }
-            }else if(cookies.size() > 1){
+            }else if(m_CookieVisitedType == CookieVisitedType::ALL_COOKIE_VISITED){
                 if(onAllCookieVisitedCb){
                     onAllCookieVisitedCb(cookies);
                 }
@@ -373,6 +373,7 @@ bool WebviewHandler::visitAllCookies(){
 		return false;
 	}
 
+    m_CookieVisitedType = CookieVisitedType::ALL_COOKIE_VISITED;
     return manager->VisitAllCookies(m_CookieVisitor);
 }
 
@@ -384,7 +385,7 @@ bool WebviewHandler::visitUrlCookies(const std::string& domain, const bool& isHt
 	}
 
     std::string httpDomain = "https://" + domain + "/cookiestorage";
-
+    m_CookieVisitedType = CookieVisitedType::URL_COOKIE_VISITED;
     return manager->VisitUrlCookies(httpDomain, isHttpOnly, m_CookieVisitor);
 }
 
