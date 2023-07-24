@@ -6,8 +6,6 @@
 
 #include <memory>
 
-#include "webview_plugin.h"
-
 namespace webview_cef {
 
 class WebviewCefPlugin : public flutter::Plugin {
