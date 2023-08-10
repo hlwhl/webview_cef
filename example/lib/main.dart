@@ -66,6 +66,25 @@ class _MyAppState extends State<MyApp> {
           }),
     ].toSet();
     //normal JavaScriptChannels
+    jsChannels.add(
+      JavascriptChannel(
+        name: 'Print',
+        onMessageReceived: (JavascriptMessage message) {
+          print("Received message from AnotherJSChannel: ${message.message}");
+          _controller.sendJavaScriptChannelCallBack(
+              false,
+              "{'code':'200','message':'print succeed!'}",
+              message.callbackId,
+              message.frameId);
+        },
+      ),
+    );
+    //normal JavaScriptChannels
+    await _controller.setJavaScriptChannels(jsChannels);
+    //also you can build your own jssdk by execute JavaScript code to CEF
+    await _controller.executeJavaScript(
+        "window.NOMOJSChannel = {}; window.NOMOJSChannel.postMessage = () => {console.log('LOG')}");
+    //TODO:
     await _controller.setJavaScriptChannels(jsChannels);
     //also you can build your own jssdk by execute JavaScript code to CEF
     await _controller.executeJavaScript("function abc(e){console.log(e)}");
