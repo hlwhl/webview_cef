@@ -28,10 +28,11 @@ class _MyAppState extends State<MyApp> {
 
   // Platform messages are asynchronous, so we initialize in an async method.
   Future<void> initPlatformState() async {
-    String url = "https://flutter.dev/";
+    String url = "https://nomo.app/downloads/plugins/demo-plugin/?t=nomo";
     _textController.text = url;
     await _controller.initialize();
     await _controller.loadUrl(url);
+    _controller.executeJavaScript("alert('hello world')");
     _controller.setWebviewListener(WebviewEventsListener(
       onTitleChanged: (t) {
         setState(() {
@@ -54,7 +55,7 @@ class _MyAppState extends State<MyApp> {
     // ignore: prefer_collection_literals
     final Set<JavascriptChannel> jsChannels = [
       JavascriptChannel(
-          name: 'Print',
+          name: 'NOMOJSChannel',
           onMessageReceived: (JavascriptMessage message) {
             print(message.message);
             _controller.sendJavaScriptChannelCallBack(
