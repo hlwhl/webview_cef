@@ -16,7 +16,7 @@ public:
 	void setOnVisitComplete(std::function<void(std::map<std::string, std::map<std::string, std::string>>)> complete);
 
 	//CefCookieVisitor
-	bool Visit(const CefCookie& cookie, int count, int total, bool& deleteCookie);
+	bool Visit(const CefCookie& cookie, int count, int total, bool& deleteCookie) override;
 
 	std::map<std::string, std::map<std::string, std::string>> getVisitedCookies();
 
