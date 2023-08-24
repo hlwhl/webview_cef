@@ -15,7 +15,7 @@ class MyApp extends StatefulWidget {
 }
 
 class _MyAppState extends State<MyApp> {
-  final _controller = WebViewController();
+  final _controller = WebViewControllerD();
   final _textController = TextEditingController();
   String title = "";
   Map<String, dynamic> allCookies = {};

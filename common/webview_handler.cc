@@ -391,14 +391,21 @@ bool WebviewHandler::visitUrlCookies(const std::string& domain, const bool& isHt
 bool WebviewHandler::setJavaScriptChannels(const std::vector<std::string> channels)
 {
     std::string extensionCode = "";
+    std::string post = "";
     for(auto& channel : channels)
     {
         extensionCode += channel;
         extensionCode += " = (e,r) => {external.JavaScriptChannel('";
         extensionCode += channel;
         extensionCode += "',e,r)};";
+
+        post += channel;
+        post += ".postMessage = (e,r) => {external.JavaScriptChannel('";
+        post += channel;
+        post += "',e,r)};";
     }
-    return executeJavaScript(extensionCode);
+    executeJavaScript(extensionCode);
+    return executeJavaScript(post);
 }
 
 bool WebviewHandler::sendJavaScriptChannelCallBack(const bool error, const std::string result, const std::string callbackId, const std::string frameId)

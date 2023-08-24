@@ -10,7 +10,7 @@ import 'webview_javascript.dart';
 
 const MethodChannel _pluginChannel = MethodChannel("webview_cef");
 
-class WebViewController extends ValueNotifier<bool> {
+class WebViewControllerD extends ValueNotifier<bool> {
   late Completer<void> _creatingCompleter;
   int _textureId = 0;
   bool _isDisposed = false;
@@ -22,7 +22,7 @@ class WebViewController extends ValueNotifier<bool> {
 
   Future<void> get ready => _creatingCompleter.future;
 
-  WebViewController() : super(false);
+  WebViewControllerD() : super(false);
 
   /// Initializes the underlying platform view.
   Future<void> initialize() async {
@@ -277,7 +277,7 @@ class WebViewController extends ValueNotifier<bool> {
 }
 
 class WebView extends StatefulWidget {
-  final WebViewController controller;
+  final WebViewControllerD controller;
 
   const WebView(this.controller, {Key? key}) : super(key: key);
 
@@ -289,7 +289,7 @@ class WebViewState extends State<WebView> {
   final GlobalKey _key = GlobalKey();
   late final _focusNode = FocusNode();
 
-  WebViewController get _controller => widget.controller;
+  WebViewControllerD get _controller => widget.controller;
 
   @override
   void initState() {

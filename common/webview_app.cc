@@ -87,7 +87,7 @@ void WebviewApp::OnContextInitialized() {
     CefBrowserSettings browser_settings;
     browser_settings.windowless_frame_rate = 60;
     
-    std::string url = "https://www.flutter.dev/";
+    std::string url = "http://flutter.dev";
     
     CefWindowInfo window_info;
     window_info.SetAsWindowless(0);

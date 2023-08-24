@@ -9,6 +9,39 @@
 #include <optional>
 // #include <mutex>
 
+std::string unescapeJson(const std::string &escapedJson) {
+    std::istringstream iss(escapedJson);
+    std::ostringstream oss;
+    bool escape = false;
+
+    while (iss) {
+        char c = iss.get();
+
+        if (escape) {
+            if (c == '\\') {
+                oss << '\\'; // Double backslashes become a single backslash.
+            } else if (c == '\"') {
+                oss << '\"'; // \" becomes ".
+            } else {
+                // Handle other escape sequences as needed.
+                // You can add more cases if necessary.
+                oss << '\\' << c;
+            }
+            escape = false;
+        } else if (c == '\\') {
+            escape = true;
+        } else if (c == '\"') {
+            continue; // Skip leading and trailing double quotes.
+        } else {
+            oss << c;
+        }
+    }
+	size_t len = oss.str().length();
+	std::string out = oss.str().substr(0, len-1);
+	printf("%s\n", out.c_str());
+    return out;
+}
+
 namespace webview_cef {
 	bool init = false;
 	bool isFocused = false;
@@ -258,11 +291,12 @@ namespace webview_cef {
 
 			handler.get()->onJavaScriptChannelMessage = [](std::string channelName, std::string message, std::string callbackId, std::string frameId)
 			{
+				const std::string unescapedMsg = unescapeJson(message);
 				if (invokeFunc)
 				{
 					PluginValueMap retMap;
 					retMap[PluginValue("channel")] = PluginValue(channelName);
-					retMap[PluginValue("message")] = PluginValue(message);
+					retMap[PluginValue("message")] = PluginValue(unescapedMsg);
 					retMap[PluginValue("callbackId")] = PluginValue(callbackId);
 					retMap[PluginValue("frameId")] = PluginValue(frameId);
 					invokeFunc("javascriptChannelMessage", new PluginValue(retMap));
