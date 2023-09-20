@@ -17,6 +17,7 @@ namespace webview_cef {
     CefRefPtr<WebviewHandler> handler(new WebviewHandler());
     CefRefPtr<WebviewApp> app(new WebviewApp(handler));
     CefMainArgs mainArgs;
+	CefString globalUserAgent;
 
 	static const std::optional<std::pair<int, int>> GetPointFromArgs(
 		const PluginValue *args) {
@@ -46,6 +47,7 @@ namespace webview_cef {
 		CefSettings cefs;
 		cefs.windowless_rendering_enabled = true;
 		cefs.no_sandbox = true;
+		CefString(&cefs.user_agent) = globalUserAgent;
 		CefInitialize(mainArgs, cefs, app.get(), nullptr);
 #if defined(OS_WIN)
 		CefRunMessageLoop();
@@ -211,6 +213,10 @@ namespace webview_cef {
 				| (bgra & 0x000000ff) << 16; // Blue >> Red.
 			dest[i] = rgba;
 		}
+	}
+
+	void setUserAgent(PluginValue* userAgent){
+		globalUserAgent = CefString(*std::get_if<std::string>(userAgent));
 	}
 
 	void setPaintCallBack(std::function<void(const void *, int32_t, int32_t)> callback)	{

@@ -183,6 +183,7 @@ namespace webview_cef {
 		const flutter::MethodCall<flutter::EncodableValue>& method_call,
 		std::unique_ptr<flutter::MethodResult<flutter::EncodableValue>> result) {
 		if (method_call.method_name().compare("init") == 0) {
+			webview_cef::PluginValue userAgent = encode_flvalue_to_pluginvalue(const_cast<flutter::EncodableValue *>(method_call.arguments()));
 			texture_id = texture_registrar->RegisterTexture(m_texture.get());
 			auto callback = [=](const void* buffer, int32_t width, int32_t height) {
 				const std::lock_guard<std::mutex> lock(buffer_mutex_);
@@ -208,6 +209,7 @@ namespace webview_cef {
 				webview_cef::SwapBufferFromBgraToRgba((void*)pixel_buffer->buffer, buffer, width, height);
 				texture_registrar->MarkTextureFrameAvailable(texture_id);
 			};
+			webview_cef::setUserAgent(&userAgent);
 			webview_cef::setPaintCallBack(callback);
 			result->Success(flutter::EncodableValue(texture_id));
 		}

@@ -25,8 +25,9 @@
         result([@"macOS " stringByAppendingString:systemVersion]);
     }
     else if([@"init" isEqualToString:call.method]){
+        NSString *userAgent = call.arguments;
         [CefWrapper init];
-        [CefWrapper startCef];
+        [CefWrapper startCef:userAgent];
         result([NSNumber numberWithLong:textureId]);
     }
     else if([@"loadUrl" isEqualToString:call.method]){

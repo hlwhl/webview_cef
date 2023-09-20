@@ -49,7 +49,7 @@ FlutterMethodChannel* f_channel;
     CefDoMessageLoopWork();
 }
 
-+ (void)startCef {
++ (void)startCef: (NSString *)userAgent{
     textureId = [tr registerTexture:[CefWrapper alloc]];
     handler.get()->onPaintCallback = [](const void* buffer, int32_t width, int32_t height) {
         NSDictionary* dic = @{
@@ -158,6 +158,7 @@ FlutterMethodChannel* f_channel;
     CefSettings settings;
     settings.windowless_rendering_enabled = true;
     settings.external_message_pump = true;
+    CefString(&settings.user_agent) = CefString([userAgent cStringUsingEncoding:NSUTF8StringEncoding]);
     CefString(&settings.browser_subprocess_path) = "/Library/Chaches";
     
     CefInitialize(mainArgs, settings, app.get(), nullptr);

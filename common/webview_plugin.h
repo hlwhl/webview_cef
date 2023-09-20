@@ -67,6 +67,7 @@ namespace webview_cef {
     void sendKeyEvent(CefKeyEvent& ev);
     int HandleMethodCall(std::string name, PluginValue* values, PluginValue* response);
     void SwapBufferFromBgraToRgba(void* _dest, const void* _src, int width, int height);
+    void setUserAgent(PluginValue* userAgent);
     void setPaintCallBack(std::function<void(const void*, int32_t , int32_t )> callback);
     void setInvokeMethodFunc(std::function<void(std::string, PluginValue*)> func);
     bool getPluginIsFocused();

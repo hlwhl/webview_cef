@@ -167,6 +167,7 @@ static void webview_cef_plugin_handle_method_call(
   const gchar *method = fl_method_call_get_name(method_call);
   FlValue *args = fl_method_call_get_args(method_call);
   if(strcmp(method, "init") == 0){
+    webview_cef::PluginValue userAgent = encode_flvalue_to_pluginvalue(args);
     auto texture = webview_cef_texture_new();
     fl_texture_registrar_register_texture(texture_register, FL_TEXTURE(texture));
 		auto callback = [=](const void* buffer, int32_t width, int32_t height) {
@@ -177,6 +178,7 @@ static void webview_cef_plugin_handle_method_call(
 			webview_cef::SwapBufferFromBgraToRgba((void*)texture->buffer, buffer, width, height);
       fl_texture_registrar_mark_texture_frame_available(texture_register, FL_TEXTURE(texture));
 		};
+    webview_cef::setUserAgent(&userAgent);
     webview_cef::setPaintCallBack(callback);
     g_timeout_add(20, [](gpointer data) -> gboolean {
       webview_cef::doMessageLoopWork();

@@ -30,6 +30,8 @@ class _MyAppState extends State<MyApp> {
   Future<void> initPlatformState() async {
     String url = "https://flutter.dev/";
     _textController.text = url;
+    //unified interface for all platforms set user agent
+    // _controller.setUserAgent("abctest!");
     await _controller.initialize();
     await _controller.loadUrl(url);
     _controller.setWebviewListener(WebviewEventsListener(

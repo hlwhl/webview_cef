@@ -18,6 +18,8 @@ class WebViewController extends ValueNotifier<bool> {
   bool _isDisposed = false;
   WebviewEventsListener? _listener;
   bool _focusEditable = false;
+  String userAgent =
+      "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/116.0.0.0 Safari/537.36";
 
   final Map<String, JavascriptChannel> _javascriptChannels =
       <String, JavascriptChannel>{};
@@ -26,6 +28,10 @@ class WebViewController extends ValueNotifier<bool> {
 
   WebViewController() : super(false);
 
+  void setUserAgent(String userAgent) {
+    this.userAgent = userAgent;
+  }
+
   /// Initializes the underlying platform view.
   Future<void> initialize() async {
     if (_isDisposed) {
@@ -33,7 +39,8 @@ class WebViewController extends ValueNotifier<bool> {
     }
     _creatingCompleter = Completer<void>();
     try {
-      _textureId = await _pluginChannel.invokeMethod<int>('init') ?? 0;
+      _textureId =
+          await _pluginChannel.invokeMethod<int>('init', userAgent) ?? 0;
       _pluginChannel.setMethodCallHandler(_methodCallhandler);
       value = true;
       _creatingCompleter.complete();

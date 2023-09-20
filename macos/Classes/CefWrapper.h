@@ -17,7 +17,7 @@ extern int64_t textureId;
 
 + (void) init;
 
-+ (void) startCef;
++ (void) startCef: (NSString *)userAgent;
 
 + (void) cursorClickUp: (int)x y:(int)y;
 
