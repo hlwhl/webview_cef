@@ -30,6 +30,8 @@ list(APPEND PLUGIN_SOURCES
   "${CMAKE_CURRENT_LIST_DIR}/../common/webview_handler.h"
   "${CMAKE_CURRENT_LIST_DIR}/../common/webview_plugin.cc"
   "${CMAKE_CURRENT_LIST_DIR}/../common/webview_plugin.h"
+  "${CMAKE_CURRENT_LIST_DIR}/../common/webview_value.cc"
+  "${CMAKE_CURRENT_LIST_DIR}/../common/webview_value.h"
   "${CMAKE_CURRENT_LIST_DIR}/../common/webview_js_handler.cc"
   "${CMAKE_CURRENT_LIST_DIR}/../common/webview_js_handler.h"
   "${CMAKE_CURRENT_LIST_DIR}/../common/webview_cookieVisitor.cc"

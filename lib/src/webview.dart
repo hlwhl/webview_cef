@@ -173,7 +173,7 @@ class WebViewController extends ValueNotifier<bool> {
     });
 
     return _pluginChannel.invokeMethod('setJavaScriptChannels',
-        [_extractJavascriptChannelNames(channels).toList()]);
+        _extractJavascriptChannelNames(channels).toList());
   }
 
   Future<void> sendJavaScriptChannelCallBack(

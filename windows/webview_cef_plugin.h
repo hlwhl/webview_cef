@@ -4,6 +4,7 @@
 #include <flutter/method_channel.h>
 #include <flutter/plugin_registrar_windows.h>
 
+#include <webview_plugin.h>
 #include <memory>
 
 namespace webview_cef {

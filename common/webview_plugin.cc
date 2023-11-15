@@ -12,24 +12,23 @@
 namespace webview_cef {
 	bool init = false;
 	bool isFocused = false;
-	std::function<void(std::string, PluginValue*)> invokeFunc;
+	std::function<void(std::string, WValue*)> invokeFunc;
     
     CefRefPtr<WebviewHandler> handler(new WebviewHandler());
     CefRefPtr<WebviewApp> app(new WebviewApp(handler));
     CefMainArgs mainArgs;
 
 	static const std::optional<std::pair<int, int>> GetPointFromArgs(
-		const PluginValue *args) {
-		const PluginValueList* list = std::get_if<PluginValueList>(args);
-		if (!list || list->size() != 2) {
+		WValue *args) {
+		if (!args || webview_value_get_len(args) != 2) {
 			return std::nullopt;
 		}
-		auto x = (*list)[0].LongValue();
-		auto y = (*list)[1].LongValue();
+		int x = int(webview_value_get_int(webview_value_get_list_value(args, 0)));
+		int y = int(webview_value_get_int(webview_value_get_list_value(args, 1)));
 		if (!x && !y) {
 			return std::nullopt;
 		}
-		return std::make_pair((int)x, (int)y);
+		return std::make_pair(x, y);
 	}
 
     void initCEFProcesses(CefMainArgs args){
@@ -58,19 +57,18 @@ namespace webview_cef {
 		CefDoMessageLoopWork();
     }
 
-    int HandleMethodCall(std::string name, PluginValue* values, PluginValue* response) {
+    int HandleMethodCall(std::string name, WValue* values, WValue* response) {
         int result = -1;
 		if (name.compare("loadUrl") == 0) {
-			if (const auto url = std::get_if<std::string>(values)) {
-				handler.get()->loadUrl(*url);
+			if (const auto url = webview_value_get_string(values)) {
+				handler.get()->loadUrl(url);
 				result = 1;
 			}
 		}
 		else if (name.compare("setSize") == 0) {
-            const PluginValueList* list = std::get_if<PluginValueList>(values);
-			const auto dpi = *std::get_if<double>(&(*list)[0]);
-			const auto width = *std::get_if<double>(&(*list)[1]);
-			const auto height = *std::get_if<double>(&(*list)[2]);
+			const auto dpi = webview_value_get_double(webview_value_get_list_value(values, 0));
+			const auto width = webview_value_get_double(webview_value_get_list_value(values, 1));
+			const auto height = webview_value_get_double(webview_value_get_list_value(values, 2));
 			handler.get()->changeSize((float)dpi, (int)std::round(width), (int)std::round(height));
 			result = 1;
 		}
@@ -95,11 +93,10 @@ namespace webview_cef {
 			result = 1;
 		}
 		else if (name.compare("setScrollDelta") == 0) {
-			const PluginValueList* list = std::get_if<PluginValueList>(values);
-			auto x = (*list)[0].LongValue();
-			auto y = (*list)[1].LongValue();
-			auto deltaX = (*list)[2].LongValue();
-			auto deltaY = (*list)[3].LongValue();
+			auto x = webview_value_get_int(webview_value_get_list_value(values, 0));
+			auto y = webview_value_get_int(webview_value_get_list_value(values, 1));
+			auto deltaX = webview_value_get_int(webview_value_get_list_value(values, 2));
+			auto deltaY = webview_value_get_int(webview_value_get_list_value(values, 3));
 			handler.get()->sendScrollEvent((int)x, (int)y, (int)deltaX, (int)deltaY);
 			result = 1;
 		}
@@ -120,22 +117,19 @@ namespace webview_cef {
 			result = 1;
 		}
 		else if (name.compare("setClientFocus") == 0) {
-			const PluginValueList* list = std::get_if<PluginValueList>(values);
-			isFocused = *std::get_if<bool>(&(*list)[0]);
+			isFocused = webview_value_get_bool(webview_value_get_list_value(values, 0));
 			result = 1;
 		}
 		else if(name.compare("setCookie") == 0){
-			const PluginValueList* list = std::get_if<PluginValueList>(values);
-			const auto domain = *std::get_if<std::string>(&(*list)[0]);
-			const auto key = *std::get_if<std::string>(&(*list)[1]);
-			const auto value = *std::get_if<std::string>(&(*list)[2]);
+			const auto domain = webview_value_get_string(webview_value_get_list_value(values, 0));
+			const auto key = webview_value_get_string(webview_value_get_list_value(values, 1));
+			const auto value = webview_value_get_string(webview_value_get_list_value(values, 2));
 			handler.get()->setCookie(domain, key, value);
 			result = 1;	
 		}
 		else if (name.compare("deleteCookie") == 0) {
-			const PluginValueList* list = std::get_if<PluginValueList>(values);
-			const auto domain = *std::get_if<std::string>(&(*list)[0]);
-			const auto key = *std::get_if<std::string>(&(*list)[1]);
+			const auto domain = webview_value_get_string(webview_value_get_list_value(values, 0));
+			const auto key = webview_value_get_string(webview_value_get_list_value(values, 1));
 			handler.get()->deleteCookie(domain, key);
 			result = 1;	
 		}
@@ -144,34 +138,31 @@ namespace webview_cef {
 			result = 1;	
 		}
 		else if (name.compare("visitUrlCookies") == 0) {
-			const PluginValueList* list = std::get_if<PluginValueList>(values);
-			const auto domain = *std::get_if<std::string>(&(*list)[0]);
-			const auto isHttpOnly = *std::get_if<bool>(&(*list)[1]);
+			const auto domain = webview_value_get_string(webview_value_get_list_value(values, 0));
+			const auto isHttpOnly = webview_value_get_bool(webview_value_get_list_value(values, 1));
 			handler.get()->visitUrlCookies(domain, isHttpOnly);
 			result = 1;	
 		}
 		else if(name.compare("setJavaScriptChannels") == 0){
-			const PluginValueList* list = std::get_if<PluginValueList>(values);
-			const auto jsChannels = *std::get_if<PluginValueList>(&(*list)[0]);
+			auto len = webview_value_get_len(values);
 			std::vector<std::string> channels;
-			for (auto& jsChannel : jsChannels) {
-				channels.push_back(*std::get_if<std::string>(&(jsChannel)));
+			for(int i = 0; i < len; i++){
+				auto channel = webview_value_get_string(webview_value_get_list_value(values, i));
+				channels.push_back(channel);
 			}
 			handler.get()->setJavaScriptChannels(channels);
 			result = 1;	
 		}
 		else if (name.compare("sendJavaScriptChannelCallBack") == 0) {
-			const PluginValueList* list = std::get_if<PluginValueList>(values);
-			const auto error = *std::get_if<bool>(&(*list)[0]);
-			const auto ret = *std::get_if<std::string>(&(*list)[1]);
-			const auto callbackId = *std::get_if<std::string>(&(*list)[2]);
-			const auto frameId = *std::get_if<std::string>(&(*list)[3]);
+			const auto error = webview_value_get_bool(webview_value_get_list_value(values, 0));
+			const auto ret = webview_value_get_string(webview_value_get_list_value(values, 1));
+			const auto callbackId = webview_value_get_string(webview_value_get_list_value(values, 2));
+			const auto frameId = webview_value_get_string(webview_value_get_list_value(values, 3));
 			handler.get()->sendJavaScriptChannelCallBack(error, ret,callbackId,frameId);
 			result = 1;	
 		}
 		else if(name.compare("executeJavaScript") == 0){
-			const PluginValueList* list = std::get_if<PluginValueList>(values);
-			const auto code = *std::get_if<std::string>(&(*list)[0]);
+			const auto code = webview_value_get_string(webview_value_get_list_value(values, 0));
 			handler.get()->executeJavaScript(code);
 			result = 1;	
 		}
@@ -179,7 +170,7 @@ namespace webview_cef {
 			result = 0;
 		}
 		if(response == nullptr){
-			response = new PluginValue(nullptr);
+			response = webview_value_new_null();
 		}
         return result;
 	}
@@ -208,7 +199,7 @@ namespace webview_cef {
 			{
 				if (invokeFunc)
 				{
-					invokeFunc("urlChanged", new PluginValue(url));
+					invokeFunc("urlChanged", webview_value_new_string(const_cast<char *>(url.c_str())));
 				}
 			};
 
@@ -216,7 +207,7 @@ namespace webview_cef {
 			{
 				if (invokeFunc)
 				{
-					invokeFunc("titleChanged", new PluginValue(title));
+					invokeFunc("titleChanged", webview_value_new_string(const_cast<char *>(title.c_str())));
 				}
 			};
 
@@ -224,17 +215,18 @@ namespace webview_cef {
 			{
 				if (invokeFunc)
 				{
-					PluginValueMap retMap;
+					WValue* retMap = webview_value_new_map();
 					for (auto &cookie : cookies)
 					{
-						PluginValueMap tempMap;
+						WValue* tempMap = webview_value_new_map();
 						for (auto &c : cookie.second)
 						{
-							tempMap[PluginValue(c.first)] = PluginValue(c.second);
+							webview_value_set_string(tempMap, c.first.c_str(), webview_value_new_string(const_cast<char *>(c.second.c_str())));
 						}
-						retMap[PluginValue(cookie.first)] = PluginValue(tempMap);
+						webview_value_set_string(retMap, cookie.first.c_str(), tempMap);
 					}
-					invokeFunc("allCookiesVisited", new PluginValue(retMap));
+					invokeFunc("allCookiesVisited", retMap);
+					webview_value_unref(retMap);
 				}
 			};
 
@@ -242,17 +234,18 @@ namespace webview_cef {
 			{
 				if (invokeFunc)
 				{
-					PluginValueMap retMap;
+					WValue* retMap = webview_value_new_map();
 					for (auto &cookie : cookies)
 					{
-						PluginValueMap tempMap;
+						WValue* tempMap = webview_value_new_map();
 						for (auto &c : cookie.second)
 						{
-							tempMap[PluginValue(c.first)] = PluginValue(c.second);
+							webview_value_set_string(tempMap, c.first.c_str(), webview_value_new_string(const_cast<char *>(c.second.c_str())));
 						}
-						retMap[PluginValue(cookie.first)] = PluginValue(tempMap);
+						webview_value_set_string(retMap, cookie.first.c_str(), tempMap);
 					}
-					invokeFunc("urlCookiesVisited", new PluginValue(retMap));
+					invokeFunc("urlCookiesVisited", retMap);
+					webview_value_unref(retMap);
 				}
 			};
 
@@ -260,12 +253,13 @@ namespace webview_cef {
 			{
 				if (invokeFunc)
 				{
-					PluginValueMap retMap;
-					retMap[PluginValue("channel")] = PluginValue(channelName);
-					retMap[PluginValue("message")] = PluginValue(message);
-					retMap[PluginValue("callbackId")] = PluginValue(callbackId);
-					retMap[PluginValue("frameId")] = PluginValue(frameId);
-					invokeFunc("javascriptChannelMessage", new PluginValue(retMap));
+					WValue* retMap = webview_value_new_map();
+					webview_value_set_string(retMap, "channel", webview_value_new_string(const_cast<char *>(channelName.c_str())));
+					webview_value_set_string(retMap, "message", webview_value_new_string(const_cast<char *>(message.c_str())));
+					webview_value_set_string(retMap, "callbackId", webview_value_new_string(const_cast<char *>(callbackId.c_str())));
+					webview_value_set_string(retMap, "frameId", webview_value_new_string(const_cast<char *>(frameId.c_str())));
+					invokeFunc("javascriptChannelMessage", retMap);
+					webview_value_unref(retMap);
 				}
 			};
 
@@ -280,7 +274,7 @@ namespace webview_cef {
 		}
     }
 
-	void setInvokeMethodFunc(std::function<void(std::string, PluginValue*)> func){
+	void setInvokeMethodFunc(std::function<void(std::string, WValue*)> func){
 		invokeFunc = func;
 	}
 
