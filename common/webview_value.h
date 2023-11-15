@@ -77,4 +77,4 @@ char* webview_value_to_string(WValue* value);
 #ifdef __cplusplus
 }
 #endif
-#endif WEBVIEW_CEF_VALUE_H_
+#endif //WEBVIEW_CEF_VALUE_H_

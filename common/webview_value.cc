@@ -1,8 +1,10 @@
 #include "webview_value.h"
 #include <memory>
 #include <string.h>
+#include <inttypes.h>
 
 #if defined(_MSC_VER)
+#pragma warning(disable: 4996)
 #include <BaseTsd.h>
 typedef SSIZE_T ssize_t;
 #endif
@@ -193,7 +195,7 @@ WValue* webview_value_new_double(double value) {
 WValue* webview_value_new_string(const char* value) {
   WValueString* self = reinterpret_cast<WValueString*>(
       webview_value_new(Webview_Value_Type_String, sizeof(WValueString)));
-  self->value = _strdup(value);
+  self->value = strdup(value);
   return reinterpret_cast<WValue*>(self);
 }
 
@@ -202,10 +204,10 @@ WValue* webview_value_new_string_len(const char* value,
   WValueString* self = reinterpret_cast<WValueString*>(
       webview_value_new(Webview_Value_Type_String, sizeof(WValueString)));
   if (value_length == 0) {
-    self->value = _strdup("");
+    self->value = strdup("");
   } else {
     self->value = new char[value_length + 1];
-    strncpy_s(self->value, value_length + 1, value, value_length);
+    strncpy(self->value, value, value_length);
     self->value[value_length] = '\0';
   }
   return reinterpret_cast<WValue*>(self);
@@ -767,167 +769,147 @@ char* webview_value_to_string(WValue* value) {
   switch (value->type)
   {
   case Webview_Value_Type_Null:
-    return _strdup("null");
+    return strdup("null");
   case Webview_Value_Type_Bool:
-    return _strdup(webview_value_get_bool(value) ? "true" : "false");
+    return strdup(webview_value_get_bool(value) ? "true" : "false");
   case Webview_Value_Type_String:
-    return _strdup(webview_value_get_string(value));
+    return strdup(webview_value_get_string(value));
   case Webview_Value_Type_Int:
   {
     char buf[32];
-    snprintf(buf, sizeof(buf), "%lld", webview_value_get_int(value));
-    return _strdup(buf);
+    snprintf(buf, sizeof(buf), "%" PRId64, webview_value_get_int(value));
+    return strdup(buf);
   }
   case Webview_Value_Type_Float:
   {
     char buf[32];
     snprintf(buf, sizeof(buf), "%f", webview_value_get_float(value));
-    return _strdup(buf);
+    return strdup(buf);
   }
   case Webview_Value_Type_Double:
   {
     char buf[32];
     snprintf(buf, sizeof(buf), "%f", webview_value_get_double(value));
-    return _strdup(buf);
+    return strdup(buf);
   }
   case Webview_Value_Type_Uint8_List:
   {
-    char *str = _strdup("[");
+    char *str = strdup("[");
     size_t len = webview_value_get_len(value);
-    for (size_t i = 0; i < len; i++)
-    {
-        uint8_t item = webview_value_get_uint8_list(value)[i];
-        char buf[32];
-        snprintf(buf, sizeof(buf), "%d", item);
-        str = (char *)realloc(str, strlen(str) + strlen(buf) + 2);
-        strcat_s(str, strlen(str) + strlen(buf) + 2, buf);
-        if (i < len - 1)
-        {
-          strcat_s(str, strlen(str) + 2, ",");
-        }
+    for(size_t i = 0; i < len; i++){
+      uint8_t item = webview_value_get_uint8_list(value)[i];
+      char buf[32];
+      snprintf(buf, sizeof(buf), "%d", item);
+      strcat(str, buf);
+      if(i != len - 1){
+        strcat(str, ",");
+      }
     }
-    strcat_s(str, strlen(str) + 2, "]");
+    strcat(str, "]");
     return str;
   }
   case Webview_Value_Type_Int32_List:
   {
-    char *str = _strdup("[");
+    char *str = strdup("[");
     size_t len = webview_value_get_len(value);
-    for (size_t i = 0; i < len; i++)
-    {
-        int32_t item = webview_value_get_int32_list(value)[i];
-        char buf[32];
-        snprintf(buf, sizeof(buf), "%d", item);
-        str = (char *)realloc(str, strlen(str) + strlen(buf) + 2);
-        strcat_s(str, strlen(str) + strlen(buf) + 2, buf);
-        if (i < len - 1)
-        {
-          strcat_s(str, strlen(str) + 2, ",");
-        }
+    for(size_t i = 0; i < len; i++){
+      int32_t item = webview_value_get_int32_list(value)[i];
+      char buf[32];
+      snprintf(buf, sizeof(buf), "%d", item);
+      strcat(str, buf);
+      if(i != len - 1){
+        strcat(str, ",");
+      }
     }
-    strcat_s(str, strlen(str) + 2, "]");
+    strcat(str, "]");
     return str;
   }
   case Webview_Value_Type_Int64_List:
   {
-    char *str = _strdup("[");
+    char *str = strdup("[");
     size_t len = webview_value_get_len(value);
-    for (size_t i = 0; i < len; i++)
-    {
-        int64_t item = webview_value_get_int64_list(value)[i];
-        char buf[32];
-        snprintf(buf, sizeof(buf), "%lld", item);
-        str = (char *)realloc(str, strlen(str) + strlen(buf) + 2);
-        strcat_s(str, strlen(str) + strlen(buf) + 2, buf);
-        if (i < len - 1)
-        {
-            strcat_s(str, strlen(str) + 2, ",");
-        }
+    for(size_t i = 0; i < len; i++){
+      int64_t item = webview_value_get_int64_list(value)[i];
+      char buf[32];
+      snprintf(buf, sizeof(buf), "%" PRId64, item);
+      strcat(str, buf);
+      if(i != len - 1){
+        strcat(str, ",");
+      }
     }
-    strcat_s(str, strlen(str) + 2, "]");
+    strcat(str, "]");
     return str;
   }
   case Webview_Value_Type_Float_List:
   {
-    char *str = _strdup("[");
+    char *str = strdup("[");
     size_t len = webview_value_get_len(value);
-    for (size_t i = 0; i < len; i++)
-    {
-        float item = webview_value_get_float_list(value)[i];
-        char buf[32];
-        snprintf(buf, sizeof(buf), "%f", item);
-        str = (char *)realloc(str, strlen(str) + strlen(buf) + 2);
-        strcat_s(str, strlen(str) + strlen(buf) + 2, buf);
-        if (i < len - 1)
-        {
-            strcat_s(str, strlen(str) + 2, ",");
-        }
+    for(size_t i = 0; i < len; i++){
+      float item = webview_value_get_float_list(value)[i];
+      char buf[32];
+      snprintf(buf, sizeof(buf), "%f", item);
+      strcat(str, buf);
+      if(i != len - 1){
+        strcat(str, ",");
+      }
     }
-    strcat_s(str, strlen(str) + 2, "]");
+    strcat(str, "]");
     return str;
   }
   case Webview_Value_Type_Double_List:
   {
-    char *str = _strdup("[");
+    char *str = strdup("[");
     size_t len = webview_value_get_len(value);
-    for (size_t i = 0; i < len; i++)
-    {
-        double item = webview_value_get_double_list(value)[i];
-        char buf[32];
-        snprintf(buf, sizeof(buf), "%f", item);
-        str = (char *)realloc(str, strlen(str) + strlen(buf) + 2);
-        strcat_s(str, strlen(str) + strlen(buf) + 2, buf);
-        if (i < len - 1)
-        {
-            strcat_s(str, strlen(str) + 2, ",");
-        }
+    for(size_t i = 0; i < len; i++){
+      double item = webview_value_get_double_list(value)[i];
+      char buf[32];
+      snprintf(buf, sizeof(buf), "%f", item);
+      strcat(str, buf);
+      if(i != len - 1){
+        strcat(str, ",");
+      }
     }
-    strcat_s(str, strlen(str) + 2, "]");
+    strcat(str, "]");
     return str;
   }
   case Webview_Value_Type_List:
   {
-    char *str = _strdup("[");
+    char *str = strdup("[");
     size_t len = webview_value_get_len(value);
-    for (size_t i = 0; i < len; i++)
-    {
-        WValue *item = webview_value_get_list_value(value, i);
-        char *item_str = webview_value_to_string(item);
-        str = (char *)realloc(str, strlen(str) + strlen(item_str) + 2);
-        strcat_s(str, strlen(str) + strlen(item_str) + 2, item_str);
-        if (i < len - 1)
-        {
-            strcat_s(str, strlen(str) + 2, ",");
-        }
+    for(size_t i = 0; i < len; i++){
+      WValue *item = webview_value_get_list_value(value, i);
+      char *item_str = webview_value_to_string(item);
+      strcat(str, item_str);
+      free(item_str);
+      if(i != len - 1){
+        strcat(str, ",");
+      }
     }
-    strcat_s(str, strlen(str) + 2, "]");
+    strcat(str, "]");
     return str;
   }
   case Webview_Value_Type_Map:
   {
-    char *str = _strdup("{");
+    char *str = strdup("{");
     size_t len = webview_value_get_len(value);
-    for (size_t i = 0; i < len; i++)
-    {
-        WValue *key = webview_value_get_map_key(value, i);
-        WValue *val = webview_value_get_map_value(value, i);
-        char *key_str = webview_value_to_string(key);
-        char *val_str = webview_value_to_string(val);
-        str = (char *)realloc(str, strlen(str) + strlen(key_str) + strlen(val_str) + 4);
-        strcat_s(str, strlen(str) + strlen(key_str) + strlen(val_str) + 4, key_str);
-        strcat_s(str, strlen(str) + strlen(key_str) + strlen(val_str) + 4, ":");
-        strcat_s(str, strlen(str) + strlen(key_str) + strlen(val_str) + 4, val_str);
-        if (i < len - 1)
-        {
-          strcat_s(str, strlen(str) + 4, ",");
-        }
-        free(key_str);
-        free(val_str);
+    for(size_t i = 0; i < len; i++){
+      WValue *key = webview_value_get_map_key(value, i);
+      WValue *item = webview_value_get_map_value(value, i);
+      char *key_str = webview_value_to_string(key);
+      char *item_str = webview_value_to_string(item);
+      strcat(str, key_str);
+      strcat(str, ":");
+      strcat(str, item_str);
+      free(key_str);
+      free(item_str);
+      if(i != len - 1){
+        strcat(str, ",");
+      }
     }
-    strcat_s(str, strlen(str) + 2, "}");
+    strcat(str, "}");
     return str;
   }
   default:
-    return _strdup("<unknown type %d>");
+    return strdup("<unknown type>");
   }
 }

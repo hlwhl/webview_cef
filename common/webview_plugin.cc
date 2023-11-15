@@ -146,7 +146,7 @@ namespace webview_cef {
 		else if(name.compare("setJavaScriptChannels") == 0){
 			auto len = webview_value_get_len(values);
 			std::vector<std::string> channels;
-			for(int i = 0; i < len; i++){
+			for(size_t i = 0; i < len; i++){
 				auto channel = webview_value_get_string(webview_value_get_list_value(values, i));
 				channels.push_back(channel);
 			}

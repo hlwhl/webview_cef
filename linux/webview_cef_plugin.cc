@@ -89,8 +89,6 @@ static WValue* encode_flvalue_to_wvalue(FlValue* args){
     case FL_VALUE_TYPE_INT:
       return webview_value_new_int(fl_value_get_int(args));
     case FL_VALUE_TYPE_FLOAT:
-      return webview_value_new_float(fl_value_get_float32(args));
-    case FL_VALUE_TYPE_DOUBLE:
       return webview_value_new_double(fl_value_get_float(args));
     case FL_VALUE_TYPE_STRING:
       return webview_value_new_string(fl_value_get_string(args));
@@ -109,12 +107,12 @@ static WValue* encode_flvalue_to_wvalue(FlValue* args){
       const int64_t* val = fl_value_get_int64_list(args);
       return webview_value_new_int64_list(val, len);
     }
-    case FL_VALUE_TYPE_FLOAT_LIST:{
+    case FL_VALUE_TYPE_FLOAT32_LIST:{
       size_t len = fl_value_get_length(args);
       const float* val = fl_value_get_float32_list(args);
       return webview_value_new_float_list(val, len);
     }
-    case FL_VALUE_TYPE_DOUBLE_LIST:{
+    case FL_VALUE_TYPE_FLOAT_LIST:{
       size_t len = fl_value_get_length(args);
       const double* val = fl_value_get_float_list(args);
       return webview_value_new_double_list(val, len);
@@ -131,7 +129,7 @@ static WValue* encode_flvalue_to_wvalue(FlValue* args){
       WValue * ret = webview_value_new_map();
       size_t len = fl_value_get_length(args);
       for (size_t i = 0; i < len; i++) {
-        fl_value_set(ret, encode_flvalue_to_wvalue(fl_value_get_key(args, i)), encode_flvalue_to_wvalue(fl_value_get_value(args, i)));
+        webview_value_set(ret, encode_flvalue_to_wvalue(fl_value_get_map_key(args, i)), encode_flvalue_to_wvalue(fl_value_get_map_value(args, i)));
       }
       return ret;
     }
