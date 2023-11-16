@@ -349,6 +349,7 @@ void webview_value_unref(WValue *self)
   case Webview_Value_Type_Bool:
   case Webview_Value_Type_Int:
   case Webview_Value_Type_Float:
+  case Webview_Value_Type_Double:
     break;
   }
   free(self);
@@ -695,6 +696,7 @@ size_t webview_value_get_len(WValue *self)
   case Webview_Value_Type_Int:
   case Webview_Value_Type_Float:
   case Webview_Value_Type_Double:
+  case Webview_Value_Type_String:
     return 0;
   }
 
