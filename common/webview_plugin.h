@@ -3,10 +3,11 @@
 
 #include <functional>
 #include <include/cef_base.h>
-#include <webview_value.h>
+#include "webview_value.h"
 
 namespace webview_cef {
     void initCEFProcesses(CefMainArgs args);
+    void initCEFProcesses();
     void startCEF();
     void doMessageLoopWork();
     void sendKeyEvent(CefKeyEvent& ev);

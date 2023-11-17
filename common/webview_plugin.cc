@@ -2,11 +2,11 @@
 
 #include "webview_app.h"
 
+#include <include/wrapper/cef_library_loader.h>
 #include <math.h>
 #include <memory>
 #include <thread>
 #include <iostream>
-#include <optional>
 // #include <mutex>
 
 namespace webview_cef {
@@ -18,23 +18,44 @@ namespace webview_cef {
     CefRefPtr<WebviewApp> app(new WebviewApp(handler));
     CefMainArgs mainArgs;
 
-	static const std::optional<std::pair<int, int>> GetPointFromArgs(
-		WValue *args) {
+	static int cursorAction(WValue *args, std::string name) {
 		if (!args || webview_value_get_len(args) != 2) {
-			return std::nullopt;
+			return 0;
 		}
 		int x = int(webview_value_get_int(webview_value_get_list_value(args, 0)));
 		int y = int(webview_value_get_int(webview_value_get_list_value(args, 1)));
 		if (!x && !y) {
-			return std::nullopt;
+			return 0;
 		}
-		return std::make_pair(x, y);
+		if (name.compare("cursorClickDown") == 0) {
+			handler.get()->cursorClick(x, y, false);
+		}
+		else if (name.compare("cursorClickUp") == 0) {
+			handler.get()->cursorClick(x, y, true);
+		}
+		else if (name.compare("cursorMove") == 0) {
+			handler.get()->cursorMove(x, y, false);
+		}
+		else if (name.compare("cursorDragging") == 0) {
+			handler.get()->cursorMove(x, y, true);
+		}
+		return 1;
 	}
 
     void initCEFProcesses(CefMainArgs args){
 		mainArgs = args;
 	    CefExecuteProcess(mainArgs, app, nullptr);
     }
+
+	void initCEFProcesses(){
+#ifdef OS_MAC
+		CefScopedLibraryLoader loader;
+    	if(!loader.LoadInMain()) {
+        	printf("load cef err");
+    	}
+#endif
+		CefExecuteProcess(mainArgs, app, nullptr);
+	}
 
     void sendKeyEvent(CefKeyEvent& ev)
     {
@@ -44,9 +65,18 @@ namespace webview_cef {
 	void startCEF() {
 		CefSettings cefs;
 		cefs.windowless_rendering_enabled = true;
+#ifndef OS_MAC
 		cefs.no_sandbox = true;
+#endif
+        
+#ifdef OS_MAC
+		cefs.external_message_pump = true;
+    	//CefString(&cefs.browser_subprocess_path) = "/Library/Chaches";
+#endif
+
 		CefInitialize(mainArgs, cefs, app.get(), nullptr);
-#if defined(OS_WIN)
+
+#ifdef OS_WIN
 		CefRunMessageLoop();
 		CefShutdown();
 #endif
@@ -72,25 +102,11 @@ namespace webview_cef {
 			handler.get()->changeSize((float)dpi, (int)std::round(width), (int)std::round(height));
 			result = 1;
 		}
-		else if (name.compare("cursorClickDown") == 0) {
-			const auto point = GetPointFromArgs(values);
-			handler.get()->cursorClick(point->first, point->second, false);
-			result = 1;
-		}
-		else if (name.compare("cursorClickUp") == 0) {
-			const auto point = GetPointFromArgs(values);
-			handler.get()->cursorClick(point->first, point->second, true);
-			result = 1;
-		}
-		else if (name.compare("cursorMove") == 0) {
-			const auto point = GetPointFromArgs(values);
-			handler.get()->cursorMove(point->first, point->second, false);
-			result = 1;
-		}
-		else if (name.compare("cursorDragging") == 0) {
-			const auto point = GetPointFromArgs(values);
-			handler.get()->cursorMove(point->first, point->second, true);
-			result = 1;
+		else if (name.compare("cursorClickDown") == 0 
+			|| name.compare("cursorClickUp") == 0 
+			|| name.compare("cursorMove") == 0 
+			|| name.compare("cursorDragging") == 0) {
+			result = cursorAction(values, name);
 		}
 		else if (name.compare("setScrollDelta") == 0) {
 			auto x = webview_value_get_int(webview_value_get_list_value(values, 0));
@@ -199,7 +215,9 @@ namespace webview_cef {
 			{
 				if (invokeFunc)
 				{
-					invokeFunc("urlChanged", webview_value_new_string(const_cast<char *>(url.c_str())));
+					WValue *wUrl = webview_value_new_string(const_cast<char *>(url.c_str()));
+					invokeFunc("urlChanged", wUrl);
+					webview_value_unref(wUrl);
 				}
 			};
 
@@ -207,7 +225,9 @@ namespace webview_cef {
 			{
 				if (invokeFunc)
 				{
-					invokeFunc("titleChanged", webview_value_new_string(const_cast<char *>(title.c_str())));
+					WValue *wTitle = webview_value_new_string(const_cast<char *>(title.c_str()));
+					invokeFunc("titleChanged", wTitle);
+					webview_value_unref(wTitle);
 				}
 			};
 
@@ -221,9 +241,12 @@ namespace webview_cef {
 						WValue* tempMap = webview_value_new_map();
 						for (auto &c : cookie.second)
 						{
-							webview_value_set_string(tempMap, c.first.c_str(), webview_value_new_string(const_cast<char *>(c.second.c_str())));
+							WValue * val = webview_value_new_string(const_cast<char *>(c.second.c_str()));
+							webview_value_set_string(tempMap, c.first.c_str(), val);
+							webview_value_unref(val);
 						}
 						webview_value_set_string(retMap, cookie.first.c_str(), tempMap);
+						webview_value_unref(tempMap);
 					}
 					invokeFunc("allCookiesVisited", retMap);
 					webview_value_unref(retMap);
@@ -240,9 +263,12 @@ namespace webview_cef {
 						WValue* tempMap = webview_value_new_map();
 						for (auto &c : cookie.second)
 						{
-							webview_value_set_string(tempMap, c.first.c_str(), webview_value_new_string(const_cast<char *>(c.second.c_str())));
+							WValue * val = webview_value_new_string(const_cast<char *>(c.second.c_str()));
+							webview_value_set_string(tempMap, c.first.c_str(), val);
+							webview_value_unref(val);
 						}
 						webview_value_set_string(retMap, cookie.first.c_str(), tempMap);
+						webview_value_unref(tempMap);
 					}
 					invokeFunc("urlCookiesVisited", retMap);
 					webview_value_unref(retMap);
@@ -254,12 +280,20 @@ namespace webview_cef {
 				if (invokeFunc)
 				{
 					WValue* retMap = webview_value_new_map();
-					webview_value_set_string(retMap, "channel", webview_value_new_string(const_cast<char *>(channelName.c_str())));
-					webview_value_set_string(retMap, "message", webview_value_new_string(const_cast<char *>(message.c_str())));
-					webview_value_set_string(retMap, "callbackId", webview_value_new_string(const_cast<char *>(callbackId.c_str())));
-					webview_value_set_string(retMap, "frameId", webview_value_new_string(const_cast<char *>(frameId.c_str())));
+					WValue* channel = webview_value_new_string(const_cast<char *>(channelName.c_str()));
+					WValue* msg = webview_value_new_string(const_cast<char *>(message.c_str()));
+					WValue* cbId = webview_value_new_string(const_cast<char *>(callbackId.c_str()));
+					WValue* fId = webview_value_new_string(const_cast<char *>(frameId.c_str()));
+					webview_value_set_string(retMap, "channel", channel);
+					webview_value_set_string(retMap, "message", msg);
+					webview_value_set_string(retMap, "callbackId", cbId);
+					webview_value_set_string(retMap, "frameId", fId);
 					invokeFunc("javascriptChannelMessage", retMap);
 					webview_value_unref(retMap);
+					webview_value_unref(channel);
+					webview_value_unref(msg);
+					webview_value_unref(cbId);
+					webview_value_unref(fId);
 				}
 			};
 

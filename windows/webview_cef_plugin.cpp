@@ -66,7 +66,7 @@ namespace webview_cef {
 				flutter::EncodableList ret;
 				size_t len = webview_value_get_len(args);
 				for (size_t i = 0; i < len; i++) {
-					ret.push_back(encode_wvalue_to_flvalue(webview_value_get_list_value(args, i)));
+                	ret.push_back(encode_wvalue_to_flvalue(webview_value_get_value(args, i)));
 				}
 				return ret;
 			}
@@ -118,7 +118,9 @@ namespace webview_cef {
 			WValue * ret = webview_value_new_list();
 			flutter::EncodableList list = *std::get_if<flutter::EncodableList>(args);
 			for (size_t i = 0; i < list.size(); i++) {
-				webview_value_append(ret, encode_flvalue_to_wvalue(&list[i]));
+				WValue *value = encode_flvalue_to_wvalue(&list[i]);
+				webview_value_append(ret, value);
+				webview_value_unref(value);
 			}
 			return ret;
 		}
@@ -127,9 +129,11 @@ namespace webview_cef {
 			flutter::EncodableMap map = *std::get_if<flutter::EncodableMap>(args);
 			for (flutter::EncodableMap::iterator it = map.begin(); it != map.end(); it++)
 			{
-
-				webview_value_set(ret, encode_flvalue_to_wvalue(const_cast<flutter::EncodableValue *>(&it->first)),
-					encode_flvalue_to_wvalue(const_cast<flutter::EncodableValue*>(&it->second)));
+				WValue *key = encode_flvalue_to_wvalue(const_cast<flutter::EncodableValue *>(&it->first));
+				WValue *value = encode_flvalue_to_wvalue(const_cast<flutter::EncodableValue*>(&it->second));
+				webview_value_set(ret, key, value);
+				webview_value_unref(key);
+				webview_value_unref(value);
 			}
 			return ret;
 		}

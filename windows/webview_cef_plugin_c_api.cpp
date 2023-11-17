@@ -12,7 +12,7 @@ void WebviewCefPluginCApiRegisterWithRegistrar(
 }
 
 FLUTTER_PLUGIN_EXPORT void initCEFProcesses() {
-  	webview_cef::initCEFProcesses(CefMainArgs());
+  	webview_cef::initCEFProcesses();
 }
 
 bool IsKeyDown(WPARAM wparam) {
