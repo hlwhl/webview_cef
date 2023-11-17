@@ -1,0 +1,303 @@
+#include "include/webview_cef/webview_cef_plugin.h"
+
+#include <flutter_linux/flutter_linux.h>
+#include <gtk/gtk.h>
+#include <sys/utsname.h>
+
+#include <cstring>
+#include <webview_plugin.h>
+#include "webview_cef_keyevent.h"
+#include "webview_cef_texture.h"
+
+#define WEBVIEW_CEF_PLUGIN(obj)                                     \
+  (G_TYPE_CHECK_INSTANCE_CAST((obj), webview_cef_plugin_get_type(), \
+                              WebviewCefPlugin))
+
+struct _WebviewCefPlugin
+{
+  GObject parent_instance;
+};
+
+G_DEFINE_TYPE(WebviewCefPlugin, webview_cef_plugin, g_object_get_type())
+
+static FlTextureRegistrar* texture_register;
+
+static FlValue* encode_wavlue_to_flvalue(WValue *args){
+	WValueType type = webview_value_get_type(args);
+	switch(type){
+    case Webview_Value_Type_Bool:
+      return fl_value_new_bool(webview_value_get_bool(args));
+    case Webview_Value_Type_Int:
+      return fl_value_new_int(webview_value_get_int(args));
+    case Webview_Value_Type_Float:
+      return fl_value_new_float(webview_value_get_float(args));
+    case Webview_Value_Type_Double:
+      return fl_value_new_float(webview_value_get_double(args));
+    case Webview_Value_Type_String:
+      return fl_value_new_string(webview_value_get_string(args));
+    case Webview_Value_Type_Uint8_List:{
+      size_t len = webview_value_get_len(args);
+      const uint8_t* val = webview_value_get_uint8_list(args);
+      return fl_value_new_uint8_list(val, len);
+    }
+    case Webview_Value_Type_Int32_List:{
+      size_t len = webview_value_get_len(args);
+      const int32_t* val = webview_value_get_int32_list(args);
+      return fl_value_new_int32_list(val, len);
+    }
+    case Webview_Value_Type_Int64_List:{
+      size_t len = webview_value_get_len(args);
+      const int64_t* val = webview_value_get_int64_list(args);
+      return fl_value_new_int64_list(val, len);
+    }
+    case Webview_Value_Type_Float_List:{
+      size_t len = webview_value_get_len(args);
+      const float* val = webview_value_get_float_list(args);
+      return fl_value_new_float32_list(val, len);
+    }
+    case Webview_Value_Type_Double_List:{
+      size_t len = webview_value_get_len(args);
+      const double* val = webview_value_get_double_list(args);
+      return fl_value_new_float_list(val, len);
+    }
+    case Webview_Value_Type_List:{
+      FlValue * ret = fl_value_new_list();
+      size_t len = webview_value_get_len(args);
+      for (size_t i = 0; i < len; i++) {
+        FlValue * val = encode_wavlue_to_flvalue(webview_value_get_value(args, i));
+        fl_value_append(ret, val);
+        fl_value_unref(val);
+      }
+      return ret;
+    }
+    case Webview_Value_Type_Map:{
+      FlValue * ret = fl_value_new_map();
+      size_t len = webview_value_get_len(args);
+      for (size_t i = 0; i < len; i++) {
+        FlValue * key = encode_wavlue_to_flvalue(webview_value_get_key(args, i));
+        FlValue * val = encode_wavlue_to_flvalue(webview_value_get_value(args, i));
+        fl_value_set(ret, key, val);
+        fl_value_unref(key);
+        fl_value_unref(val);
+      }
+      return ret;
+    }
+    default:
+      return fl_value_new_null();
+  }
+}
+
+static WValue* encode_flvalue_to_wvalue(FlValue* args){
+  FlValueType argsType = fl_value_get_type(args);
+  switch (argsType){
+    case FL_VALUE_TYPE_BOOL:
+      return webview_value_new_bool(fl_value_get_bool(args));
+    case FL_VALUE_TYPE_INT:
+      return webview_value_new_int(fl_value_get_int(args));
+    case FL_VALUE_TYPE_FLOAT:
+      return webview_value_new_double(fl_value_get_float(args));
+    case FL_VALUE_TYPE_STRING:
+      return webview_value_new_string(fl_value_get_string(args));
+    case FL_VALUE_TYPE_UINT8_LIST:{
+      size_t len = fl_value_get_length(args);
+      const uint8_t* val = fl_value_get_uint8_list(args);
+      return webview_value_new_uint8_list(val, len);
+    }
+    case FL_VALUE_TYPE_INT32_LIST:{
+      size_t len = fl_value_get_length(args);
+      const int32_t* val = fl_value_get_int32_list(args);
+      return webview_value_new_int32_list(val, len);
+    }
+    case FL_VALUE_TYPE_INT64_LIST:{
+      size_t len = fl_value_get_length(args);
+      const int64_t* val = fl_value_get_int64_list(args);
+      return webview_value_new_int64_list(val, len);
+    }
+    case FL_VALUE_TYPE_FLOAT32_LIST:{
+      size_t len = fl_value_get_length(args);
+      const float* val = fl_value_get_float32_list(args);
+      return webview_value_new_float_list(val, len);
+    }
+    case FL_VALUE_TYPE_FLOAT_LIST:{
+      size_t len = fl_value_get_length(args);
+      const double* val = fl_value_get_float_list(args);
+      return webview_value_new_double_list(val, len);
+    }
+    case FL_VALUE_TYPE_LIST:{
+      WValue * ret = webview_value_new_list();
+      size_t len = fl_value_get_length(args);
+      for (size_t i = 0; i < len; i++) {
+        WValue * item = encode_flvalue_to_wvalue(fl_value_get_list_value(args, i));
+        webview_value_append(ret, item);
+        webview_value_unref(item);
+      }
+      return ret;
+    }
+    case FL_VALUE_TYPE_MAP:{
+      WValue * ret = webview_value_new_map();
+      size_t len = fl_value_get_length(args);
+      for (size_t i = 0; i < len; i++) {
+        WValue * key = encode_flvalue_to_wvalue(fl_value_get_map_key(args, i));
+        WValue * val = encode_flvalue_to_wvalue(fl_value_get_map_value(args, i));
+        webview_value_set(ret, key, val);
+        webview_value_unref(key);
+        webview_value_unref(val);
+      }
+      return ret;
+    }
+    default:
+      return webview_value_new_null();
+  }
+}
+
+// Called when a method call is received from Flutter.
+static void webview_cef_plugin_handle_method_call(
+    WebviewCefPlugin *self,
+    FlMethodCall *method_call)
+{
+  g_autoptr(FlMethodResponse) response = nullptr;
+
+  const gchar *method = fl_method_call_get_name(method_call);
+  FlValue *args = fl_method_call_get_args(method_call);
+  FlValue *result = nullptr;
+  if(strcmp(method, "init") == 0){
+    auto texture = webview_cef_texture_new();
+    fl_texture_registrar_register_texture(texture_register, FL_TEXTURE(texture));
+		auto callback = [=](const void* buffer, int32_t width, int32_t height) {
+			texture->width = width;
+      texture->height = height;
+			const auto size = width * height * 4;
+			texture->buffer = new uint8_t[size];
+			webview_cef::SwapBufferFromBgraToRgba((void*)texture->buffer, buffer, width, height);
+      fl_texture_registrar_mark_texture_frame_available(texture_register, FL_TEXTURE(texture));
+		};
+    webview_cef::setPaintCallBack(callback);
+    g_timeout_add(20, [](gpointer data) -> gboolean {
+      webview_cef::doMessageLoopWork();
+      return TRUE;
+    }, NULL);
+    result = fl_value_new_int((int64_t)texture);
+    response = FL_METHOD_RESPONSE(fl_method_success_response_new(result));
+  }else{
+    WValue *encodeArgs = encode_flvalue_to_wvalue(args);
+    WValue *responseArgs = nullptr;
+    int ret = webview_cef::HandleMethodCall(method, encodeArgs, responseArgs);
+    webview_value_unref(encodeArgs);
+    if (ret > 0){
+      result = encode_wavlue_to_flvalue(responseArgs);
+      response = FL_METHOD_RESPONSE(fl_method_success_response_new(result));
+    }
+    else if (ret < 0){
+      result = encode_wavlue_to_flvalue(responseArgs);
+      response = FL_METHOD_RESPONSE(fl_method_error_response_new("error", "error", result));
+    }
+    else{
+      response = FL_METHOD_RESPONSE(fl_method_not_implemented_response_new());
+    }
+    webview_value_unref(responseArgs);
+  }
+
+  fl_method_call_respond(method_call, response, nullptr);
+  fl_value_unref(result);
+}
+
+static void webview_cef_plugin_dispose(GObject *object)
+{
+  G_OBJECT_CLASS(webview_cef_plugin_parent_class)->dispose(object);
+}
+
+static void webview_cef_plugin_class_init(WebviewCefPluginClass *klass)
+{
+  G_OBJECT_CLASS(klass)->dispose = webview_cef_plugin_dispose;
+}
+
+static void webview_cef_plugin_init(WebviewCefPlugin *self) {}
+
+static void method_call_cb(FlMethodChannel *channel, FlMethodCall *method_call,
+                           gpointer user_data)
+{
+  WebviewCefPlugin *plugin = WEBVIEW_CEF_PLUGIN(user_data);
+  webview_cef_plugin_handle_method_call(plugin, method_call);
+}
+
+void webview_cef_plugin_register_with_registrar(FlPluginRegistrar *registrar)
+{
+  WebviewCefPlugin *plugin = WEBVIEW_CEF_PLUGIN(
+      g_object_new(webview_cef_plugin_get_type(), nullptr));
+
+  texture_register = fl_plugin_registrar_get_texture_registrar(registrar);
+
+  g_autoptr(FlStandardMethodCodec) codec = fl_standard_method_codec_new();
+  g_autoptr(FlMethodChannel) channel =
+      fl_method_channel_new(fl_plugin_registrar_get_messenger(registrar),
+                            "webview_cef",
+                            FL_METHOD_CODEC(codec));
+  fl_method_channel_set_method_call_handler(channel, method_call_cb,
+                                            g_object_ref(plugin),
+                                            g_object_unref);
+
+  auto invoke = [=](std::string method, WValue* arguments) {
+    FlValue *args = encode_wavlue_to_flvalue(arguments); 
+    fl_method_channel_invoke_method(channel, method.c_str(), args, NULL, NULL, NULL);
+    fl_value_unref(args);
+  };
+  webview_cef::setInvokeMethodFunc(invoke);
+
+  g_object_unref(plugin);
+}
+
+FLUTTER_PLUGIN_EXPORT void initCEFProcesses(int argc, char** argv)
+{
+  CefMainArgs main_args(argc, argv);
+  webview_cef::initCEFProcesses(main_args);
+}
+
+FLUTTER_PLUGIN_EXPORT gboolean processKeyEventForCEF(GtkWidget *widget, GdkEventKey *event, gpointer data)
+{
+  if(webview_cef::getPluginIsFocused())
+  {
+    CefKeyEvent key_event;
+    KeyboardCode windows_key_code = GdkEventToWindowsKeyCode(event);
+    key_event.windows_key_code =
+        GetWindowsKeyCodeWithoutLocation(windows_key_code);
+    key_event.native_key_code = event->hardware_keycode;
+
+    key_event.modifiers = GetCefStateModifiers(event->state);
+    if (event->keyval >= GDK_KP_Space && event->keyval <= GDK_KP_9) {
+      key_event.modifiers |= EVENTFLAG_IS_KEY_PAD;
+    }
+    if (key_event.modifiers & EVENTFLAG_ALT_DOWN) {
+      key_event.is_system_key = true;
+    }
+
+    if (windows_key_code == VKEY_RETURN) {
+      // We need to treat the enter key as a key press of character \r.  This
+      // is apparently just how webkit handles it and what it expects.
+      key_event.unmodified_character = '\r';
+    } else {
+      // FIXME: fix for non BMP chars
+      key_event.unmodified_character =
+          static_cast<int>(gdk_keyval_to_unicode(event->keyval));
+    }
+
+    // If ctrl key is pressed down, then control character shall be input.
+    if (key_event.modifiers & EVENTFLAG_CONTROL_DOWN) {
+      key_event.character = GetControlCharacter(
+          windows_key_code, key_event.modifiers & EVENTFLAG_SHIFT_DOWN);
+    } else {
+      key_event.character = key_event.unmodified_character;
+    }
+    if (event->type == GDK_KEY_PRESS) {
+      key_event.type = KEYEVENT_RAWKEYDOWN;
+      webview_cef::sendKeyEvent(key_event);
+      key_event.type = KEYEVENT_CHAR;
+    } else {
+      key_event.type = KEYEVENT_KEYUP;
+    }
+    webview_cef::sendKeyEvent(key_event);
+
+    return TRUE;
+  }
+  //processKeyEventForFlutter need return FALSE
+  return FALSE;
+}

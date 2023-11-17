@@ -6,5 +6,6 @@
 #include "../../common/webview_handler.cc"
 #include "../../common/webview_cookieVisitor.cc"
 #include "../../common/webview_js_handler.cc"
-
+#include "../../common/webview_plugin.cc"
+#include "../../common/webview_value.cc"
 #endif

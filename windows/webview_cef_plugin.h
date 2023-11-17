@@ -4,19 +4,14 @@
 #include <flutter/method_channel.h>
 #include <flutter/plugin_registrar_windows.h>
 
+#include <webview_plugin.h>
 #include <memory>
 
-#include "webview_app.h"
-
 namespace webview_cef {
-
-//Use WebviewApp for both CefExecuteProcess and CefInitialize.
-extern CefRefPtr<WebviewApp> app;
 
 class WebviewCefPlugin : public flutter::Plugin {
  public:
   static void RegisterWithRegistrar(flutter::PluginRegistrarWindows *registrar);
-  static void sendKeyEvent(CefKeyEvent ev);
 
   WebviewCefPlugin();
 

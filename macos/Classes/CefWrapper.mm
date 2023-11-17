@@ -7,21 +7,18 @@
 
 #import "CefWrapper.h"
 #import <Foundation/Foundation.h>
-#import "include/wrapper/cef_library_loader.h"
-#import "include/cef_app.h"
+#import "include/cef_base.h"
 #import "../../common/webview_app.h"
 #import "../../common/webview_handler.h"
 #import "../../common/webview_cookieVisitor.h"
 #import "../../common/webview_js_handler.h"
-
+#import "../../common/webview_plugin.h"
+#import "../../common/webview_value.h"
 #include <thread>
-
-CefRefPtr<WebviewHandler> handler(new WebviewHandler());
-CefRefPtr<WebviewApp> app(new WebviewApp(handler));
-CefMainArgs mainArgs;
 
 NSObject<FlutterTextureRegistry>* tr;
 CGFloat scaleFactor = 0.0;
+CefMainArgs mainArgs;
 
 static NSTimer* _timer;
 static CVPixelBufferRef buf_cache;
@@ -34,132 +31,100 @@ FlutterMethodChannel* f_channel;
 
 @implementation CefWrapper
 
-+ (void)init {
-    CefScopedLibraryLoader loader;
-    
-    if(!loader.LoadInMain()) {
-        printf("load cef err");
++ (NSObject *)encode_wvalue_to_flvalue: (WValue*)args {
+    WValueType type = webview_value_get_type(args);
+    switch(type) {
+        case Webview_Value_Type_Bool:
+            return [NSNumber numberWithBool:webview_value_get_bool(args)];
+        case Webview_Value_Type_Int:
+            return [NSNumber numberWithInt:webview_value_get_int(args)];
+        case Webview_Value_Type_Float:
+            return [NSNumber numberWithFloat:webview_value_get_float(args)];
+        case Webview_Value_Type_Double:
+            return [NSNumber numberWithDouble:webview_value_get_double(args)];
+        case Webview_Value_Type_String:
+            return [NSString stringWithUTF8String:webview_value_get_string(args)];
+        case Webview_Value_Type_Uint8_List:
+            return [NSData dataWithBytes:webview_value_get_uint8_list(args) length:webview_value_get_len(args)];
+        case Webview_Value_Type_Int32_List:
+            return [NSData dataWithBytes:webview_value_get_int32_list(args) length:webview_value_get_len(args)];
+        case Webview_Value_Type_Int64_List:
+            return [NSData dataWithBytes:webview_value_get_int64_list(args) length:webview_value_get_len(args)];
+        case Webview_Value_Type_Float_List:
+            return [NSData dataWithBytes:webview_value_get_float_list(args) length:webview_value_get_len(args)];
+        case Webview_Value_Type_Double_List:
+            return [NSData dataWithBytes:webview_value_get_double_list(args) length:webview_value_get_len(args)];
+        case Webview_Value_Type_List: {
+            int len = webview_value_get_len(args);
+            NSMutableArray* array = [NSMutableArray arrayWithCapacity:len];
+            for(int i = 0; i < len; i++) {
+                WValue* item = webview_value_get_value(args, i);
+                [array addObject:[self encode_wvalue_to_flvalue:item]];
+            }
+            return array;
+        }
+        case Webview_Value_Type_Map: {
+            int len = webview_value_get_len(args);
+            NSMutableDictionary* dic = [NSMutableDictionary dictionaryWithCapacity:len];
+            for(int i = 0; i < len; i++) {
+                NSString *key = [self encode_wvalue_to_flvalue:webview_value_get_key(args, i)];
+                WValue *value = webview_value_get_value(args, i);
+                if (key != nil && value != nil) {
+                    [dic setObject:[self encode_wvalue_to_flvalue:value] forKey:key];
+                }
+            }
+            return dic;
+        }
+        default:
+            return nil;
     }
-    
-    CefMainArgs main_args;
-    CefExecuteProcess(main_args, nullptr, nullptr);
 }
 
-+ (void)doMessageLoopWork {
-    CefDoMessageLoopWork();
-}
-
-+ (void)startCef {
-    textureId = [tr registerTexture:[CefWrapper alloc]];
-    handler.get()->onPaintCallback = [](const void* buffer, int32_t width, int32_t height) {
-        NSDictionary* dic = @{
-            (__bridge NSString*)kCVPixelBufferPixelFormatTypeKey: @(kCVPixelFormatType_32BGRA),
-            (__bridge NSString*)kCVPixelBufferIOSurfacePropertiesKey : @{},
-            (__bridge NSString*)kCVPixelBufferOpenGLCompatibilityKey : @YES,
-            (__bridge NSString*)kCVPixelBufferMetalCompatibilityKey : @YES,
-        };
-        
-        static CVPixelBufferRef buf = NULL;
-        CVPixelBufferCreate(kCFAllocatorDefault,  width,
-                            height, kCVPixelFormatType_32BGRA,
-                            (__bridge CFDictionaryRef)dic, &buf);
-        
-        //copy data
-        CVPixelBufferLockBaseAddress(buf, 0);
-        char *copyBaseAddress = (char *) CVPixelBufferGetBaseAddress(buf);
-        
-        //MUST align pixel to pixelBuffer. Otherwise cause render issue. see https://www.codeprintr.com/thread/6563066.html about 16 bytes align
-        size_t bytesPerRow = CVPixelBufferGetBytesPerRowOfPlane(buf, 0);
-        char* src = (char*) buffer;
-        int actureRowSize = width * 4;
-        for(int line = 0; line < height; line++) {
-            memcpy(copyBaseAddress, src, actureRowSize);
-            src += actureRowSize;
-            copyBaseAddress += bytesPerRow;
++ (WValue*) encode_flvalue_to_wvalue: (NSObject *)value{
+    if([value isKindOfClass:[NSNumber class]]) {
+        NSNumber* number = (NSNumber*)value;
+        if(strcmp([number objCType], @encode(BOOL)) == 0) {
+            return webview_value_new_bool([number boolValue]);
+        } else if(strcmp([number objCType], @encode(int)) == 0) {
+            return webview_value_new_int([number intValue]);
+        } else if(strcmp([number objCType], @encode(float)) == 0) {
+            return webview_value_new_float([number floatValue]);
+        } else if(strcmp([number objCType], @encode(double)) == 0) {
+            return webview_value_new_double([number doubleValue]);
+        } else {
+            return nil;
         }
-        CVPixelBufferUnlockBaseAddress(buf, 0);
-        
-        dispatch_semaphore_wait(lock, DISPATCH_TIME_FOREVER);
-        if(buf_cache) {
-            CVPixelBufferRelease(buf_cache);
+    } else if([value isKindOfClass:[NSString class]]) {
+        NSString* string = (NSString*)value;
+        return webview_value_new_string([string UTF8String]);
+    } else if([value isKindOfClass:[NSData class]]) {
+        NSData* data = (NSData*)value;
+        return webview_value_new_int64_list((int64_t*)data.bytes, (size_t)data.length);
+    } else if([value isKindOfClass:[NSArray class]]) {
+        NSArray* array = (NSArray*)value;
+        int len = (int)array.count;
+        WValue* wvalue = webview_value_new_list();
+        for(int i = 0; i < len; i++) {
+            WValue* item = [self encode_flvalue_to_wvalue:array[i]];
+            webview_value_append(wvalue, item);
+            webview_value_unref(item);
         }
-        buf_cache = buf;
-        dispatch_semaphore_signal(lock);
-        [tr textureFrameAvailable:textureId];
-    };
-    
-    //url change cb
-    handler.get()->onUrlChangedCb = [](std::string url) {
-        [f_channel invokeMethod:@"urlChanged" arguments:[NSString stringWithCString:url.c_str() encoding:NSUTF8StringEncoding]];
-    };
-    //title change cb
-    handler.get()->onTitleChangedCb = [](std::string title) {
-        [f_channel invokeMethod:@"titleChanged" arguments:[NSString stringWithCString:title.c_str() encoding:NSUTF8StringEncoding]];
-    };
-    //allcookie visited cb
-    handler.get()->onAllCookieVisitedCb = [](std::map<std::string, std::map<std::string, std::string>> cookies) {
-        NSMutableDictionary * dict = [NSMutableDictionary dictionary];
-        for(auto &cookie : cookies)
-        {
-            NSString * domain = [NSString stringWithCString:cookie.first.c_str() encoding:NSUTF8StringEncoding];
-            NSMutableDictionary * tempdict = [NSMutableDictionary dictionary];
-            for(auto &c : cookie.second)
-            {
-                NSString * key = [NSString stringWithCString:c.first.c_str() encoding:NSUTF8StringEncoding];
-                NSString * val = [NSString stringWithCString:c.second.c_str() encoding:NSUTF8StringEncoding];
-                tempdict[key] = val;
-            }
-            dict[domain] = tempdict;
+        return wvalue;
+    } else if([value isKindOfClass:[NSDictionary class]]) {
+        NSDictionary* dic = (NSDictionary*)value;
+        int len = (int)dic.count;
+        WValue* wvalue = webview_value_new_map();
+        for(int i = 0; i < len; i++) {
+            WValue* key = [self encode_flvalue_to_wvalue:dic.allKeys[i]];
+            WValue* item = [self encode_flvalue_to_wvalue:dic.allValues[i]];
+            webview_value_set(wvalue, key, item);
+            webview_value_unref(key);
+            webview_value_unref(item);
         }
-        [f_channel invokeMethod:@"allCookiesVisited" arguments:dict];
-    };
-    
-    //urlcookie visited cb
-    handler.get()->onUrlCookieVisitedCb = [](std::map<std::string, std::map<std::string, std::string>> cookies) {
-        NSMutableDictionary * dict = [NSMutableDictionary dictionary];
-        for(auto &cookie : cookies)
-        {
-            NSString * domain = [NSString stringWithCString:cookie.first.c_str() encoding:NSUTF8StringEncoding];
-            NSMutableDictionary * tempdict = [NSMutableDictionary dictionary];
-            for(auto &c : cookie.second)
-            {
-                NSString * key = [NSString stringWithCString:c.first.c_str() encoding:NSUTF8StringEncoding];
-                NSString * val = [NSString stringWithCString:c.second.c_str() encoding:NSUTF8StringEncoding];
-                tempdict[key] = val;
-            }
-            dict[domain] = tempdict;
-        }
-        [f_channel invokeMethod:@"urlCookiesVisited" arguments:dict];
-    };
-
-    //JavaScriptChannel called
- 	handler.get()->onJavaScriptChannelMessage = [](std::string channelName, std::string message, std::string callbackId, std::string frameId) {
-        NSMutableDictionary * dict = [NSMutableDictionary dictionary];
-        dict[@"channel"] = [NSString stringWithCString:channelName.c_str() encoding:NSUTF8StringEncoding];
-        dict[@"message"]  = [NSString stringWithCString:message.c_str() encoding:NSUTF8StringEncoding];
-        dict[@"callbackId"]  = [NSString stringWithCString:callbackId.c_str() encoding:NSUTF8StringEncoding];
-        dict[@"frameId"]  = [NSString stringWithCString:frameId.c_str() encoding:NSUTF8StringEncoding];
-        [f_channel invokeMethod:@"javascriptChannelMessage" arguments:dict];
-	};   
-
-    CefSettings settings;
-    settings.windowless_rendering_enabled = true;
-    settings.external_message_pump = true;
-    CefString(&settings.browser_subprocess_path) = "/Library/Chaches";
-    
-    CefInitialize(mainArgs, settings, app.get(), nullptr);
-    _timer = [NSTimer timerWithTimeInterval:0.016f target:self selector:@selector(doMessageLoopWork) userInfo:nil repeats:YES];
-    [[NSRunLoop mainRunLoop] addTimer: _timer forMode:NSRunLoopCommonModes];
-    
-    [NSEvent addLocalMonitorForEventsMatchingMask:NSEventMaskKeyDown handler:^NSEvent * _Nullable(NSEvent * _Nonnull event) {
-        [self processKeyboardEvent:event];
-        return event;
-    }];
-    
-    [NSEvent addLocalMonitorForEventsMatchingMask:NSEventMaskKeyUp handler:^NSEvent * _Nullable(NSEvent * _Nonnull event) {
-        [self processKeyboardEvent:event];
-        return event;
-    }];
+        return wvalue;
+    } else {
+        return nil;
+    }
 }
 
 + (void)processKeyboardEvent: (NSEvent*) event {
@@ -190,8 +155,8 @@ FlutterMethodChannel* f_channel;
             keyEvent.type = KEYEVENT_KEYUP;
         }
     }
-    
-    handler.get()->sendKeyEvent(keyEvent);
+
+    webview_cef::sendKeyEvent(keyEvent);
 }
 
 + (int)getModifiersForEvent:(NSEvent*)event {
@@ -244,46 +209,6 @@ FlutterMethodChannel* f_channel;
     return modifiers;
 }
 
-+(void)sendScrollEvent:(int)x y:(int)y deltaX:(int)deltaX deltaY:(int)deltaY {
-    handler.get()->sendScrollEvent(x, y, deltaX, deltaY);
-}
-
-+ (void)cursorClickUp:(int)x y:(int)y {
-    handler.get()->cursorClick(x, y, true);
-}
-
-+ (void)cursorClickDown:(int)x y:(int)y {
-    handler.get()->cursorClick(x, y, false);
-}
-
-+ (void)cursorMove:(int)x y:(int)y dragging:(bool)dragging {
-    handler.get()->cursorMove(x, y, dragging);
-}
-
-+ (void)sizeChanged:(float)dpi width:(int)width height:(int)height {
-    handler.get()->changeSize(dpi, width, height);
-}
-
-+ (void)loadUrl:(NSString*)url {
-    handler.get()->loadUrl(std::string([url cStringUsingEncoding:NSUTF8StringEncoding]));
-}
-
-+ (void)goForward {
-    handler.get()->goForward();
-}
-
-+ (void)goBack {
-    handler.get()->goBack();
-}
-
-+ (void)reload {
-    handler.get()->reload();
-}
-
-+ (void)openDevTools {
-    handler.get()->openDevTools();
-}
-
 - (CVPixelBufferRef _Nullable)copyPixelBuffer {
     dispatch_semaphore_wait(lock, DISPATCH_TIME_FOREVER);
     buf_temp = buf_cache;
@@ -294,40 +219,87 @@ FlutterMethodChannel* f_channel;
 
 + (void)setMethodChannel: (FlutterMethodChannel*)channel {
     f_channel = channel;
+    auto invoke = [=](std::string method, WValue* arguments){
+        NSObject *arg = [self encode_wvalue_to_flvalue:arguments];
+        [f_channel invokeMethod:[NSString stringWithUTF8String:method.c_str()] arguments:arg];
+    };
+    webview_cef::setInvokeMethodFunc(invoke);
 }
 
-+ (void)setCookie: (NSString *)domain key:(NSString *) key value:(NSString *)value {
-    handler.get()->setCookie(std::string([domain cStringUsingEncoding:NSUTF8StringEncoding]), std::string([key cStringUsingEncoding:NSUTF8StringEncoding]), std::string([value cStringUsingEncoding:NSUTF8StringEncoding]));
++ (void)doMessageLoopWork {
+    webview_cef::doMessageLoopWork();
 }
 
-+ (void)deleteCookie: (NSString *)domain key:(NSString *) key {
-    handler.get()->deleteCookie(std::string([domain cStringUsingEncoding:NSUTF8StringEncoding]), std::string([key cStringUsingEncoding:NSUTF8StringEncoding]));
-}
++ (NSObject*) handleMethodCallWrapper: (FlutterMethodCall*)call{
+    std::string name = std::string([call.method cStringUsingEncoding:NSUTF8StringEncoding]);
+    if(name.compare("init") == 0){
+        textureId = [tr registerTexture:[CefWrapper alloc]];
+        auto callback = [](const void* buffer, int32_t width, int32_t height) {
+            NSDictionary* dic = @{
+                (__bridge NSString*)kCVPixelBufferPixelFormatTypeKey: @(kCVPixelFormatType_32BGRA),
+                (__bridge NSString*)kCVPixelBufferIOSurfacePropertiesKey : @{},
+                (__bridge NSString*)kCVPixelBufferOpenGLCompatibilityKey : @YES,
+                (__bridge NSString*)kCVPixelBufferMetalCompatibilityKey : @YES,
+            };
+            
+            static CVPixelBufferRef buf = NULL;
+            CVPixelBufferCreate(kCFAllocatorDefault,  width,
+                                height, kCVPixelFormatType_32BGRA,
+                                (__bridge CFDictionaryRef)dic, &buf);
+            
+            //copy data
+            CVPixelBufferLockBaseAddress(buf, 0);
+            char *copyBaseAddress = (char *) CVPixelBufferGetBaseAddress(buf);
+            
+            //MUST align pixel to pixelBuffer. Otherwise cause render issue. see https://www.codeprintr.com/thread/6563066.html about 16 bytes align
+            size_t bytesPerRow = CVPixelBufferGetBytesPerRowOfPlane(buf, 0);
+            char* src = (char*) buffer;
+            int actureRowSize = width * 4;
+            for(int line = 0; line < height; line++) {
+                memcpy(copyBaseAddress, src, actureRowSize);
+                src += actureRowSize;
+                copyBaseAddress += bytesPerRow;
+            }
+            CVPixelBufferUnlockBaseAddress(buf, 0);
+            
+            dispatch_semaphore_wait(lock, DISPATCH_TIME_FOREVER);
+            if(buf_cache) {
+                CVPixelBufferRelease(buf_cache);
+            }
+            buf_cache = buf;
+            dispatch_semaphore_signal(lock);
+            [tr textureFrameAvailable:textureId];
+        };
+        webview_cef::initCEFProcesses();
+        webview_cef::setPaintCallBack(callback);
 
-+ (void)visitAllCookies {
-    handler.get()->visitAllCookies();
-}
-
-+ (void)visitUrlCookies: (NSString *)domain isHttpOnly:(bool)isHttpOnly {
-    handler.get()->visitUrlCookies(std::string([domain cStringUsingEncoding:NSUTF8StringEncoding]), isHttpOnly);
-}
-
-+ (void) setJavaScriptChannels: (NSArray *)channels {
-    std::vector<std::string> stdChannels;
-    NSEnumerator * enumerator = [channels objectEnumerator];
-    NSString * value;
-    while (value = [enumerator nextObject]) {
-        stdChannels.push_back(std::string([value cStringUsingEncoding:NSUTF8StringEncoding]));
+        _timer = [NSTimer timerWithTimeInterval:0.016f target:self selector:@selector(doMessageLoopWork) userInfo:nil repeats:YES];
+        [[NSRunLoop mainRunLoop] addTimer: _timer forMode:NSRunLoopCommonModes];
+        
+        [NSEvent addLocalMonitorForEventsMatchingMask:NSEventMaskKeyDown handler:^NSEvent * _Nullable(NSEvent * _Nonnull event) {
+            [self processKeyboardEvent:event];
+            return event;
+        }];
+        
+        [NSEvent addLocalMonitorForEventsMatchingMask:NSEventMaskKeyUp handler:^NSEvent * _Nullable(NSEvent * _Nonnull event) {
+            [self processKeyboardEvent:event];
+            return event;
+        }];
+        return [NSNumber numberWithLong:textureId];
+    }else{
+        WValue *encodeArgs = [self encode_flvalue_to_wvalue:call.arguments];
+        WValue *responseArgs = nullptr;
+        int ret = webview_cef::HandleMethodCall(name, encodeArgs, responseArgs);
+        webview_value_unref(encodeArgs);
+        if(ret != 0){
+            NSObject *result = [self encode_wvalue_to_flvalue:responseArgs];
+            webview_value_unref(responseArgs);
+            return result;
+        }
+        else{
+            webview_value_unref(responseArgs);
+        }
     }
-    handler.get()->setJavaScriptChannels(stdChannels);
-}
-
-+ (void) sendJavaScriptChannelCallBack: (bool)error  result:(NSString *)result callbackId:(NSString *)callbackId frameId:(NSString *)frameId {
-    handler.get()->sendJavaScriptChannelCallBack(error, std::string([result cStringUsingEncoding:NSUTF8StringEncoding]), 
-        std::string([callbackId cStringUsingEncoding:NSUTF8StringEncoding]), std::string([frameId cStringUsingEncoding:NSUTF8StringEncoding]));
-}
-
-+ (void) executeJavaScript: (NSString *)code {
-    handler.get()->executeJavaScript(std::string([code cStringUsingEncoding:NSUTF8StringEncoding]));
+    return nil;
 }
 @end

@@ -16,7 +16,6 @@
 #include <mutex>
 
 namespace webview_cef {
-	bool init = false;
 	int64_t texture_id;
 
 	flutter::TextureRegistrar* texture_registrar;
@@ -33,140 +32,119 @@ namespace webview_cef {
 		}
 		return buffer;
 		}));
-	CefRefPtr<WebviewHandler> handler(new WebviewHandler());
-	CefRefPtr<WebviewApp> app(new WebviewApp(handler));
-	CefMainArgs mainArgs;
 
 	std::unique_ptr<
 		flutter::MethodChannel<flutter::EncodableValue>,
 		std::default_delete<flutter::MethodChannel<flutter::EncodableValue>>>
 		channel = nullptr;
 
-
-	void SwapBufferFromBgraToRgba(void* _dest, const void* _src, int width, int height) {
-		int32_t* dest = (int32_t*)_dest;
-		int32_t* src = (int32_t*)_src;
-		int32_t rgba;
-		int32_t bgra;
-		int length = width * height;
-		for (int i = 0; i < length; i++) {
-			bgra = src[i];
-			// BGRA in hex = 0xAARRGGBB.
-			rgba = (bgra & 0x00ff0000) >> 16 // Red >> Blue.
-				| (bgra & 0xff00ff00) // Green Alpha.
-				| (bgra & 0x000000ff) << 16; // Blue >> Red.
-			dest[i] = rgba;
-		}
-	}
-
-	void startCEF() {
-		CefWindowInfo window_info;
-		CefBrowserSettings settings;
-		window_info.SetAsWindowless(nullptr);
-
-		handler.get()->onPaintCallback = [](const void* buffer, int32_t width, int32_t height) {
-			const std::lock_guard<std::mutex> lock(buffer_mutex_);
-			if (!pixel_buffer.get() || pixel_buffer.get()->width != width || pixel_buffer.get()->height != height) {
-				if (!pixel_buffer.get()) {
-					pixel_buffer = std::make_unique<FlutterDesktopPixelBuffer>();
-					pixel_buffer->release_context = &buffer_mutex_;
-					// Gets invoked after the FlutterDesktopPixelBuffer's
-					// backing buffer has been uploaded.
-					pixel_buffer->release_callback = [](void* opaque) {
-						auto mutex = reinterpret_cast<std::mutex*>(opaque);
-						// Gets locked just before |CopyPixelBuffer| returns.
-						mutex->unlock();
-					};
-				}
-				pixel_buffer->width = width;
-				pixel_buffer->height = height;
-				const auto size = width * height * 4;
-				backing_pixel_buffer.reset(new uint8_t[size]);
-				pixel_buffer->buffer = backing_pixel_buffer.get();
-			}
-
-			SwapBufferFromBgraToRgba((void*)pixel_buffer->buffer, buffer, width, height);
-			texture_registrar->MarkTextureFrameAvailable(texture_id);
-		};
-
-		handler.get()->onUrlChangedCb = [](std::string url) {
-			channel->InvokeMethod("urlChanged", std::make_unique<flutter::EncodableValue>(url));
-		};
-
-		handler.get()->onTitleChangedCb = [](std::string title) {
-			channel->InvokeMethod("titleChanged", std::make_unique<flutter::EncodableValue>(title));
-		};
-
-		handler.get()->onAllCookieVisitedCb = [](std::map<std::string, std::map<std::string, std::string>> cookies) {
-			flutter::EncodableMap retMap;
-			for (auto& cookie : cookies)
+	static flutter::EncodableValue encode_wvalue_to_flvalue(WValue* args) {
+		WValueType type = webview_value_get_type(args);
+		switch(type){
+			case Webview_Value_Type_Bool:
+				return flutter::EncodableValue(webview_value_get_bool(args));
+			case Webview_Value_Type_Int:
+				return flutter::EncodableValue(webview_value_get_int(args));
+			case Webview_Value_Type_Float:
+				return flutter::EncodableValue(webview_value_get_float(args));
+			case Webview_Value_Type_Double:
+				return flutter::EncodableValue(webview_value_get_double(args));
+			case Webview_Value_Type_String:
+				return flutter::EncodableValue(webview_value_get_string(args));
+			case Webview_Value_Type_Uint8_List:
+				return flutter::EncodableValue(webview_value_get_uint8_list(args));
+			case Webview_Value_Type_Int32_List:
+				return flutter::EncodableValue(webview_value_get_int32_list(args));
+			case Webview_Value_Type_Int64_List:
+				return flutter::EncodableValue(webview_value_get_int64_list(args));
+			case Webview_Value_Type_Float_List:
+				return flutter::EncodableValue(webview_value_get_float_list(args));
+			case Webview_Value_Type_Double_List:
+				return flutter::EncodableValue(webview_value_get_double_list(args));
+			case Webview_Value_Type_List:
 			{
-				flutter::EncodableMap tempMap;
-				for (auto& c : cookie.second)
-				{
-					tempMap[flutter::EncodableValue(c.first)] = flutter::EncodableValue(c.second);
+				flutter::EncodableList ret;
+				size_t len = webview_value_get_len(args);
+				for (size_t i = 0; i < len; i++) {
+                	ret.push_back(encode_wvalue_to_flvalue(webview_value_get_value(args, i)));
 				}
-				retMap[flutter::EncodableValue(cookie.first)] = flutter::EncodableValue(tempMap);
+				return ret;
 			}
-			channel->InvokeMethod("allCookiesVisited", std::make_unique<flutter::EncodableValue>(retMap));
-		};
-
-		handler.get()->onUrlCookieVisitedCb = [](std::map<std::string, std::map<std::string, std::string>> cookies) {
-			flutter::EncodableMap retMap;
-			for (auto& cookie : cookies)
+			case Webview_Value_Type_Map:
 			{
-				flutter::EncodableMap tempMap;
-				for (auto& c : cookie.second)
-				{
-					tempMap[flutter::EncodableValue(c.first)] = flutter::EncodableValue(c.second);
+				flutter::EncodableMap ret;
+				size_t len = webview_value_get_len(args);
+				for (size_t i = 0; i < len; i++) {
+					ret[encode_wvalue_to_flvalue(webview_value_get_key(args, i))] = encode_wvalue_to_flvalue(webview_value_get_value(args, i));
 				}
-				retMap[flutter::EncodableValue(cookie.first)] = flutter::EncodableValue(tempMap);
+				return ret;
 			}
-			channel->InvokeMethod("urlCookiesVisited", std::make_unique<flutter::EncodableValue>(retMap));
-		};
-
-		handler.get()->onJavaScriptChannelMessage = [](std::string channelName, std::string message, std::string callbackId, std::string frameId) {
-			flutter::EncodableMap retMap;
-			retMap[flutter::EncodableValue("channel")] = flutter::EncodableValue(channelName);
-			retMap[flutter::EncodableValue("message")] = flutter::EncodableValue(message);
-			retMap[flutter::EncodableValue("callbackId")] = flutter::EncodableValue(callbackId);
-			retMap[flutter::EncodableValue("frameId")] = flutter::EncodableValue(frameId);
-			channel->InvokeMethod("javascriptChannelMessage", std::make_unique<flutter::EncodableValue>(retMap));
-		};
-
-		CefSettings cefs;
-		cefs.windowless_rendering_enabled = true;
-		CefInitialize(mainArgs, cefs, app.get(), nullptr);
-		CefRunMessageLoop();
-		CefShutdown();
+			default:
+				return flutter::EncodableValue(nullptr);
+		}
 	}
 
-	template <typename T>
-	std::optional<T> GetOptionalValue(const flutter::EncodableMap& map,
-		const std::string& key) {
-		const auto it = map.find(flutter::EncodableValue(key));
-		if (it != map.end()) {
-			const auto val = std::get_if<T>(&it->second);
-			if (val) {
-				return *val;
+	static WValue *encode_flvalue_to_wvalue(flutter::EncodableValue* args) {
+		size_t index = args->index();
+		if (index == 1) {
+			return webview_value_new_bool(*std::get_if<bool>(args));
+		}
+		else if (index == 2 || index == 3) {
+			return webview_value_new_int(*std::get_if<int32_t>(args));
+		}
+		else if (index == 4) {
+			return webview_value_new_double(*std::get_if<double>(args));
+		}
+		else if (index == 5) {
+			return webview_value_new_string((*std::get_if<std::string>(args)).c_str());
+		}
+		else if (index == 6) {
+			auto list = *std::get_if<std::vector<uint8_t>>(args);
+			return webview_value_new_uint8_list(list.data(), list.size());
+		}
+		else if (index == 7) {
+			auto list = *std::get_if<std::vector<int32_t>>(args);
+			return webview_value_new_int32_list(list.data(), list.size());
+		}
+		else if (index == 8) {
+			auto list = *std::get_if<std::vector<int64_t>>(args);
+			return webview_value_new_int64_list(list.data(), list.size());
+		}
+		else if (index == 9) {
+			auto list = *std::get_if<std::vector<double>>(args);
+			return webview_value_new_double_list(list.data(), list.size());
+		}
+		else if (index == 10) {
+			WValue * ret = webview_value_new_list();
+			flutter::EncodableList list = *std::get_if<flutter::EncodableList>(args);
+			for (size_t i = 0; i < list.size(); i++) {
+				WValue *value = encode_flvalue_to_wvalue(&list[i]);
+				webview_value_append(ret, value);
+				webview_value_unref(value);
 			}
+			return ret;
 		}
-		return std::nullopt;
-	}
-
-	static const std::optional<std::pair<int, int>> GetPointFromArgs(
-		const flutter::EncodableValue* args) {
-		const flutter::EncodableList* list =
-			std::get_if<flutter::EncodableList>(args);
-		if (!list || list->size() != 2) {
-			return std::nullopt;
+		else if (index == 11) {
+			WValue * ret = webview_value_new_map();
+			flutter::EncodableMap map = *std::get_if<flutter::EncodableMap>(args);
+			for (flutter::EncodableMap::iterator it = map.begin(); it != map.end(); it++)
+			{
+				WValue *key = encode_flvalue_to_wvalue(const_cast<flutter::EncodableValue *>(&it->first));
+				WValue *value = encode_flvalue_to_wvalue(const_cast<flutter::EncodableValue*>(&it->second));
+				webview_value_set(ret, key, value);
+				webview_value_unref(key);
+				webview_value_unref(value);
+			}
+			return ret;
 		}
-		const auto x = std::get_if<int>(&(*list)[0]);
-		const auto y = std::get_if<int>(&(*list)[1]);
-		if (!x || !y) {
-			return std::nullopt;
+		else if (index == 12) {
+			return nullptr;
 		}
-		return std::make_pair(*x, *y);
+		else if (index == 13) {
+			auto list = *std::get_if<std::vector<float>>(args);
+			return webview_value_new_float_list(list.data(), list.size());
+		}
+		return nullptr;
 	}
 
 	// static
@@ -185,12 +163,13 @@ namespace webview_cef {
 				plugin_pointer->HandleMethodCall(call, std::move(result));
 			});
 
-		registrar->AddPlugin(std::move(plugin));
-	}
+		auto invoke = [=](std::string method, WValue* arguments) {
+			flutter::EncodableValue args = encode_wvalue_to_flvalue(arguments);
+			channel->InvokeMethod(method, std::make_unique<flutter::EncodableValue>(args));
+  		};
+  		webview_cef::setInvokeMethodFunc(invoke);
 
-	void WebviewCefPlugin::sendKeyEvent(CefKeyEvent ev)
-	{
-		handler.get()->sendKeyEvent(ev);
+		registrar->AddPlugin(std::move(plugin));
 	}
 
 	WebviewCefPlugin::WebviewCefPlugin() {}
@@ -201,133 +180,49 @@ namespace webview_cef {
 		const flutter::MethodCall<flutter::EncodableValue>& method_call,
 		std::unique_ptr<flutter::MethodResult<flutter::EncodableValue>> result) {
 		if (method_call.method_name().compare("init") == 0) {
-			if (!init) {
-				texture_id = texture_registrar->RegisterTexture(m_texture.get());
-				new std::thread(startCEF);
-				init = true;
-			}
+			texture_id = texture_registrar->RegisterTexture(m_texture.get());
+			auto callback = [=](const void* buffer, int32_t width, int32_t height) {
+				const std::lock_guard<std::mutex> lock(buffer_mutex_);
+				if (!pixel_buffer.get() || pixel_buffer.get()->width != width || pixel_buffer.get()->height != height) {
+					if (!pixel_buffer.get()) {
+						pixel_buffer = std::make_unique<FlutterDesktopPixelBuffer>();
+						pixel_buffer->release_context = &buffer_mutex_;
+							// Gets invoked after the FlutterDesktopPixelBuffer's
+							// backing buffer has been uploaded.
+						pixel_buffer->release_callback = [](void* opaque) {
+							auto mutex = reinterpret_cast<std::mutex*>(opaque);
+								// Gets locked just before |CopyPixelBuffer| returns.
+							mutex->unlock();
+						};
+					}
+					pixel_buffer->width = width;
+					pixel_buffer->height = height;
+					const auto size = width * height * 4;
+					backing_pixel_buffer.reset(new uint8_t[size]);
+					pixel_buffer->buffer = backing_pixel_buffer.get();
+				}
+
+				webview_cef::SwapBufferFromBgraToRgba((void*)pixel_buffer->buffer, buffer, width, height);
+				texture_registrar->MarkTextureFrameAvailable(texture_id);
+			};
+			webview_cef::setPaintCallBack(callback);
 			result->Success(flutter::EncodableValue(texture_id));
 		}
-		else if (method_call.method_name().compare("loadUrl") == 0) {
-			if (const auto url = std::get_if<std::string>(method_call.arguments())) {
-				handler.get()->loadUrl(*url);
-				return result->Success();
+		else{
+			WValue *encodeArgs = encode_flvalue_to_wvalue(const_cast<flutter::EncodableValue *>(method_call.arguments()));
+			WValue *responseArgs = nullptr;
+			int ret = webview_cef::HandleMethodCall(method_call.method_name(), encodeArgs, responseArgs);
+			if (ret > 0){
+				result->Success(encode_wvalue_to_flvalue(responseArgs));
 			}
-		}
-		else if (method_call.method_name().compare("setSize") == 0) {
-			const flutter::EncodableList* list =
-				std::get_if<flutter::EncodableList>(method_call.arguments());
-			const auto dpi = *std::get_if<double>(&(*list)[0]);
-			const auto width = *std::get_if<double>(&(*list)[1]);
-			const auto height = *std::get_if<double>(&(*list)[2]);
-			handler.get()->changeSize((float)dpi, (int)std::round(width), (int)std::round(height));
-			result->Success();
-		}
-		else if (method_call.method_name().compare("cursorClickDown") == 0) {
-			const auto point = GetPointFromArgs(method_call.arguments());
-			handler.get()->cursorClick(point->first, point->second, false);
-			result->Success();
-		}
-		else if (method_call.method_name().compare("cursorClickUp") == 0) {
-			const auto point = GetPointFromArgs(method_call.arguments());
-			handler.get()->cursorClick(point->first, point->second, true);
-			result->Success();
-		}
-		else if (method_call.method_name().compare("cursorMove") == 0) {
-			const auto point = GetPointFromArgs(method_call.arguments());
-			handler.get()->cursorMove(point->first, point->second, false);
-			result->Success();
-		}
-		else if (method_call.method_name().compare("cursorDragging") == 0) {
-			const auto point = GetPointFromArgs(method_call.arguments());
-			handler.get()->cursorMove(point->first, point->second, true);
-			result->Success();
-		}
-		else if (method_call.method_name().compare("setScrollDelta") == 0) {
-			const flutter::EncodableList* list =
-				std::get_if<flutter::EncodableList>(method_call.arguments());
-			const auto x = *std::get_if<int>(&(*list)[0]);
-			const auto y = *std::get_if<int>(&(*list)[1]);
-			const auto deltaX = *std::get_if<int>(&(*list)[2]);
-			const auto deltaY = *std::get_if<int>(&(*list)[3]);
-			handler.get()->sendScrollEvent(x, y, deltaX, deltaY);
-			result->Success();
-		}
-		else if (method_call.method_name().compare("goForward") == 0) {
-			handler.get()->goForward();
-			result->Success();
-		}
-		else if (method_call.method_name().compare("goBack") == 0) {
-			handler.get()->goBack();
-			result->Success();
-		}
-		else if (method_call.method_name().compare("reload") == 0) {
-			handler.get()->reload();
-			result->Success();
-		}
-		else if (method_call.method_name().compare("openDevTools") == 0) {
-			handler.get()->openDevTools();
-			result->Success();
-		}
-		else if(method_call.method_name().compare("setCookie") == 0){
-			const flutter::EncodableList* list =
-				std::get_if<flutter::EncodableList>(method_call.arguments());
-			const auto domain = *std::get_if<std::string>(&(*list)[0]);
-			const auto key = *std::get_if<std::string>(&(*list)[1]);
-			const auto value = *std::get_if<std::string>(&(*list)[2]);
-			handler.get()->setCookie(domain, key, value);
-			result->Success();
-		}
-		else if (method_call.method_name().compare("deleteCookie") == 0) {
-			const flutter::EncodableList* list =
-				std::get_if<flutter::EncodableList>(method_call.arguments());
-			const auto domain = *std::get_if<std::string>(&(*list)[0]);
-			const auto key = *std::get_if<std::string>(&(*list)[1]);
-			handler.get()->deleteCookie(domain, key);
-			result->Success();
-		}
-		else if (method_call.method_name().compare("visitAllCookies") == 0) {
-			handler.get()->visitAllCookies();
-			result->Success();
-		}
-		else if (method_call.method_name().compare("visitUrlCookies") == 0) {
-			const flutter::EncodableList* list =
-				std::get_if<flutter::EncodableList>(method_call.arguments());
-			const auto domain = *std::get_if<std::string>(&(*list)[0]);
-			const auto isHttpOnly = *std::get_if<bool>(&(*list)[1]);
-			handler.get()->visitUrlCookies(domain, isHttpOnly);
-			result->Success();
-		}
-		else if(method_call.method_name().compare("setJavaScriptChannels") == 0){
-			const flutter::EncodableList* list =
-				std::get_if<flutter::EncodableList>(method_call.arguments());
-			const auto jsChannels = *std::get_if<std::vector<flutter::EncodableValue>>(&(*list)[0]);
-			std::vector<std::string> channels;
-			for (auto& jsChannel : jsChannels) {
-				channels.push_back(*std::get_if<std::string>(&(jsChannel)));
+			else if (ret < 0){
+				result->Error("error", "error", encode_wvalue_to_flvalue(responseArgs));
 			}
-			handler.get()->setJavaScriptChannels(channels);
-			result->Success();
-		}
-		else if (method_call.method_name().compare("sendJavaScriptChannelCallBack") == 0) {
-			const flutter::EncodableList* list =
-				std::get_if<flutter::EncodableList>(method_call.arguments());
-			const auto error = *std::get_if<bool>(&(*list)[0]);
-			const auto ret = *std::get_if<std::string>(&(*list)[1]);
-			const auto callbackId = *std::get_if<std::string>(&(*list)[2]);
-			const auto frameId = *std::get_if<std::string>(&(*list)[3]);
-			handler.get()->sendJavaScriptChannelCallBack(error, ret,callbackId,frameId);
-			result->Success();
-		}
-		else if(method_call.method_name().compare("executeJavaScript") == 0){
-			const flutter::EncodableList* list =
-				std::get_if<flutter::EncodableList>(method_call.arguments());
-			const auto code = *std::get_if<std::string>(&(*list)[0]);
-			handler.get()->executeJavaScript(code);
-			result->Success();	
-		}
-		else {
-			result->NotImplemented();
+			else{
+				result->NotImplemented();
+			}
+			webview_value_unref(encodeArgs);
+			webview_value_unref(responseArgs);
 		}
 	}
 
