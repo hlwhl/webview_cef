@@ -1,8 +1,10 @@
 #include "webview_plugin.h"
-
 #include "webview_app.h"
 
+#ifdef OS_MAC
 #include <include/wrapper/cef_library_loader.h>
+#endif
+
 #include <math.h>
 #include <memory>
 #include <thread>

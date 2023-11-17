@@ -64,7 +64,9 @@ static FlValue* encode_wavlue_to_flvalue(WValue *args){
       FlValue * ret = fl_value_new_list();
       size_t len = webview_value_get_len(args);
       for (size_t i = 0; i < len; i++) {
-        fl_value_append(ret, encode_wavlue_to_flvalue(webview_value_get_list_value(args, i)));
+        FlValue * val = encode_wavlue_to_flvalue(webview_value_get_value(args, i));
+        fl_value_append(ret, val);
+        fl_value_unref(val);
       }
       return ret;
     }
@@ -72,7 +74,11 @@ static FlValue* encode_wavlue_to_flvalue(WValue *args){
       FlValue * ret = fl_value_new_map();
       size_t len = webview_value_get_len(args);
       for (size_t i = 0; i < len; i++) {
-        fl_value_set(ret, encode_wavlue_to_flvalue(webview_value_get_key(args, i)), encode_wavlue_to_flvalue(webview_value_get_value(args, i)));
+        FlValue * key = encode_wavlue_to_flvalue(webview_value_get_key(args, i));
+        FlValue * val = encode_wavlue_to_flvalue(webview_value_get_value(args, i));
+        fl_value_set(ret, key, val);
+        fl_value_unref(key);
+        fl_value_unref(val);
       }
       return ret;
     }
@@ -121,7 +127,9 @@ static WValue* encode_flvalue_to_wvalue(FlValue* args){
       WValue * ret = webview_value_new_list();
       size_t len = fl_value_get_length(args);
       for (size_t i = 0; i < len; i++) {
-        webview_value_append(ret, encode_flvalue_to_wvalue(fl_value_get_list_value(args, i)));
+        WValue * item = encode_flvalue_to_wvalue(fl_value_get_list_value(args, i));
+        webview_value_append(ret, item);
+        webview_value_unref(item);
       }
       return ret;
     }
@@ -129,7 +137,11 @@ static WValue* encode_flvalue_to_wvalue(FlValue* args){
       WValue * ret = webview_value_new_map();
       size_t len = fl_value_get_length(args);
       for (size_t i = 0; i < len; i++) {
-        webview_value_set(ret, encode_flvalue_to_wvalue(fl_value_get_map_key(args, i)), encode_flvalue_to_wvalue(fl_value_get_map_value(args, i)));
+        WValue * key = encode_flvalue_to_wvalue(fl_value_get_map_key(args, i));
+        WValue * val = encode_flvalue_to_wvalue(fl_value_get_map_value(args, i));
+        webview_value_set(ret, key, val);
+        webview_value_unref(key);
+        webview_value_unref(val);
       }
       return ret;
     }
@@ -147,6 +159,7 @@ static void webview_cef_plugin_handle_method_call(
 
   const gchar *method = fl_method_call_get_name(method_call);
   FlValue *args = fl_method_call_get_args(method_call);
+  FlValue *result = nullptr;
   if(strcmp(method, "init") == 0){
     auto texture = webview_cef_texture_new();
     fl_texture_registrar_register_texture(texture_register, FL_TEXTURE(texture));
@@ -163,23 +176,29 @@ static void webview_cef_plugin_handle_method_call(
       webview_cef::doMessageLoopWork();
       return TRUE;
     }, NULL);
-    response = FL_METHOD_RESPONSE(fl_method_success_response_new(fl_value_new_int((int64_t)texture)));
+    result = fl_value_new_int((int64_t)texture);
+    response = FL_METHOD_RESPONSE(fl_method_success_response_new(result));
   }else{
     WValue *encodeArgs = encode_flvalue_to_wvalue(args);
     WValue *responseArgs = nullptr;
     int ret = webview_cef::HandleMethodCall(method, encodeArgs, responseArgs);
+    webview_value_unref(encodeArgs);
     if (ret > 0){
-      response = FL_METHOD_RESPONSE(fl_method_success_response_new(encode_wavlue_to_flvalue(responseArgs)));
+      result = encode_wavlue_to_flvalue(responseArgs);
+      response = FL_METHOD_RESPONSE(fl_method_success_response_new(result));
     }
     else if (ret < 0){
-      response = FL_METHOD_RESPONSE(fl_method_error_response_new("error", "error", encode_wavlue_to_flvalue(responseArgs)));
+      result = encode_wavlue_to_flvalue(responseArgs);
+      response = FL_METHOD_RESPONSE(fl_method_error_response_new("error", "error", result));
     }
     else{
       response = FL_METHOD_RESPONSE(fl_method_not_implemented_response_new());
     }
+    webview_value_unref(responseArgs);
   }
 
   fl_method_call_respond(method_call, response, nullptr);
+  fl_value_unref(result);
 }
 
 static void webview_cef_plugin_dispose(GObject *object)
@@ -218,7 +237,9 @@ void webview_cef_plugin_register_with_registrar(FlPluginRegistrar *registrar)
                                             g_object_unref);
 
   auto invoke = [=](std::string method, WValue* arguments) {
-      fl_method_channel_invoke_method(channel, method.c_str(), encode_wavlue_to_flvalue(arguments), NULL, NULL, NULL);
+    FlValue *args = encode_wavlue_to_flvalue(arguments); 
+    fl_method_channel_invoke_method(channel, method.c_str(), args, NULL, NULL, NULL);
+    fl_value_unref(args);
   };
   webview_cef::setInvokeMethodFunc(invoke);
 
