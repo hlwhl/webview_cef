@@ -38,116 +38,113 @@ namespace webview_cef {
 		std::default_delete<flutter::MethodChannel<flutter::EncodableValue>>>
 		channel = nullptr;
 
-	static flutter::EncodableValue encode_pluginvalue_to_flvalue(webview_cef::PluginValue* args) {
-		size_t index = args->index();
-		if (index == 1) {
-			return flutter::EncodableValue(*std::get_if<bool>(args));
-		}
-		else if (index == 2) {
-			return flutter::EncodableValue(*std::get_if<int32_t>(args));
-		}
-		else if (index == 3) {
-			return flutter::EncodableValue(*std::get_if<int64_t>(args));
-		}
-		else if (index == 4) {
-			return flutter::EncodableValue(*std::get_if<double>(args));
-		}
-		else if (index == 5) {
-			return flutter::EncodableValue(*std::get_if<std::string>(args));
-		}
-		else if (index == 6) {
-			return flutter::EncodableValue(*std::get_if<std::vector<uint8_t>>(args));
-		}
-		else if (index == 7) {
-			return flutter::EncodableValue(*std::get_if<std::vector<int32_t>>(args));
-		}
-		else if (index == 8) {
-			return flutter::EncodableValue(*std::get_if<std::vector<int64_t>>(args));
-		}
-		else if (index == 9) {
-			return flutter::EncodableValue(*std::get_if<std::vector<float>>(args));
-		}
-		else if (index == 10) {
-			return flutter::EncodableValue(*std::get_if<std::vector<double>>(args));
-		}
-		else if (index == 11) {
-			flutter::EncodableList ret;
-			webview_cef::PluginValueList vec = *std::get_if<webview_cef::PluginValueList>(args);
-			for (size_t i = 0; i < vec.size(); i++) {
-				ret.push_back(encode_pluginvalue_to_flvalue(&vec[i]));
-			}
-			return ret;
-		}
-		else if (index == 12) {
-			flutter::EncodableMap ret;
-			webview_cef::PluginValueMap maps = *std::get_if<webview_cef::PluginValueMap>(args);
-			for (webview_cef::PluginValueMap::iterator it = maps.begin(); it != maps.end(); it++)
+	static flutter::EncodableValue encode_wvalue_to_flvalue(WValue* args) {
+		WValueType type = webview_value_get_type(args);
+		switch(type){
+			case Webview_Value_Type_Bool:
+				return flutter::EncodableValue(webview_value_get_bool(args));
+			case Webview_Value_Type_Int:
+				return flutter::EncodableValue(webview_value_get_int(args));
+			case Webview_Value_Type_Float:
+				return flutter::EncodableValue(webview_value_get_float(args));
+			case Webview_Value_Type_Double:
+				return flutter::EncodableValue(webview_value_get_double(args));
+			case Webview_Value_Type_String:
+				return flutter::EncodableValue(webview_value_get_string(args));
+			case Webview_Value_Type_Uint8_List:
+				return flutter::EncodableValue(webview_value_get_uint8_list(args));
+			case Webview_Value_Type_Int32_List:
+				return flutter::EncodableValue(webview_value_get_int32_list(args));
+			case Webview_Value_Type_Int64_List:
+				return flutter::EncodableValue(webview_value_get_int64_list(args));
+			case Webview_Value_Type_Float_List:
+				return flutter::EncodableValue(webview_value_get_float_list(args));
+			case Webview_Value_Type_Double_List:
+				return flutter::EncodableValue(webview_value_get_double_list(args));
+			case Webview_Value_Type_List:
 			{
-				webview_cef::PluginValue key = it->first;
-				webview_cef::PluginValue val = it->second;
-				ret[encode_pluginvalue_to_flvalue(&key)] = encode_pluginvalue_to_flvalue(&val);
+				flutter::EncodableList ret;
+				size_t len = webview_value_get_len(args);
+				for (size_t i = 0; i < len; i++) {
+                	ret.push_back(encode_wvalue_to_flvalue(webview_value_get_value(args, i)));
+				}
+				return ret;
 			}
-			return ret;
+			case Webview_Value_Type_Map:
+			{
+				flutter::EncodableMap ret;
+				size_t len = webview_value_get_len(args);
+				for (size_t i = 0; i < len; i++) {
+					ret[encode_wvalue_to_flvalue(webview_value_get_key(args, i))] = encode_wvalue_to_flvalue(webview_value_get_value(args, i));
+				}
+				return ret;
+			}
+			default:
+				return flutter::EncodableValue(nullptr);
 		}
-		return flutter::EncodableValue(nullptr);
 	}
 
-	static webview_cef::PluginValue encode_flvalue_to_pluginvalue(flutter::EncodableValue* args) {
-		webview_cef::PluginValue ret;
+	static WValue *encode_flvalue_to_wvalue(flutter::EncodableValue* args) {
 		size_t index = args->index();
 		if (index == 1) {
-			ret = webview_cef::PluginValue(*std::get_if<bool>(args));
+			return webview_value_new_bool(*std::get_if<bool>(args));
 		}
-		else if (index == 2) {
-			ret = webview_cef::PluginValue(*std::get_if<int32_t>(args));
-		}
-		else if (index == 3) {
-			ret = webview_cef::PluginValue(*std::get_if<int64_t>(args));
+		else if (index == 2 || index == 3) {
+			return webview_value_new_int(*std::get_if<int32_t>(args));
 		}
 		else if (index == 4) {
-			ret = webview_cef::PluginValue(*std::get_if<double>(args));
+			return webview_value_new_double(*std::get_if<double>(args));
 		}
 		else if (index == 5) {
-			ret = webview_cef::PluginValue(*std::get_if<std::string>(args));
+			return webview_value_new_string((*std::get_if<std::string>(args)).c_str());
 		}
 		else if (index == 6) {
-			ret = webview_cef::PluginValue(*std::get_if<std::vector<uint8_t>>(args));
+			auto list = *std::get_if<std::vector<uint8_t>>(args);
+			return webview_value_new_uint8_list(list.data(), list.size());
 		}
 		else if (index == 7) {
-			ret = webview_cef::PluginValue(*std::get_if<std::vector<int32_t>>(args));
+			auto list = *std::get_if<std::vector<int32_t>>(args);
+			return webview_value_new_int32_list(list.data(), list.size());
 		}
 		else if (index == 8) {
-			ret = webview_cef::PluginValue(*std::get_if<std::vector<int64_t>>(args));
+			auto list = *std::get_if<std::vector<int64_t>>(args);
+			return webview_value_new_int64_list(list.data(), list.size());
 		}
 		else if (index == 9) {
-			ret = webview_cef::PluginValue(*std::get_if<std::vector<double>>(args));
+			auto list = *std::get_if<std::vector<double>>(args);
+			return webview_value_new_double_list(list.data(), list.size());
 		}
 		else if (index == 10) {
-			webview_cef::PluginValueList vec;
+			WValue * ret = webview_value_new_list();
 			flutter::EncodableList list = *std::get_if<flutter::EncodableList>(args);
 			for (size_t i = 0; i < list.size(); i++) {
-				vec.push_back(encode_flvalue_to_pluginvalue(&list[i]));
+				WValue *value = encode_flvalue_to_wvalue(&list[i]);
+				webview_value_append(ret, value);
+				webview_value_unref(value);
 			}
-			ret = webview_cef::PluginValue(vec);
+			return ret;
 		}
 		else if (index == 11) {
-			webview_cef::PluginValueMap maps;
+			WValue * ret = webview_value_new_map();
 			flutter::EncodableMap map = *std::get_if<flutter::EncodableMap>(args);
 			for (flutter::EncodableMap::iterator it = map.begin(); it != map.end(); it++)
 			{
-				flutter::EncodableValue key = it->first;
-				flutter::EncodableValue val = it->second;
-				maps[encode_flvalue_to_pluginvalue(&key)] = encode_flvalue_to_pluginvalue(&val);
+				WValue *key = encode_flvalue_to_wvalue(const_cast<flutter::EncodableValue *>(&it->first));
+				WValue *value = encode_flvalue_to_wvalue(const_cast<flutter::EncodableValue*>(&it->second));
+				webview_value_set(ret, key, value);
+				webview_value_unref(key);
+				webview_value_unref(value);
 			}
-			ret = webview_cef::PluginValue(maps);
+			return ret;
 		}
 		else if (index == 12) {
-
+			return nullptr;
 		}
 		else if (index == 13) {
-			ret = webview_cef::PluginValue(*std::get_if<std::vector<float>>(args));
+			auto list = *std::get_if<std::vector<float>>(args);
+			return webview_value_new_float_list(list.data(), list.size());
 		}
-		return ret;
+		return nullptr;
 	}
 
 	// static
@@ -166,8 +163,8 @@ namespace webview_cef {
 				plugin_pointer->HandleMethodCall(call, std::move(result));
 			});
 
-		auto invoke = [=](std::string method, webview_cef::PluginValue* arguments) {
-			flutter::EncodableValue args = encode_pluginvalue_to_flvalue(arguments);
+		auto invoke = [=](std::string method, WValue* arguments) {
+			flutter::EncodableValue args = encode_wvalue_to_flvalue(arguments);
 			channel->InvokeMethod(method, std::make_unique<flutter::EncodableValue>(args));
   		};
   		webview_cef::setInvokeMethodFunc(invoke);
@@ -183,7 +180,7 @@ namespace webview_cef {
 		const flutter::MethodCall<flutter::EncodableValue>& method_call,
 		std::unique_ptr<flutter::MethodResult<flutter::EncodableValue>> result) {
 		if (method_call.method_name().compare("init") == 0) {
-			webview_cef::PluginValue userAgent = encode_flvalue_to_pluginvalue(const_cast<flutter::EncodableValue *>(method_call.arguments()));
+			WValue *userAgent = encode_flvalue_to_wvalue(const_cast<flutter::EncodableValue *>(method_call.arguments()));
 			texture_id = texture_registrar->RegisterTexture(m_texture.get());
 			auto callback = [=](const void* buffer, int32_t width, int32_t height) {
 				const std::lock_guard<std::mutex> lock(buffer_mutex_);
@@ -209,23 +206,26 @@ namespace webview_cef {
 				webview_cef::SwapBufferFromBgraToRgba((void*)pixel_buffer->buffer, buffer, width, height);
 				texture_registrar->MarkTextureFrameAvailable(texture_id);
 			};
-			webview_cef::setUserAgent(&userAgent);
+			webview_cef::setUserAgent(userAgent);
 			webview_cef::setPaintCallBack(callback);
+			webview_value_unref(userAgent);
 			result->Success(flutter::EncodableValue(texture_id));
 		}
 		else{
-			webview_cef::PluginValue encodeArgs = encode_flvalue_to_pluginvalue(const_cast<flutter::EncodableValue *>(method_call.arguments()));
-			webview_cef::PluginValue responseArgs;
-			int ret = webview_cef::HandleMethodCall(method_call.method_name(), &encodeArgs, &responseArgs);
+			WValue *encodeArgs = encode_flvalue_to_wvalue(const_cast<flutter::EncodableValue *>(method_call.arguments()));
+			WValue *responseArgs = nullptr;
+			int ret = webview_cef::HandleMethodCall(method_call.method_name(), encodeArgs, responseArgs);
 			if (ret > 0){
-				result->Success(encode_pluginvalue_to_flvalue(&responseArgs));
+				result->Success(encode_wvalue_to_flvalue(responseArgs));
 			}
 			else if (ret < 0){
-				result->Error("error", "error", encode_pluginvalue_to_flvalue(&responseArgs));
+				result->Error("error", "error", encode_wvalue_to_flvalue(responseArgs));
 			}
 			else{
 				result->NotImplemented();
 			}
+			webview_value_unref(encodeArgs);
+			webview_value_unref(responseArgs);
 		}
 	}
 

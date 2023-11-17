@@ -5,7 +5,7 @@
 #include <sys/utsname.h>
 
 #include <cstring>
-#include "../../common/webview_plugin.h"
+#include <webview_plugin.h>
 #include "webview_cef_keyevent.h"
 #include "webview_cef_texture.h"
 
@@ -22,139 +22,132 @@ G_DEFINE_TYPE(WebviewCefPlugin, webview_cef_plugin, g_object_get_type())
 
 static FlTextureRegistrar* texture_register;
 
-static FlValue* encode_pluginvalue_to_flvalue(webview_cef::PluginValue *args){
-  int index = args->index();
-  if(index == 1){
-    return fl_value_new_bool(*std::get_if<bool>(args));
-  }else if(index == 2 || index == 3){
-    return fl_value_new_int((int64_t)*std::get_if<int>(args));
-  }else if(index == 4){
-    return fl_value_new_float(*std::get_if<double>(args));
-  }else if(index == 5){
-    std::string str = *std::get_if<std::string>(args);
-    return fl_value_new_string(str.c_str());
-  }else if(index == 6){
-    std::vector<uint8_t> vec = *std::get_if<std::vector<uint8_t>>(args);
-    return fl_value_new_uint8_list(&vec[0], vec.size());
-  }else if(index == 7){
-    std::vector<int32_t> vec = *std::get_if<std::vector<int32_t>>(args);
-    return fl_value_new_int32_list(&vec[0], vec.size());
-  }else if(index == 8){
-    std::vector<int64_t> vec = *std::get_if<std::vector<int64_t>>(args);
-    return fl_value_new_int64_list(&vec[0], vec.size());
-  }else if(index == 9){
-    std::vector<float> vec = *std::get_if<std::vector<float>>(args);
-    return fl_value_new_float32_list(&vec[0], vec.size());
-  }else if(index == 10){
-    std::vector<double> vec = *std::get_if<std::vector<double>>(args);
-    return fl_value_new_float_list(&vec[0], vec.size());
-  }else if(index == 11){
-    FlValue * ret = fl_value_new_list();
-    webview_cef::PluginValueList vec = *std::get_if<webview_cef::PluginValueList>(args);
-    for(size_t i=0;i<vec.size();i++){
-      fl_value_append(ret, encode_pluginvalue_to_flvalue(&vec[i]));
+static FlValue* encode_wavlue_to_flvalue(WValue *args){
+	WValueType type = webview_value_get_type(args);
+	switch(type){
+    case Webview_Value_Type_Bool:
+      return fl_value_new_bool(webview_value_get_bool(args));
+    case Webview_Value_Type_Int:
+      return fl_value_new_int(webview_value_get_int(args));
+    case Webview_Value_Type_Float:
+      return fl_value_new_float(webview_value_get_float(args));
+    case Webview_Value_Type_Double:
+      return fl_value_new_float(webview_value_get_double(args));
+    case Webview_Value_Type_String:
+      return fl_value_new_string(webview_value_get_string(args));
+    case Webview_Value_Type_Uint8_List:{
+      size_t len = webview_value_get_len(args);
+      const uint8_t* val = webview_value_get_uint8_list(args);
+      return fl_value_new_uint8_list(val, len);
     }
-    return ret;
-  }else if(index == 12){
-    FlValue* ret = fl_value_new_map();
-    webview_cef::PluginValueMap maps = *std::get_if<webview_cef::PluginValueMap>(args);
-    for(webview_cef::PluginValueMap::iterator it = maps.begin(); it != maps.end(); it++ )
-    {
-      webview_cef::PluginValue key = it->first;
-      webview_cef::PluginValue val = it->second;
-      fl_value_set(ret, encode_pluginvalue_to_flvalue(&key), encode_pluginvalue_to_flvalue(&val));
+    case Webview_Value_Type_Int32_List:{
+      size_t len = webview_value_get_len(args);
+      const int32_t* val = webview_value_get_int32_list(args);
+      return fl_value_new_int32_list(val, len);
     }
-    return ret;
+    case Webview_Value_Type_Int64_List:{
+      size_t len = webview_value_get_len(args);
+      const int64_t* val = webview_value_get_int64_list(args);
+      return fl_value_new_int64_list(val, len);
+    }
+    case Webview_Value_Type_Float_List:{
+      size_t len = webview_value_get_len(args);
+      const float* val = webview_value_get_float_list(args);
+      return fl_value_new_float32_list(val, len);
+    }
+    case Webview_Value_Type_Double_List:{
+      size_t len = webview_value_get_len(args);
+      const double* val = webview_value_get_double_list(args);
+      return fl_value_new_float_list(val, len);
+    }
+    case Webview_Value_Type_List:{
+      FlValue * ret = fl_value_new_list();
+      size_t len = webview_value_get_len(args);
+      for (size_t i = 0; i < len; i++) {
+        FlValue * val = encode_wavlue_to_flvalue(webview_value_get_value(args, i));
+        fl_value_append(ret, val);
+        fl_value_unref(val);
+      }
+      return ret;
+    }
+    case Webview_Value_Type_Map:{
+      FlValue * ret = fl_value_new_map();
+      size_t len = webview_value_get_len(args);
+      for (size_t i = 0; i < len; i++) {
+        FlValue * key = encode_wavlue_to_flvalue(webview_value_get_key(args, i));
+        FlValue * val = encode_wavlue_to_flvalue(webview_value_get_value(args, i));
+        fl_value_set(ret, key, val);
+        fl_value_unref(key);
+        fl_value_unref(val);
+      }
+      return ret;
+    }
+    default:
+      return fl_value_new_null();
   }
-  return fl_value_new_null();
 }
 
-static webview_cef::PluginValue encode_flvalue_to_pluginvalue(FlValue* args){
-  webview_cef::PluginValue ret;
+static WValue* encode_flvalue_to_wvalue(FlValue* args){
   FlValueType argsType = fl_value_get_type(args);
-  switch (argsType)
-  {
-  case FlValueType::FL_VALUE_TYPE_NULL:
-    ret = webview_cef::PluginValue(NULL);
-    break;
-  case FlValueType::FL_VALUE_TYPE_BOOL:{
-    bool val = fl_value_get_bool(args);
-    ret = webview_cef::PluginValue(val);
-    break;
-  }
-  case FlValueType::FL_VALUE_TYPE_INT:{
-    int64_t val = fl_value_get_int(args);
-    ret = webview_cef::PluginValue(val);
-    break;
-  }
-  case FlValueType::FL_VALUE_TYPE_FLOAT:{
-    double val = fl_value_get_float(args);
-    ret = webview_cef::PluginValue(val);
-    break;
-  }
-  case FlValueType::FL_VALUE_TYPE_STRING:{
-    const gchar* val = fl_value_get_string(args);
-    ret = webview_cef::PluginValue(val);
-    break;
-  }
-  case FlValueType::FL_VALUE_TYPE_UINT8_LIST:{
-    size_t len = fl_value_get_length(args);
-    const uint8_t* val = fl_value_get_uint8_list(args);
-    std::vector<uint8_t> vec(val, val + len);
-    ret = webview_cef::PluginValue(vec);
-    break;
-  }
-  case FlValueType::FL_VALUE_TYPE_INT32_LIST:{
-    size_t len = fl_value_get_length(args);
-    const int32_t* val = fl_value_get_int32_list(args);
-    std::vector<int32_t> vec(val, val + len);
-    ret = webview_cef::PluginValue(vec);
-    break;
-  }
-  case FlValueType::FL_VALUE_TYPE_INT64_LIST:{
-    size_t len = fl_value_get_length(args);
-    const int64_t* val = fl_value_get_int64_list(args);
-    std::vector<int64_t> vec(val, val + len);
-    ret = webview_cef::PluginValue(vec);
-    break;
-  }
-  case FlValueType::FL_VALUE_TYPE_FLOAT32_LIST:{
-    size_t len = fl_value_get_length(args);
-    const float* val = fl_value_get_float32_list(args);
-    std::vector<float> vec(val, val + len);
-    ret = webview_cef::PluginValue(vec);
-    break;
-  }
-  case FlValueType::FL_VALUE_TYPE_FLOAT_LIST:{
-    size_t len = fl_value_get_length(args);
-    const double* val = fl_value_get_float_list(args);
-    std::vector<double> vec(val, val + len);
-    ret = webview_cef::PluginValue(vec);
-    break;
-  }
-  case FlValueType::FL_VALUE_TYPE_LIST:{
-    webview_cef::PluginValueList list;
-    for (size_t i = 0; i < fl_value_get_length (args); i++) {
-      FlValue *child = fl_value_get_list_value (args, i);
-      list.push_back(encode_flvalue_to_pluginvalue(child));
+  switch (argsType){
+    case FL_VALUE_TYPE_BOOL:
+      return webview_value_new_bool(fl_value_get_bool(args));
+    case FL_VALUE_TYPE_INT:
+      return webview_value_new_int(fl_value_get_int(args));
+    case FL_VALUE_TYPE_FLOAT:
+      return webview_value_new_double(fl_value_get_float(args));
+    case FL_VALUE_TYPE_STRING:
+      return webview_value_new_string(fl_value_get_string(args));
+    case FL_VALUE_TYPE_UINT8_LIST:{
+      size_t len = fl_value_get_length(args);
+      const uint8_t* val = fl_value_get_uint8_list(args);
+      return webview_value_new_uint8_list(val, len);
     }
-    ret = webview_cef::PluginValue(list);
-    break;
-  }
-  case FlValueType::FL_VALUE_TYPE_MAP:{
-    webview_cef::PluginValueMap map;
-    for (size_t i = 0; i < fl_value_get_length (args); i++) {
-      FlValue *key = fl_value_get_map_key (args, i);
-      FlValue *value = fl_value_get_map_value (args, i);
-      map[encode_flvalue_to_pluginvalue(key)] = encode_flvalue_to_pluginvalue(value);
+    case FL_VALUE_TYPE_INT32_LIST:{
+      size_t len = fl_value_get_length(args);
+      const int32_t* val = fl_value_get_int32_list(args);
+      return webview_value_new_int32_list(val, len);
     }
-    ret = webview_cef::PluginValue(map);
-    break;
+    case FL_VALUE_TYPE_INT64_LIST:{
+      size_t len = fl_value_get_length(args);
+      const int64_t* val = fl_value_get_int64_list(args);
+      return webview_value_new_int64_list(val, len);
+    }
+    case FL_VALUE_TYPE_FLOAT32_LIST:{
+      size_t len = fl_value_get_length(args);
+      const float* val = fl_value_get_float32_list(args);
+      return webview_value_new_float_list(val, len);
+    }
+    case FL_VALUE_TYPE_FLOAT_LIST:{
+      size_t len = fl_value_get_length(args);
+      const double* val = fl_value_get_float_list(args);
+      return webview_value_new_double_list(val, len);
+    }
+    case FL_VALUE_TYPE_LIST:{
+      WValue * ret = webview_value_new_list();
+      size_t len = fl_value_get_length(args);
+      for (size_t i = 0; i < len; i++) {
+        WValue * item = encode_flvalue_to_wvalue(fl_value_get_list_value(args, i));
+        webview_value_append(ret, item);
+        webview_value_unref(item);
+      }
+      return ret;
+    }
+    case FL_VALUE_TYPE_MAP:{
+      WValue * ret = webview_value_new_map();
+      size_t len = fl_value_get_length(args);
+      for (size_t i = 0; i < len; i++) {
+        WValue * key = encode_flvalue_to_wvalue(fl_value_get_map_key(args, i));
+        WValue * val = encode_flvalue_to_wvalue(fl_value_get_map_value(args, i));
+        webview_value_set(ret, key, val);
+        webview_value_unref(key);
+        webview_value_unref(val);
+      }
+      return ret;
+    }
+    default:
+      return webview_value_new_null();
   }
-  default:
-    break;
-  }
-  return ret;
 }
 
 // Called when a method call is received from Flutter.
@@ -166,9 +159,10 @@ static void webview_cef_plugin_handle_method_call(
 
   const gchar *method = fl_method_call_get_name(method_call);
   FlValue *args = fl_method_call_get_args(method_call);
+  FlValue *result = nullptr;
   if(strcmp(method, "init") == 0){
-    webview_cef::PluginValue userAgent = encode_flvalue_to_pluginvalue(args);
     auto texture = webview_cef_texture_new();
+    WValue *userAgent = encode_flvalue_to_wvalue(args);
     fl_texture_registrar_register_texture(texture_register, FL_TEXTURE(texture));
 		auto callback = [=](const void* buffer, int32_t width, int32_t height) {
 			texture->width = width;
@@ -178,29 +172,38 @@ static void webview_cef_plugin_handle_method_call(
 			webview_cef::SwapBufferFromBgraToRgba((void*)texture->buffer, buffer, width, height);
       fl_texture_registrar_mark_texture_frame_available(texture_register, FL_TEXTURE(texture));
 		};
-    webview_cef::setUserAgent(&userAgent);
+
+    webview_cef::setUserAgent(userAgent);
     webview_cef::setPaintCallBack(callback);
+    webview_value_unref(userAgent);
+
     g_timeout_add(20, [](gpointer data) -> gboolean {
       webview_cef::doMessageLoopWork();
       return TRUE;
     }, NULL);
-    response = FL_METHOD_RESPONSE(fl_method_success_response_new(fl_value_new_int((int64_t)texture)));
+    result = fl_value_new_int((int64_t)texture);
+    response = FL_METHOD_RESPONSE(fl_method_success_response_new(result));
   }else{
-    webview_cef::PluginValue encodeArgs = encode_flvalue_to_pluginvalue(args);
-    webview_cef::PluginValue responseArgs;
-    int ret = webview_cef::HandleMethodCall(method, &encodeArgs, &responseArgs);
+    WValue *encodeArgs = encode_flvalue_to_wvalue(args);
+    WValue *responseArgs = nullptr;
+    int ret = webview_cef::HandleMethodCall(method, encodeArgs, responseArgs);
+    webview_value_unref(encodeArgs);
     if (ret > 0){
-      response = FL_METHOD_RESPONSE(fl_method_success_response_new(encode_pluginvalue_to_flvalue(&responseArgs)));
+      result = encode_wavlue_to_flvalue(responseArgs);
+      response = FL_METHOD_RESPONSE(fl_method_success_response_new(result));
     }
     else if (ret < 0){
-      response = FL_METHOD_RESPONSE(fl_method_error_response_new("error", "error", encode_pluginvalue_to_flvalue(&responseArgs)));
+      result = encode_wavlue_to_flvalue(responseArgs);
+      response = FL_METHOD_RESPONSE(fl_method_error_response_new("error", "error", result));
     }
     else{
       response = FL_METHOD_RESPONSE(fl_method_not_implemented_response_new());
     }
+    webview_value_unref(responseArgs);
   }
 
   fl_method_call_respond(method_call, response, nullptr);
+  fl_value_unref(result);
 }
 
 static void webview_cef_plugin_dispose(GObject *object)
@@ -238,8 +241,10 @@ void webview_cef_plugin_register_with_registrar(FlPluginRegistrar *registrar)
                                             g_object_ref(plugin),
                                             g_object_unref);
 
-  auto invoke = [=](std::string method, webview_cef::PluginValue* arguments) {
-      fl_method_channel_invoke_method(channel, method.c_str(), encode_pluginvalue_to_flvalue(arguments), NULL, NULL, NULL);
+  auto invoke = [=](std::string method, WValue* arguments) {
+    FlValue *args = encode_wavlue_to_flvalue(arguments); 
+    fl_method_channel_invoke_method(channel, method.c_str(), args, NULL, NULL, NULL);
+    fl_value_unref(args);
   };
   webview_cef::setInvokeMethodFunc(invoke);
 

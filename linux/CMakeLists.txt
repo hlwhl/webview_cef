@@ -36,6 +36,8 @@ add_library(${PLUGIN_NAME} SHARED
   "${CMAKE_CURRENT_SOURCE_DIR}/../common/webview_handler.h"
   "${CMAKE_CURRENT_SOURCE_DIR}/../common/webview_plugin.cc"
   "${CMAKE_CURRENT_SOURCE_DIR}/../common/webview_plugin.h"
+  "${CMAKE_CURRENT_SOURCE_DIR}/../common/webview_value.cc"
+  "${CMAKE_CURRENT_SOURCE_DIR}/../common/webview_value.h"
   "${CMAKE_CURRENT_SOURCE_DIR}/../common/webview_js_handler.cc"
   "${CMAKE_CURRENT_SOURCE_DIR}/../common/webview_js_handler.h"
   "${CMAKE_CURRENT_SOURCE_DIR}/../common/webview_cookieVisitor.cc"
