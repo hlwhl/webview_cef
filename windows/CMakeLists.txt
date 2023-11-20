@@ -14,7 +14,7 @@ endif()
 
 include(${CMAKE_CURRENT_SOURCE_DIR}/../third/download.cmake)
 # wait for unified version cef source code and prebuilt files
-# prepare_prebuilt_files(${CMAKE_CURRENT_SOURCE_DIR}/../third/cef)
+prepare_prebuilt_files(${CMAKE_CURRENT_SOURCE_DIR}/../third/cef)
 
 # This value is used when generating builds using this plugin, so it must
 # not be changed
