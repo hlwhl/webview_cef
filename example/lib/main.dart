@@ -19,6 +19,8 @@ class _MyAppState extends State<MyApp> {
   final _textController = TextEditingController();
   String title = "";
   Map<String, dynamic> allCookies = {};
+  late WebView webview = _controller.createWebView();
+  late WebView webview2 = _controller.createWebView();
 
   @override
   void initState() {
@@ -31,9 +33,8 @@ class _MyAppState extends State<MyApp> {
     String url = "https://flutter.dev/";
     _textController.text = url;
     //unified interface for all platforms set user agent
-    // _controller.setUserAgent("abctest!");
+    _controller.setUserAgent("abctest!");
     await _controller.initialize();
-    await _controller.loadUrl(url);
     _controller.setWebviewListener(WebviewEventsListener(
       onTitleChanged: (t) {
         setState(() {
@@ -53,6 +54,9 @@ class _MyAppState extends State<MyApp> {
       },
     ));
 
+    _controller.loadUrl(webview.BrowserId, _textController.text);
+    _controller.loadUrl(webview2.BrowserId, "https://www.baidu.com/");
+
     // ignore: prefer_collection_literals
     final Set<JavascriptChannel> jsChannels = [
       JavascriptChannel(
@@ -63,13 +67,16 @@ class _MyAppState extends State<MyApp> {
                 false,
                 "{'code':'200','message':'print succeed!'}",
                 message.callbackId,
+                webview.BrowserId,
                 message.frameId);
           }),
     ].toSet();
     //normal JavaScriptChannels
-    await _controller.setJavaScriptChannels(jsChannels);
+    _controller.setJavaScriptChannels(webview.BrowserId, jsChannels);
     //also you can build your own jssdk by execute JavaScript code to CEF
-    await _controller.executeJavaScript("function abc(e){console.log(e)}");
+    _controller.executeJavaScript(
+        webview.BrowserId, "function abc(e){console.log(e)}");
+
     // If the widget was removed from the tree while the asynchronous platform
     // message was in flight, we want to discard the reply rather than calling
     // setState to update our non-existent appearance.
@@ -95,7 +102,7 @@ class _MyAppState extends State<MyApp> {
                 height: 48,
                 child: MaterialButton(
                   onPressed: () {
-                    _controller.reload();
+                    _controller.reload(webview.BrowserId);
                   },
                   child: const Icon(Icons.refresh),
                 ),
@@ -104,7 +111,7 @@ class _MyAppState extends State<MyApp> {
                 height: 48,
                 child: MaterialButton(
                   onPressed: () {
-                    _controller.goBack();
+                    _controller.goBack(webview.BrowserId);
                   },
                   child: const Icon(Icons.arrow_left),
                 ),
@@ -113,7 +120,7 @@ class _MyAppState extends State<MyApp> {
                 height: 48,
                 child: MaterialButton(
                   onPressed: () {
-                    _controller.goForward();
+                    _controller.goForward(webview.BrowserId);
                   },
                   child: const Icon(Icons.arrow_right),
                 ),
@@ -122,7 +129,7 @@ class _MyAppState extends State<MyApp> {
                 height: 48,
                 child: MaterialButton(
                   onPressed: () {
-                    _controller.openDevTools();
+                    _controller.openDevTools(webview.BrowserId);
                   },
                   child: const Icon(Icons.developer_mode),
                 ),
@@ -131,7 +138,7 @@ class _MyAppState extends State<MyApp> {
                 child: TextField(
                   controller: _textController,
                   onSubmitted: (url) {
-                    _controller.loadUrl(url);
+                    _controller.loadUrl(webview.BrowserId, url);
                     _controller.visitAllCookies();
                     Future.delayed(const Duration(milliseconds: 100), () {
                       if (url == "baidu.com") {
@@ -148,9 +155,13 @@ class _MyAppState extends State<MyApp> {
               ),
             ],
           ),
-          _controller.value
-              ? Expanded(child: WebView(_controller))
-              : const Text("not init"),
+          // _controller.value ? Expanded(child: webview) : const Text("not init"),
+          Expanded(
+            child: Row(children: [
+              Expanded(child: webview),
+              Expanded(child: webview2),
+            ]),
+          )
         ],
       )),
     );

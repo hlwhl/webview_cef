@@ -26,12 +26,12 @@ public CefFocusHandler,
 public CefLoadHandler,
 public CefRenderHandler{
 public:
-    std::function<void(const void*, int32_t width, int32_t height)> onPaintCallback;
+    std::function<void(int64_t textureId, const void*, int32_t width, int32_t height)> onPaintCallback;
     std::function<void(std::string url)> onUrlChangedCb;
     std::function<void(std::string title)> onTitleChangedCb;
     std::function<void(std::map<std::string, std::map<std::string, std::string>>)> onAllCookieVisitedCb;
     std::function<void(std::map<std::string, std::map<std::string, std::string>>)> onUrlCookieVisitedCb;
-    std::function<void(std::string, std::string, std::string, std::string)> onJavaScriptChannelMessage;
+    std::function<void(std::string, std::string, std::string, int, std::string)> onJavaScriptChannelMessage;
     std::function<void(bool editable)> onFocusedNodeChangeMessage;
     std::function<void(int32_t x, int32_t y)> onImeCompositionRangeChangedMessage;
 
@@ -113,17 +113,20 @@ public:
     
     // Returns true if the Chrome runtime is enabled.
     static bool IsChromeRuntimeEnabled();
-    
-    void sendScrollEvent(int x, int y, int deltaX, int deltaY);
-    void changeSize(float a_dpi, int width, int height);
-    void cursorClick(int x, int y, bool up);
-    void cursorMove(int x, int y, bool dragging);
+
+    void setBrowserId(int64_t textureId, int browserId, CefRefPtr<CefBrowser> browser = nullptr);
+    void closeBrowser(int browserId);
+
+    void sendScrollEvent(int browserId, int x, int y, int deltaX, int deltaY);
+    void changeSize(int browserId, float a_dpi, int width, int height);
+    void cursorClick(int browserId, int x, int y, bool up);
+    void cursorMove(int browserId, int x, int y, bool dragging);
     void sendKeyEvent(CefKeyEvent& ev);
-    void loadUrl(std::string url);
-    void goForward();
-    void goBack();
-    void reload();
-    void openDevTools();
+    void loadUrl(int browserId, std::string url);
+    void goForward(int browserId);
+    void goBack(int browserId);
+    void reload(int browserId);
+    void openDevTools(int browserId);
 
     void imeSetComposition(std::string text);
     void imeCommitText(std::string text);
@@ -134,9 +137,9 @@ public:
     bool visitAllCookies();
     bool visitUrlCookies(const std::string& domain, const bool& isHttpOnly);
 
-    bool setJavaScriptChannels(const std::vector<std::string> channels);
-    bool sendJavaScriptChannelCallBack(const bool error, const std::string result, const std::string callbackId, const std::string frameId);
-    bool executeJavaScript(const std::string code);
+    bool setJavaScriptChannels(int browserId, const std::vector<std::string> channels);
+    bool sendJavaScriptChannelCallBack(const bool error, const std::string result, const std::string callbackId, const int browserId, const std::string frameId);
+    bool executeJavaScript(int browserId, const std::string code);
     
 private:
     bool getCookieVisitor();
@@ -149,8 +152,9 @@ private:
     bool is_ime_commit = false;
     
     // List of existing browser windows. Only accessed on the CEF UI thread.
-    typedef std::list<CefRefPtr<CefBrowser>> BrowserList;
-    BrowserList browser_list_;
+    std::unordered_map<int,int64_t> browser_textureId_map_;        // browserId -> textureId
+    typedef std::unordered_map<int, CefRefPtr<CefBrowser>> BrowserMap;
+    BrowserMap browser_map_;
     
     // Include the default reference counting implementation.
     IMPLEMENT_REFCOUNTING(WebviewHandler);

@@ -16,23 +16,65 @@
 #include <mutex>
 
 namespace webview_cef {
-	int64_t texture_id;
+
+	class WebviewTextureRenderer{
+	public:
+		WebviewTextureRenderer(flutter::TextureRegistrar* texture_registrar) {
+			registrar_ = texture_registrar;
+			texture = std::make_unique<flutter::TextureVariant>(
+				flutter::PixelBufferTexture([this](size_t width, size_t height) -> const FlutterDesktopPixelBuffer* {
+					return this->CopyPixelBuffer(width, height);
+				}));
+			texture_id = registrar_->RegisterTexture(texture.get());
+		}
+
+		~WebviewTextureRenderer() {
+			std::lock_guard<std::mutex> autolock(mutex_);
+			if (pixel_buffer && pixel_buffer->buffer) {
+				delete[] pixel_buffer->buffer;
+			}
+			if(registrar_){
+				registrar_->UnregisterTexture(texture_id);
+        		registrar_ = nullptr;
+			}
+		}
+
+		const FlutterDesktopPixelBuffer *CopyPixelBuffer(size_t width, size_t height) const{
+			std::lock_guard<std::mutex> autolock(mutex_);
+    		// copyNum_++;
+    		return pixel_buffer.get();
+		}
+
+		void onframe(const void* buffer, int width, int height){
+			const std::lock_guard<std::mutex> autolock(mutex_);
+			if (!pixel_buffer.get() || pixel_buffer.get()->width != width || pixel_buffer.get()->height != height) {
+				if (!pixel_buffer.get()) {
+					pixel_buffer = std::make_unique<FlutterDesktopPixelBuffer>();
+					pixel_buffer->release_context = nullptr;
+				}
+				pixel_buffer->width = width;
+				pixel_buffer->height = height;
+				const auto size = width * height * 4;
+				backing_pixel_buffer.reset(new uint8_t[size]);
+				pixel_buffer->buffer = backing_pixel_buffer.get();
+			}
+
+			webview_cef::SwapBufferFromBgraToRgba((void*)pixel_buffer->buffer, buffer, width, height);
+			if(registrar_){
+				registrar_->MarkTextureFrameAvailable(texture_id);
+			}
+		}
+
+		flutter::TextureRegistrar* registrar_ = nullptr;
+		std::unique_ptr<flutter::TextureVariant> texture;
+		int64_t texture_id;
+		mutable std::shared_ptr<FlutterDesktopPixelBuffer> pixel_buffer;
+		std::unique_ptr<uint8_t> backing_pixel_buffer;
+		mutable std::mutex mutex_;
+	};
 
 	flutter::TextureRegistrar* texture_registrar;
-	std::shared_ptr<FlutterDesktopPixelBuffer> pixel_buffer;
-	std::unique_ptr<uint8_t> backing_pixel_buffer;
-	std::mutex buffer_mutex_;
-	std::unique_ptr<flutter::TextureVariant> m_texture = std::make_unique<flutter::TextureVariant>(flutter::PixelBufferTexture([](size_t width, size_t height) -> const FlutterDesktopPixelBuffer* {
-		buffer_mutex_.lock();
-		auto buffer = pixel_buffer.get();
-		// Only lock the mutex if the buffer is not null
-		// (to ensure the release callback gets called)
-		if (!buffer) {
-			buffer_mutex_.unlock();
-		}
-		return buffer;
-		}));
-
+	std::unordered_map<int64_t, std::shared_ptr<WebviewTextureRenderer>> renderers;
 	std::unique_ptr<
 		flutter::MethodChannel<flutter::EncodableValue>,
 		std::default_delete<flutter::MethodChannel<flutter::EncodableValue>>>
@@ -181,35 +223,39 @@ namespace webview_cef {
 		std::unique_ptr<flutter::MethodResult<flutter::EncodableValue>> result) {
 		if (method_call.method_name().compare("init") == 0) {
 			WValue *userAgent = encode_flvalue_to_wvalue(const_cast<flutter::EncodableValue *>(method_call.arguments()));
-			texture_id = texture_registrar->RegisterTexture(m_texture.get());
-			auto callback = [=](const void* buffer, int32_t width, int32_t height) {
-				const std::lock_guard<std::mutex> lock(buffer_mutex_);
-				if (!pixel_buffer.get() || pixel_buffer.get()->width != width || pixel_buffer.get()->height != height) {
-					if (!pixel_buffer.get()) {
-						pixel_buffer = std::make_unique<FlutterDesktopPixelBuffer>();
-						pixel_buffer->release_context = &buffer_mutex_;
-							// Gets invoked after the FlutterDesktopPixelBuffer's
-							// backing buffer has been uploaded.
-						pixel_buffer->release_callback = [](void* opaque) {
-							auto mutex = reinterpret_cast<std::mutex*>(opaque);
-								// Gets locked just before |CopyPixelBuffer| returns.
-							mutex->unlock();
-						};
-					}
-					pixel_buffer->width = width;
-					pixel_buffer->height = height;
-					const auto size = width * height * 4;
-					backing_pixel_buffer.reset(new uint8_t[size]);
-					pixel_buffer->buffer = backing_pixel_buffer.get();
-				}
-
-				webview_cef::SwapBufferFromBgraToRgba((void*)pixel_buffer->buffer, buffer, width, height);
-				texture_registrar->MarkTextureFrameAvailable(texture_id);
+			auto callback = [=](int64_t texture_id, const void* buffer, int32_t width, int32_t height) {
+				auto renderer = renderers[texture_id];
+				renderer->onframe(buffer, width, height);
 			};
 			webview_cef::setUserAgent(userAgent);
 			webview_cef::setPaintCallBack(callback);
 			webview_value_unref(userAgent);
+			result->Success(nullptr);
+		}
+		else if(method_call.method_name().compare("dispose") == 0){
+			for(auto render : renderers){
+				delete render.second.get();
+			}
+			renderers.clear();
+			webview_cef::closeAllBrowser();
+			result->Success();
+		}
+		else if(method_call.method_name().compare("create") == 0){
+			int browserId = *std::get_if<int>(method_call.arguments());
+			std::shared_ptr<WebviewTextureRenderer> renderer = std::make_shared<WebviewTextureRenderer>(texture_registrar);
+			int64_t texture_id = renderer->texture_id;
+			renderers[renderer->texture_id] = renderer;
+			webview_cef::createBrowser(texture_id, browserId);
 			result->Success(flutter::EncodableValue(texture_id));
+		}
+		else if(method_call.method_name().compare("close") == 0){
+			int64_t texture_id = *std::get_if<int64_t>(method_call.arguments());
+			int browserId = *std::get_if<int>(method_call.arguments());
+			auto renderer = renderers[texture_id];
+			delete renderer.get();
+			renderers.erase(texture_id);
+			webview_cef::closeBrowser(browserId);
+			result->Success(nullptr);
 		}
 		else{
 			WValue *encodeArgs = encode_flvalue_to_wvalue(const_cast<flutter::EncodableValue *>(method_call.arguments()));

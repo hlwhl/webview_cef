@@ -22,25 +22,26 @@ namespace webview_cef {
 	CefString globalUserAgent;
 
 	static int cursorAction(WValue *args, std::string name) {
-		if (!args || webview_value_get_len(args) != 2) {
+		if (!args || webview_value_get_len(args) != 3) {
 			return 0;
 		}
-		int x = int(webview_value_get_int(webview_value_get_list_value(args, 0)));
-		int y = int(webview_value_get_int(webview_value_get_list_value(args, 1)));
+		int browserId = int(webview_value_get_int(webview_value_get_list_value(args, 0)));
+		int x = int(webview_value_get_int(webview_value_get_list_value(args, 1)));
+		int y = int(webview_value_get_int(webview_value_get_list_value(args, 2)));
 		if (!x && !y) {
 			return 0;
 		}
 		if (name.compare("cursorClickDown") == 0) {
-			handler.get()->cursorClick(x, y, false);
+			handler.get()->cursorClick(browserId, x, y, false);
 		}
 		else if (name.compare("cursorClickUp") == 0) {
-			handler.get()->cursorClick(x, y, true);
+			handler.get()->cursorClick(browserId, x, y, true);
 		}
 		else if (name.compare("cursorMove") == 0) {
-			handler.get()->cursorMove(x, y, false);
+			handler.get()->cursorMove(browserId, x, y, false);
 		}
 		else if (name.compare("cursorDragging") == 0) {
-			handler.get()->cursorMove(x, y, true);
+			handler.get()->cursorMove(browserId, x, y, true);
 		}
 		return 1;
 	}
@@ -67,8 +68,32 @@ namespace webview_cef {
 		}
     }
 
-	void startCEF() {
-		CefSettings cefs;
+    void createBrowser(int64_t textureId, int browserId)
+    {
+		// Specify CEF browser settings here.
+		CefBrowserSettings browser_settings;
+		browser_settings.windowless_frame_rate = 60;
+				
+		CefWindowInfo window_info;
+		window_info.SetAsWindowless(0);
+
+		// create browser
+		CefBrowserHost::CreateBrowser(window_info, handler, "", browser_settings, nullptr, nullptr);
+		handler->setBrowserId(textureId, browserId);
+    }
+
+	void closeBrowser(int browserId)
+    {
+		handler->closeBrowser(browserId);
+    }
+
+	void closeAllBrowser(){
+		handler->CloseAllBrowsers(true);
+	}
+
+    void startCEF()
+    {
+        CefSettings cefs;
 		cefs.windowless_rendering_enabled = true;       
 #ifdef OS_MAC
 		cefs.external_message_pump = true;
@@ -76,14 +101,13 @@ namespace webview_cef {
 #else
 		cefs.no_sandbox = true;
 #endif
-
 		CefInitialize(mainArgs, cefs, app.get(), nullptr);
 
 #ifdef OS_WIN
 		CefRunMessageLoop();
 		CefShutdown();
 #endif
-	}
+    }
 
     void doMessageLoopWork(){
 		CefDoMessageLoopWork();
@@ -92,16 +116,19 @@ namespace webview_cef {
     int HandleMethodCall(std::string name, WValue* values, WValue* response) {
         int result = -1;
 		if (name.compare("loadUrl") == 0) {
-			if (const auto url = webview_value_get_string(values)) {
-				handler.get()->loadUrl(url);
-				result = 1;
+			int browserId = int(webview_value_get_int(webview_value_get_list_value(values, 0)));
+			const auto url = webview_value_get_string(webview_value_get_list_value(values, 1));
+			if(url != nullptr){
+				handler.get()->loadUrl(browserId, url);
+				result = 1;			
 			}
 		}
 		else if (name.compare("setSize") == 0) {
-			const auto dpi = webview_value_get_double(webview_value_get_list_value(values, 0));
-			const auto width = webview_value_get_double(webview_value_get_list_value(values, 1));
-			const auto height = webview_value_get_double(webview_value_get_list_value(values, 2));
-			handler.get()->changeSize((float)dpi, (int)std::round(width), (int)std::round(height));
+			int browserId = int(webview_value_get_int(webview_value_get_list_value(values, 0)));
+			const auto dpi = webview_value_get_double(webview_value_get_list_value(values, 1));
+			const auto width = webview_value_get_double(webview_value_get_list_value(values, 2));
+			const auto height = webview_value_get_double(webview_value_get_list_value(values, 3));
+			handler.get()->changeSize(browserId, (float)dpi, (int)std::round(width), (int)std::round(height));
 			result = 1;
 		}
 		else if (name.compare("cursorClickDown") == 0 
@@ -111,36 +138,41 @@ namespace webview_cef {
 			result = cursorAction(values, name);
 		}
 		else if (name.compare("setScrollDelta") == 0) {
-			auto x = webview_value_get_int(webview_value_get_list_value(values, 0));
-			auto y = webview_value_get_int(webview_value_get_list_value(values, 1));
-			auto deltaX = webview_value_get_int(webview_value_get_list_value(values, 2));
-			auto deltaY = webview_value_get_int(webview_value_get_list_value(values, 3));
-			handler.get()->sendScrollEvent((int)x, (int)y, (int)deltaX, (int)deltaY);
+			int browserId = int(webview_value_get_int(webview_value_get_list_value(values, 0)));
+			auto x = webview_value_get_int(webview_value_get_list_value(values, 1));
+			auto y = webview_value_get_int(webview_value_get_list_value(values, 2));
+			auto deltaX = webview_value_get_int(webview_value_get_list_value(values, 3));
+			auto deltaY = webview_value_get_int(webview_value_get_list_value(values, 4));
+			handler.get()->sendScrollEvent(browserId, (int)x, (int)y, (int)deltaX, (int)deltaY);
 			result = 1;
 		}
 		else if (name.compare("goForward") == 0) {
-			handler.get()->goForward();
+			int browserId = int(webview_value_get_int(values));
+			handler.get()->goForward(browserId);
 			result = 1;
 		}
 		else if (name.compare("goBack") == 0) {
-			handler.get()->goBack();
+			int browserId = int(webview_value_get_int(values));
+			handler.get()->goBack(browserId);
 			result = 1;
 		}
 		else if (name.compare("reload") == 0) {
-			handler.get()->reload();
+			int browserId = int(webview_value_get_int(values));
+			handler.get()->reload(browserId);
 			result = 1;
 		}
-		else if (name.compare("openDevTools") == 0) {
-			handler.get()->openDevTools();
+		else if (name.compare("openDevTools") == 0) {			
+			int browserId = int(webview_value_get_int(values));
+			handler.get()->openDevTools(browserId);
 			result = 1;
 		}
 		else if (name.compare("imeSetComposition") == 0) {
-			std::string text = webview_value_get_string(webview_value_get_list_value(values, 0));
+			std::string text = webview_value_get_string(values);
 			handler.get()->imeSetComposition(text);
 			result = 1;
 		} 
 		else if (name.compare("imeCommitText") == 0) {
-			std::string text = webview_value_get_string(webview_value_get_list_value(values, 0));
+			std::string text = webview_value_get_string(values);
 			handler.get()->imeCommitText(text);
 			result = 1;
 		} 
@@ -173,26 +205,30 @@ namespace webview_cef {
 			result = 1;	
 		}
 		else if(name.compare("setJavaScriptChannels") == 0){
-			auto len = webview_value_get_len(values);
+			int browserId = int(webview_value_get_int(webview_value_get_list_value(values, 0)));
+			WValue *list = webview_value_get_list_value(values, 1);
+			auto len = webview_value_get_len(list);
 			std::vector<std::string> channels;
 			for(size_t i = 0; i < len; i++){
-				auto channel = webview_value_get_string(webview_value_get_list_value(values, i));
+				auto channel = webview_value_get_string(webview_value_get_list_value(list, i));
 				channels.push_back(channel);
 			}
-			handler.get()->setJavaScriptChannels(channels);
+			handler.get()->setJavaScriptChannels(browserId, channels);
 			result = 1;	
 		}
 		else if (name.compare("sendJavaScriptChannelCallBack") == 0) {
 			const auto error = webview_value_get_bool(webview_value_get_list_value(values, 0));
 			const auto ret = webview_value_get_string(webview_value_get_list_value(values, 1));
 			const auto callbackId = webview_value_get_string(webview_value_get_list_value(values, 2));
-			const auto frameId = webview_value_get_string(webview_value_get_list_value(values, 3));
-			handler.get()->sendJavaScriptChannelCallBack(error, ret,callbackId,frameId);
+			const auto browserId = int(webview_value_get_int(webview_value_get_list_value(values, 3)));
+			const auto frameId = webview_value_get_string(webview_value_get_list_value(values, 4));
+			handler.get()->sendJavaScriptChannelCallBack(error, ret, callbackId, browserId, frameId);
 			result = 1;	
 		}
 		else if(name.compare("executeJavaScript") == 0){
-			const auto code = webview_value_get_string(webview_value_get_list_value(values, 0));
-			handler.get()->executeJavaScript(code);
+			int browserId = int(webview_value_get_int(webview_value_get_list_value(values, 0)));
+			const auto code = webview_value_get_string(webview_value_get_list_value(values, 1));
+			handler.get()->executeJavaScript(browserId, code);
 			result = 1;	
 		}
 		else {
@@ -224,7 +260,7 @@ namespace webview_cef {
 		globalUserAgent = CefString(webview_value_get_string(userAgent));
 	}
 
-	void setPaintCallBack(std::function<void(const void *, int32_t, int32_t)> callback)	{
+	void setPaintCallBack(std::function<void(int64_t textureId, const void *, int32_t, int32_t)> callback)	{
 		if (!init)
 		{
 			handler.get()->onPaintCallback = callback;
@@ -292,7 +328,7 @@ namespace webview_cef {
 				}
 			};
 
-			handler.get()->onJavaScriptChannelMessage = [](std::string channelName, std::string message, std::string callbackId, std::string frameId)
+			handler.get()->onJavaScriptChannelMessage = [](std::string channelName, std::string message, std::string callbackId, int browserId, std::string frameId)
 			{
 				if (invokeFunc)
 				{
@@ -300,16 +336,19 @@ namespace webview_cef {
 					WValue* channel = webview_value_new_string(const_cast<char *>(channelName.c_str()));
 					WValue* msg = webview_value_new_string(const_cast<char *>(message.c_str()));
 					WValue* cbId = webview_value_new_string(const_cast<char *>(callbackId.c_str()));
+					WValue* bId = webview_value_new_int(browserId);
 					WValue* fId = webview_value_new_string(const_cast<char *>(frameId.c_str()));
 					webview_value_set_string(retMap, "channel", channel);
 					webview_value_set_string(retMap, "message", msg);
 					webview_value_set_string(retMap, "callbackId", cbId);
+					webview_value_set_string(retMap, "browserId", bId);
 					webview_value_set_string(retMap, "frameId", fId);
 					invokeFunc("javascriptChannelMessage", retMap);
 					webview_value_unref(retMap);
 					webview_value_unref(channel);
 					webview_value_unref(msg);
 					webview_value_unref(cbId);
+					webview_value_unref(bId);
 					webview_value_unref(fId);
 				}
 			};
