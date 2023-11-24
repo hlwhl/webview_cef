@@ -100,7 +100,8 @@ class WebViewController extends ValueNotifier<bool> {
 
   WebView createWebView() {
     final browserId = _webViews.length + 1;
-    final webView = WebView(this, browserId);
+    final webView = WebView(this);
+    webView._browserId = browserId;
     _webViews[browserId] = webView;
     return webView;
   }
@@ -337,13 +338,13 @@ class WebViewController extends ValueNotifier<bool> {
 
 class WebView extends StatefulWidget {
   final WebViewController controller;
-  final _browserId;
 
-  WebView(this.controller, this._browserId, {Key? key}) : super(key: key);
+  WebView(this.controller, {Key? key, Widget? loadingWidget}) : super(key: key);
 
+  Widget loadingWidget = const Text("loading");
   int _textureId = 0;
-  int get BrowserId => _browserId;
-
+  int _browserId = 0;
+  int get browserId =>_browserId;
   final Map<String, JavascriptChannel> _javascriptChannels =
       <String, JavascriptChannel>{};
 
@@ -395,7 +396,9 @@ class WebViewState extends State<WebView> with WebeViewTextInput {
   @override
   void initState() {
     super.initState();
-    _controller.create(widget._browserId);
+    _controller.create(widget._browserId).then((value) => setState(() {
+      print('textureId:${widget._textureId}');
+    }));
     _controller._onFocusedNodeChangeMessage = (editable) {
       _composingText = '';
       editable ? attachTextInputClient() : detachTextInputClient();

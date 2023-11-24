@@ -103,11 +103,6 @@ void WebviewApp::OnBeforeCommandLineProcessing(const CefString &process_type, Ce
     // Pass additional command-line flags to the browser process.
 	if (process_type.empty())
 	{
-        // Use software rendering and compositing (disable GPU) for increased FPS
-		// and decreased CPU usage. This will also disable WebGL so remove these
-		// switches if you need that capability.
-		// See https://bitbucket.org/chromiumembedded/cef/issues/1257 for details.
-		command_line->AppendSwitch("in-process-gpu");
 		if (!m_bEnableGPU)
 		{
 			command_line->AppendSwitch("disable-gpu");

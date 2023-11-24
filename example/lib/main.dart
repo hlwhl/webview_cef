@@ -54,8 +54,8 @@ class _MyAppState extends State<MyApp> {
       },
     ));
 
-    _controller.loadUrl(webview.BrowserId, _textController.text);
-    _controller.loadUrl(webview2.BrowserId, "https://www.baidu.com/");
+    _controller.loadUrl(webview.browserId, _textController.text);
+    _controller.loadUrl(webview2.browserId, "https://www.baidu.com/");
 
     // ignore: prefer_collection_literals
     final Set<JavascriptChannel> jsChannels = [
@@ -67,15 +67,15 @@ class _MyAppState extends State<MyApp> {
                 false,
                 "{'code':'200','message':'print succeed!'}",
                 message.callbackId,
-                webview.BrowserId,
+                webview.browserId,
                 message.frameId);
           }),
     ].toSet();
     //normal JavaScriptChannels
-    _controller.setJavaScriptChannels(webview.BrowserId, jsChannels);
+    _controller.setJavaScriptChannels(webview.browserId, jsChannels);
     //also you can build your own jssdk by execute JavaScript code to CEF
     _controller.executeJavaScript(
-        webview.BrowserId, "function abc(e){console.log(e)}");
+        webview.browserId, "function abc(e){console.log(e)}");
 
     // If the widget was removed from the tree while the asynchronous platform
     // message was in flight, we want to discard the reply rather than calling
@@ -102,7 +102,7 @@ class _MyAppState extends State<MyApp> {
                 height: 48,
                 child: MaterialButton(
                   onPressed: () {
-                    _controller.reload(webview.BrowserId);
+                    _controller.reload(webview.browserId);
                   },
                   child: const Icon(Icons.refresh),
                 ),
@@ -111,7 +111,7 @@ class _MyAppState extends State<MyApp> {
                 height: 48,
                 child: MaterialButton(
                   onPressed: () {
-                    _controller.goBack(webview.BrowserId);
+                    _controller.goBack(webview.browserId);
                   },
                   child: const Icon(Icons.arrow_left),
                 ),
@@ -120,7 +120,7 @@ class _MyAppState extends State<MyApp> {
                 height: 48,
                 child: MaterialButton(
                   onPressed: () {
-                    _controller.goForward(webview.BrowserId);
+                    _controller.goForward(webview.browserId);
                   },
                   child: const Icon(Icons.arrow_right),
                 ),
@@ -129,7 +129,7 @@ class _MyAppState extends State<MyApp> {
                 height: 48,
                 child: MaterialButton(
                   onPressed: () {
-                    _controller.openDevTools(webview.BrowserId);
+                    _controller.openDevTools(webview.browserId);
                   },
                   child: const Icon(Icons.developer_mode),
                 ),
@@ -138,7 +138,7 @@ class _MyAppState extends State<MyApp> {
                 child: TextField(
                   controller: _textController,
                   onSubmitted: (url) {
-                    _controller.loadUrl(webview.BrowserId, url);
+                    _controller.loadUrl(webview.browserId, url);
                     _controller.visitAllCookies();
                     Future.delayed(const Duration(milliseconds: 100), () {
                       if (url == "baidu.com") {
