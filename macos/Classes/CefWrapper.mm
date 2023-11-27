@@ -20,15 +20,20 @@ NSObject<FlutterTextureRegistry>* tr;
 CGFloat scaleFactor = 0.0;
 
 static NSTimer* _timer;
-static CVPixelBufferRef buf_cache;
-static CVPixelBufferRef buf_temp;
-dispatch_semaphore_t lock = dispatch_semaphore_create(1);
 
-int64_t textureId;
-
+NSMutableDictionary* renderers = [[NSMutableDictionary alloc] init];
 FlutterMethodChannel* f_channel;
 
 @implementation CefWrapper
+@synthesize textureId = _textureId;
+
+- (id) init {
+    self = [super init];
+    if (self) {
+        _lock = dispatch_semaphore_create(1);
+    }
+    return self;
+}
 
 + (NSObject *)encode_wvalue_to_flvalue: (WValue*)args {
     WValueType type = webview_value_get_type(args);
@@ -36,7 +41,7 @@ FlutterMethodChannel* f_channel;
         case Webview_Value_Type_Bool:
             return [NSNumber numberWithBool:webview_value_get_bool(args)];
         case Webview_Value_Type_Int:
-            return [NSNumber numberWithInt:webview_value_get_int(args)];
+            return [NSNumber numberWithLongLong:webview_value_get_int(args)];
         case Webview_Value_Type_Float:
             return [NSNumber numberWithFloat:webview_value_get_float(args)];
         case Webview_Value_Type_Double:
@@ -54,16 +59,16 @@ FlutterMethodChannel* f_channel;
         case Webview_Value_Type_Double_List:
             return [NSData dataWithBytes:webview_value_get_double_list(args) length:webview_value_get_len(args)];
         case Webview_Value_Type_List: {
-            int len = webview_value_get_len(args);
+            int64_t len = webview_value_get_len(args);
             NSMutableArray* array = [NSMutableArray arrayWithCapacity:len];
-            for(int i = 0; i < len; i++) {
+            for(int64_t i = 0; i < len; i++) {
                 WValue* item = webview_value_get_value(args, i);
                 [array addObject:[self encode_wvalue_to_flvalue:item]];
             }
             return array;
         }
         case Webview_Value_Type_Map: {
-            int len = webview_value_get_len(args);
+            int64_t len = webview_value_get_len(args);
             NSMutableDictionary* dic = [NSMutableDictionary dictionaryWithCapacity:len];
             for(int i = 0; i < len; i++) {
                 NSString *key = [self encode_wvalue_to_flvalue:webview_value_get_key(args, i)];
@@ -208,13 +213,49 @@ FlutterMethodChannel* f_channel;
     return modifiers;
 }
 
+- (void)onFrame:(const void *)buffer width:(int64_t)width height:(int64_t)height{
+    NSDictionary* dic = @{
+        (__bridge NSString*)kCVPixelBufferPixelFormatTypeKey: @(kCVPixelFormatType_32BGRA),
+        (__bridge NSString*)kCVPixelBufferIOSurfacePropertiesKey : @{},
+        (__bridge NSString*)kCVPixelBufferOpenGLCompatibilityKey : @YES,
+        (__bridge NSString*)kCVPixelBufferMetalCompatibilityKey : @YES,
+    };
+            
+    static CVPixelBufferRef buf = NULL;
+    CVPixelBufferCreate(kCFAllocatorDefault,  width,
+                                height, kCVPixelFormatType_32BGRA,
+                                (__bridge CFDictionaryRef)dic, &buf);
+            
+    //copy data
+    CVPixelBufferLockBaseAddress(buf, 0);
+    char *copyBaseAddress = (char *) CVPixelBufferGetBaseAddress(buf);
+            
+    //MUST align pixel to _pixelBuffer. Otherwise cause render issue. see https://www.codeprintr.com/thread/6563066.html about 16 bytes align
+    size_t bytesPerRow = CVPixelBufferGetBytesPerRowOfPlane(buf, 0);
+    char* src = (char*) buffer;
+    int actureRowSize = width * 4;
+    for(int line = 0; line < height; line++) {
+        memcpy(copyBaseAddress, src, actureRowSize);
+        src += actureRowSize;
+        copyBaseAddress += bytesPerRow;
+    }
+    CVPixelBufferUnlockBaseAddress(buf, 0);
+            
+    dispatch_semaphore_wait(_lock, DISPATCH_TIME_FOREVER);
+    if(_pixelBuffer) {
+        CVPixelBufferRelease(_pixelBuffer);
+    }
+    _pixelBuffer = buf;
+    dispatch_semaphore_signal(_lock);
+    [tr textureFrameAvailable:_textureId];
+}
 
 - (CVPixelBufferRef _Nullable)copyPixelBuffer {
-    dispatch_semaphore_wait(lock, DISPATCH_TIME_FOREVER);
-    buf_temp = buf_cache;
-    CVPixelBufferRetain(buf_temp);
-    dispatch_semaphore_signal(lock);
-    return buf_temp;
+    dispatch_semaphore_wait(_lock, DISPATCH_TIME_FOREVER);
+    _pixelBufferTemp = _pixelBuffer;
+    CVPixelBufferRetain(_pixelBufferTemp);
+    dispatch_semaphore_signal(_lock);
+    return _pixelBufferTemp;
 }
 
 + (void)setMethodChannel: (FlutterMethodChannel*)channel {
@@ -233,43 +274,12 @@ FlutterMethodChannel* f_channel;
 + (NSObject*) handleMethodCallWrapper: (FlutterMethodCall*)call{
     std::string name = std::string([call.method cStringUsingEncoding:NSUTF8StringEncoding]);
     if(name.compare("init") == 0){
-        textureId = [tr registerTexture:[CefWrapper alloc]];
         WValue *userAgent = [self encode_flvalue_to_wvalue:call.arguments];
-        auto callback = [](const void* buffer, int32_t width, int32_t height) {
-            NSDictionary* dic = @{
-                (__bridge NSString*)kCVPixelBufferPixelFormatTypeKey: @(kCVPixelFormatType_32BGRA),
-                (__bridge NSString*)kCVPixelBufferIOSurfacePropertiesKey : @{},
-                (__bridge NSString*)kCVPixelBufferOpenGLCompatibilityKey : @YES,
-                (__bridge NSString*)kCVPixelBufferMetalCompatibilityKey : @YES,
-            };
-            
-            static CVPixelBufferRef buf = NULL;
-            CVPixelBufferCreate(kCFAllocatorDefault,  width,
-                                height, kCVPixelFormatType_32BGRA,
-                                (__bridge CFDictionaryRef)dic, &buf);
-            
-            //copy data
-            CVPixelBufferLockBaseAddress(buf, 0);
-            char *copyBaseAddress = (char *) CVPixelBufferGetBaseAddress(buf);
-            
-            //MUST align pixel to pixelBuffer. Otherwise cause render issue. see https://www.codeprintr.com/thread/6563066.html about 16 bytes align
-            size_t bytesPerRow = CVPixelBufferGetBytesPerRowOfPlane(buf, 0);
-            char* src = (char*) buffer;
-            int actureRowSize = width * 4;
-            for(int line = 0; line < height; line++) {
-                memcpy(copyBaseAddress, src, actureRowSize);
-                src += actureRowSize;
-                copyBaseAddress += bytesPerRow;
+        auto callback = [](int64_t textureId, const void* buffer, int32_t width, int32_t height) {
+            CefWrapper *renderer = [renderers objectForKey:[NSNumber numberWithLong:textureId]];
+            if (renderer != nil) {
+                [renderer onFrame:buffer width:width height:height];
             }
-            CVPixelBufferUnlockBaseAddress(buf, 0);
-            
-            dispatch_semaphore_wait(lock, DISPATCH_TIME_FOREVER);
-            if(buf_cache) {
-                CVPixelBufferRelease(buf_cache);
-            }
-            buf_cache = buf;
-            dispatch_semaphore_signal(lock);
-            [tr textureFrameAvailable:textureId];
         };
         webview_cef::initCEFProcesses();
         webview_cef::setUserAgent(userAgent);
@@ -288,7 +298,30 @@ FlutterMethodChannel* f_channel;
             [self processKeyboardEvent:event];
             return event;
         }];
+    }else if(name.compare("dispose") == 0){
+        [_timer invalidate];
+        _timer = nil;
+        [renderers removeAllObjects];
+        renderers = nil;
+        webview_cef::closeAllBrowser();
+    }else if(name.compare("create") == 0){
+        int browserId = [((NSNumber *)call.arguments) intValue];
+        CefWrapper *renderer = [[CefWrapper alloc] init];
+        int64_t textureId = [tr registerTexture:renderer];
+        renderer.textureId = textureId;
+        [renderers setObject:renderer forKey:[NSNumber numberWithLong:textureId]];
+        webview_cef::createBrowser(textureId, browserId);
         return [NSNumber numberWithLong:textureId];
+    }else if(name.compare("close") == 0){
+        NSArray<NSNumber *> *args = (NSArray *)call.arguments;
+        int64_t textureId = [args[0] longValue];
+        int browserId = [args[1] intValue];
+        CefWrapper *renderer = [renderers objectForKey:[NSNumber numberWithLong:textureId]];
+        if (renderer != nil) {
+            [renderers removeObjectForKey:[NSNumber numberWithLong:textureId]];
+            [tr unregisterTexture:textureId];
+            webview_cef::closeBrowser(browserId);
+        }
     }else{
         WValue *encodeArgs = [self encode_flvalue_to_wvalue:call.arguments];
         WValue *responseArgs = nullptr;

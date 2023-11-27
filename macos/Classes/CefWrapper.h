@@ -13,6 +13,13 @@ extern NSObject<FlutterTextureRegistry>* tr;
 extern CGFloat scaleFactor;
 
 @interface CefWrapper : NSObject<FlutterTexture>
+{
+    int64_t _textureId;
+    CVPixelBufferRef _pixelBuffer;
+    CVPixelBufferRef _pixelBufferTemp;
+    dispatch_semaphore_t _lock;
+}
+@property(nonatomic) int64_t textureId;
 
 + (void)setMethodChannel: (FlutterMethodChannel*)channel;
 + (FlutterResult) handleMethodCallWrapper: (FlutterMethodCall*)call;

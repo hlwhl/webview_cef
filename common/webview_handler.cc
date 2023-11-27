@@ -184,7 +184,7 @@ void WebviewHandler::OnLoadError(CefRefPtr<CefBrowser> browser,
 void WebviewHandler::CloseAllBrowsers(bool force_close) {
     if (!CefCurrentlyOn(TID_UI)) {
         //Execute on the UI thread.
-           CefPostTask(TID_UI, base::BindOnce(&WebviewHandler::CloseAllBrowsers, this, force_close));
+        //    CefPostTask(TID_UI, base::BindOnce(&WebviewHandler::CloseAllBrowsers, this, force_close));
         return;
     }
     
