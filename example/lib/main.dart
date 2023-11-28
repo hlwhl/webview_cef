@@ -15,12 +15,14 @@ class MyApp extends StatefulWidget {
 }
 
 class _MyAppState extends State<MyApp> {
-  final _controller = WebViewController();
+  final WebViewController _controller =
+      WebviewManager().createWebView(const Text("not initialized"));
+  final WebViewController _controller2 =
+      WebviewManager().createWebView(const Text("not initialized"));
+
   final _textController = TextEditingController();
   String title = "";
   Map<String, dynamic> allCookies = {};
-  late WebView webview = _controller.createWebView();
-  late WebView webview2 = _controller.createWebView();
 
   @override
   void initState() {
@@ -33,8 +35,6 @@ class _MyAppState extends State<MyApp> {
     String url = "https://flutter.dev/";
     _textController.text = url;
     //unified interface for all platforms set user agent
-    _controller.setUserAgent("abctest!");
-    await _controller.initialize();
     _controller.setWebviewListener(WebviewEventsListener(
       onTitleChanged: (t) {
         setState(() {
@@ -44,19 +44,12 @@ class _MyAppState extends State<MyApp> {
       onUrlChanged: (url) {
         _textController.text = url;
       },
-      onAllCookiesVisited: (cookies) {
-        allCookies = cookies;
-      },
-      onUrlCookiesVisited: (cookies) {
-        for (final key in cookies.keys) {
-          allCookies[key] = cookies[key];
-        }
-      },
     ));
 
-    _controller.loadUrl(webview.browserId, _textController.text);
-    _controller.loadUrl(webview2.browserId, "https://www.baidu.com/");
-
+    await _controller.initialize();
+    await _controller2.initialize();
+    await _controller.loadUrl(_textController.text);
+    _controller2.loadUrl("www.baidu.com");
     // ignore: prefer_collection_literals
     final Set<JavascriptChannel> jsChannels = [
       JavascriptChannel(
@@ -67,15 +60,13 @@ class _MyAppState extends State<MyApp> {
                 false,
                 "{'code':'200','message':'print succeed!'}",
                 message.callbackId,
-                webview.browserId,
                 message.frameId);
           }),
     ].toSet();
     //normal JavaScriptChannels
-    _controller.setJavaScriptChannels(webview.browserId, jsChannels);
+    _controller.setJavaScriptChannels(jsChannels);
     //also you can build your own jssdk by execute JavaScript code to CEF
-    _controller.executeJavaScript(
-        webview.browserId, "function abc(e){console.log(e)}");
+    _controller.executeJavaScript("function abc(e){console.log(e)}");
 
     // If the widget was removed from the tree while the asynchronous platform
     // message was in flight, we want to discard the reply rather than calling
@@ -102,7 +93,7 @@ class _MyAppState extends State<MyApp> {
                 height: 48,
                 child: MaterialButton(
                   onPressed: () {
-                    _controller.reload(webview.browserId);
+                    _controller.reload();
                   },
                   child: const Icon(Icons.refresh),
                 ),
@@ -111,7 +102,7 @@ class _MyAppState extends State<MyApp> {
                 height: 48,
                 child: MaterialButton(
                   onPressed: () {
-                    _controller.goBack(webview.browserId);
+                    _controller.goBack();
                   },
                   child: const Icon(Icons.arrow_left),
                 ),
@@ -120,7 +111,7 @@ class _MyAppState extends State<MyApp> {
                 height: 48,
                 child: MaterialButton(
                   onPressed: () {
-                    _controller.goForward(webview.browserId);
+                    _controller.goForward();
                   },
                   child: const Icon(Icons.arrow_right),
                 ),
@@ -129,7 +120,7 @@ class _MyAppState extends State<MyApp> {
                 height: 48,
                 child: MaterialButton(
                   onPressed: () {
-                    _controller.openDevTools(webview.browserId);
+                    _controller.openDevTools();
                   },
                   child: const Icon(Icons.developer_mode),
                 ),
@@ -138,15 +129,15 @@ class _MyAppState extends State<MyApp> {
                 child: TextField(
                   controller: _textController,
                   onSubmitted: (url) {
-                    _controller.loadUrl(webview.browserId, url);
-                    _controller.visitAllCookies();
+                    _controller.loadUrl(url);
+                    WebviewManager().visitAllCookies();
                     Future.delayed(const Duration(milliseconds: 100), () {
                       if (url == "baidu.com") {
                         if (!allCookies.containsKey('.$url') ||
                             !Map.of(allCookies['.$url']).containsKey('test')) {
-                          _controller.setCookie(url, 'test', 'test123');
+                          WebviewManager().setCookie(url, 'test', 'test123');
                         } else {
-                          _controller.deleteCookie(url, 'test');
+                          WebviewManager().deleteCookie(url, 'test');
                         }
                       }
                     });
@@ -155,13 +146,17 @@ class _MyAppState extends State<MyApp> {
               ),
             ],
           ),
-          // _controller.value ? Expanded(child: webview) : const Text("not init"),
           Expanded(
-            child: Row(children: [
-              Expanded(child: webview),
-              Expanded(child: webview2),
-            ]),
-          )
+              child: Row(
+            children: [
+              _controller.value
+                  ? Expanded(child: _controller.webviewWidget)
+                  : _controller.loadingWidget,
+              _controller2.value
+                  ? Expanded(child: _controller2.webviewWidget)
+                  : _controller2.loadingWidget,
+            ],
+          ))
         ],
       )),
     );

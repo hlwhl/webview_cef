@@ -17,7 +17,7 @@
 
 namespace webview_cef {
 
-	class WebviewTextureRenderer{
+	class WebviewTextureRenderer : public WebviewTexture{
 	public:
 		WebviewTextureRenderer(flutter::TextureRegistrar* texture_registrar) {
 			registrar_ = texture_registrar;
@@ -28,7 +28,7 @@ namespace webview_cef {
 			textureId = registrar_->RegisterTexture(texture.get());
 		}
 
-		~WebviewTextureRenderer() {
+		virtual ~WebviewTextureRenderer() {
 			std::lock_guard<std::mutex> autolock(mutex_);
 			if (pixel_buffer && pixel_buffer->buffer) {
 				delete[] pixel_buffer->buffer;
@@ -45,7 +45,7 @@ namespace webview_cef {
     		return pixel_buffer.get();
 		}
 
-		void onframe(const void* buffer, int width, int height){
+		virtual void onFrame(const void* buffer, int width, int height) override{
 			const std::lock_guard<std::mutex> autolock(mutex_);
 			if (!pixel_buffer.get() || pixel_buffer.get()->width != width || pixel_buffer.get()->height != height) {
 				if (!pixel_buffer.get()) {
@@ -59,7 +59,7 @@ namespace webview_cef {
 				pixel_buffer->buffer = backing_pixel_buffer.get();
 			}
 
-			webview_cef::SwapBufferFromBgraToRgba((void*)pixel_buffer->buffer, buffer, width, height);
+			SwapBufferFromBgraToRgba((void*)pixel_buffer->buffer, buffer, width, height);
 			if(registrar_){
 				registrar_->MarkTextureFrameAvailable(textureId);
 			}
@@ -67,14 +67,12 @@ namespace webview_cef {
 
 		flutter::TextureRegistrar* registrar_ = nullptr;
 		std::unique_ptr<flutter::TextureVariant> texture;
-		int64_t textureId;
 		mutable std::shared_ptr<FlutterDesktopPixelBuffer> pixel_buffer;
 		std::unique_ptr<uint8_t> backing_pixel_buffer;
 		mutable std::mutex mutex_;
 	};
 
 	flutter::TextureRegistrar* texture_registrar;
-	std::unordered_map<int64_t, std::shared_ptr<WebviewTextureRenderer>> renderers;
 	std::unique_ptr<
 		flutter::MethodChannel<flutter::EncodableValue>,
 		std::default_delete<flutter::MethodChannel<flutter::EncodableValue>>>
@@ -209,8 +207,14 @@ namespace webview_cef {
 			flutter::EncodableValue args = encode_wvalue_to_flvalue(arguments);
 			channel->InvokeMethod(method, std::make_unique<flutter::EncodableValue>(args));
   		};
-  		webview_cef::setInvokeMethodFunc(invoke);
+  		setInvokeMethodFunc(invoke);
 
+		auto createTexture = [=]() {
+			std::shared_ptr<WebviewTextureRenderer> renderer = std::make_shared<WebviewTextureRenderer>(texture_registrar);
+			return std::dynamic_pointer_cast<WebviewTexture>(renderer);
+		};
+		setCreateTextureFunc(createTexture);
+		
 		registrar->AddPlugin(std::move(plugin));
 	}
 
@@ -221,58 +225,23 @@ namespace webview_cef {
 	void WebviewCefPlugin::HandleMethodCall(
 		const flutter::MethodCall<flutter::EncodableValue>& method_call,
 		std::unique_ptr<flutter::MethodResult<flutter::EncodableValue>> result) {
-		if (method_call.method_name().compare("init") == 0) {
-			WValue *userAgent = encode_flvalue_to_wvalue(const_cast<flutter::EncodableValue *>(method_call.arguments()));
-			auto callback = [=](int64_t textureId, const void* buffer, int32_t width, int32_t height) {
-				auto renderer = renderers[textureId];
-				renderer->onframe(buffer, width, height);
-			};
-			webview_cef::setUserAgent(userAgent);
-			webview_cef::setPaintCallBack(callback);
-			webview_value_unref(userAgent);
-			result->Success(nullptr);
+		WValue *encodeArgs = encode_flvalue_to_wvalue(const_cast<flutter::EncodableValue *>(method_call.arguments()));
+		WValue *responseArgs = nullptr;
+		int ret = webview_cef::HandleMethodCall(method_call.method_name(), encodeArgs, &responseArgs);
+		if (ret > 0)
+		{
+			result->Success(encode_wvalue_to_flvalue(responseArgs));
 		}
-		else if(method_call.method_name().compare("dispose") == 0){
-			for(auto render : renderers){
-				delete render.second.get();
-			}
-			renderers.clear();
-			webview_cef::closeAllBrowser();
-			result->Success();
+		else if (ret < 0)
+		{
+			result->Error("error", "error", encode_wvalue_to_flvalue(responseArgs));
 		}
-		else if(method_call.method_name().compare("create") == 0){
-			int browserId = *std::get_if<int>(method_call.arguments());
-			std::shared_ptr<WebviewTextureRenderer> renderer = std::make_shared<WebviewTextureRenderer>(texture_registrar);
-			int64_t textureId = renderer->textureId;
-			renderers[renderer->textureId] = renderer;
-			webview_cef::createBrowser(textureId, browserId);
-			result->Success(flutter::EncodableValue(textureId));
+		else
+		{
+			result->NotImplemented();
 		}
-		else if(method_call.method_name().compare("close") == 0){
-			int64_t textureId = *std::get_if<int64_t>(method_call.arguments());
-			int browserId = *std::get_if<int>(method_call.arguments());
-			auto renderer = renderers[textureId];
-			delete renderer.get();
-			renderers.erase(textureId);
-			webview_cef::closeBrowser(browserId);
-			result->Success(nullptr);
-		}
-		else{
-			WValue *encodeArgs = encode_flvalue_to_wvalue(const_cast<flutter::EncodableValue *>(method_call.arguments()));
-			WValue *responseArgs = nullptr;
-			int ret = webview_cef::HandleMethodCall(method_call.method_name(), encodeArgs, responseArgs);
-			if (ret > 0){
-				result->Success(encode_wvalue_to_flvalue(responseArgs));
-			}
-			else if (ret < 0){
-				result->Error("error", "error", encode_wvalue_to_flvalue(responseArgs));
-			}
-			else{
-				result->NotImplemented();
-			}
-			webview_value_unref(encodeArgs);
-			webview_value_unref(responseArgs);
-		}
+		webview_value_unref(encodeArgs);
+		webview_value_unref(responseArgs);
 	}
 
 }  // namespace webview_cef

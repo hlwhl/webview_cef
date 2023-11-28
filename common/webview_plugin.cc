@@ -15,6 +15,8 @@ namespace webview_cef {
 	bool init = false;
 	bool isFocused = false;
 	std::function<void(std::string, WValue*)> invokeFunc;
+	std::function<std::shared_ptr<WebviewTexture>()> createTextureFunc;
+	std::unordered_map<int64_t, std::shared_ptr<WebviewTexture>> renderers;
     
     CefRefPtr<WebviewHandler> handler(new WebviewHandler());
     CefRefPtr<WebviewApp> app(new WebviewApp(handler));
@@ -46,6 +48,162 @@ namespace webview_cef {
 		return 1;
 	}
 
+	static void initCefEngine() {
+		if (!init)
+		{
+			handler.get()->onPaintCallback = [=](int64_t textureId, const void* buffer, int32_t width, int32_t height) {
+				if (renderers.find(textureId) != renderers.end()) {
+					renderers[textureId]->onFrame(buffer, width, height);
+				}
+			};
+
+			handler.get()->onUrlChangedCb = [](int browserId, std::string url)
+			{
+				if (invokeFunc)
+				{
+					WValue* bId = webview_value_new_int(browserId);
+					WValue* wUrl = webview_value_new_string(const_cast<char*>(url.c_str()));
+					WValue* retMap = webview_value_new_map();
+					webview_value_set_string(retMap, "browserId", bId);
+					webview_value_set_string(retMap, "url", wUrl);
+					invokeFunc("urlChanged", retMap);
+					webview_value_unref(bId);
+					webview_value_unref(wUrl);
+					webview_value_unref(retMap);
+				}
+			};
+
+			handler.get()->onTitleChangedCb = [](int browserId, std::string title)
+			{
+				if (invokeFunc)
+				{
+					WValue* bId = webview_value_new_int(browserId);
+					WValue* wTitle = webview_value_new_string(const_cast<char*>(title.c_str()));
+					WValue* retMap = webview_value_new_map();
+					webview_value_set_string(retMap, "browserId", bId);
+					webview_value_set_string(retMap, "title", wTitle);
+					invokeFunc("titleChanged", retMap);
+					webview_value_unref(bId);
+					webview_value_unref(wTitle);
+					webview_value_unref(retMap);
+				}
+			};
+
+			handler.get()->onAllCookieVisitedCb = [](std::map<std::string, std::map<std::string, std::string>> cookies)
+			{
+				if (invokeFunc)
+				{
+					WValue* retMap = webview_value_new_map();
+					for (auto& cookie : cookies)
+					{
+						WValue* tempMap = webview_value_new_map();
+						for (auto& c : cookie.second)
+						{
+							WValue* val = webview_value_new_string(const_cast<char*>(c.second.c_str()));
+							webview_value_set_string(tempMap, c.first.c_str(), val);
+							webview_value_unref(val);
+						}
+						webview_value_set_string(retMap, cookie.first.c_str(), tempMap);
+						webview_value_unref(tempMap);
+					}
+					invokeFunc("allCookiesVisited", retMap);
+					webview_value_unref(retMap);
+				}
+			};
+
+			handler.get()->onUrlCookieVisitedCb = [](std::map<std::string, std::map<std::string, std::string>> cookies)
+			{
+				if (invokeFunc)
+				{
+					WValue* retMap = webview_value_new_map();
+					for (auto& cookie : cookies)
+					{
+						WValue* tempMap = webview_value_new_map();
+						for (auto& c : cookie.second)
+						{
+							WValue* val = webview_value_new_string(const_cast<char*>(c.second.c_str()));
+							webview_value_set_string(tempMap, c.first.c_str(), val);
+							webview_value_unref(val);
+						}
+						webview_value_set_string(retMap, cookie.first.c_str(), tempMap);
+						webview_value_unref(tempMap);
+					}
+					invokeFunc("urlCookiesVisited", retMap);
+					webview_value_unref(retMap);
+				}
+			};
+
+			handler.get()->onJavaScriptChannelMessage = [](std::string channelName, std::string message, std::string callbackId, int browserId, std::string frameId)
+			{
+				if (invokeFunc)
+				{
+					WValue* retMap = webview_value_new_map();
+					WValue* channel = webview_value_new_string(const_cast<char*>(channelName.c_str()));
+					WValue* msg = webview_value_new_string(const_cast<char*>(message.c_str()));
+					WValue* cbId = webview_value_new_string(const_cast<char*>(callbackId.c_str()));
+					WValue* bId = webview_value_new_int(browserId);
+					WValue* fId = webview_value_new_string(const_cast<char*>(frameId.c_str()));
+					webview_value_set_string(retMap, "channel", channel);
+					webview_value_set_string(retMap, "message", msg);
+					webview_value_set_string(retMap, "callbackId", cbId);
+					webview_value_set_string(retMap, "browserId", bId);
+					webview_value_set_string(retMap, "frameId", fId);
+					invokeFunc("javascriptChannelMessage", retMap);
+					webview_value_unref(retMap);
+					webview_value_unref(channel);
+					webview_value_unref(msg);
+					webview_value_unref(cbId);
+					webview_value_unref(bId);
+					webview_value_unref(fId);
+				}
+			};
+
+			handler.get()->onFocusedNodeChangeMessage = [](int nBrowserId, bool bEditable)
+			{
+				if (invokeFunc)
+				{
+					WValue* bId = webview_value_new_int(int64_t(nBrowserId));
+					WValue* editable = webview_value_new_bool(bEditable);
+					WValue* retMap = webview_value_new_map();
+					webview_value_set_string(retMap, "browserId", bId);
+					webview_value_set_string(retMap, "editable", editable);
+					invokeFunc("onFocusedNodeChangeMessage", retMap);
+					webview_value_unref(bId);
+					webview_value_unref(editable);
+					webview_value_unref(retMap);
+				}
+			};
+
+			handler.get()->onImeCompositionRangeChangedMessage = [](int nBrowserId, int32_t x, int32_t y)
+			{
+				if (invokeFunc)
+				{
+					WValue* bId = webview_value_new_int(nBrowserId);
+					WValue* retMap = webview_value_new_map();
+					WValue* xValue = webview_value_new_int(x);
+					WValue* yValue = webview_value_new_int(y);
+					webview_value_set_string(retMap, "browserId", bId);
+					webview_value_set_string(retMap, "x", xValue);
+					webview_value_set_string(retMap, "y", yValue);
+					invokeFunc("onImeCompositionRangeChangedMessage", retMap);
+					webview_value_unref(bId);
+					webview_value_unref(xValue);
+					webview_value_unref(yValue);
+					webview_value_unref(retMap);
+				}
+			};
+
+#if defined(OS_WIN)
+			//windows run in multi thread
+			new std::thread(startCEF);
+#else
+			//mac、linux run in main thread 
+			startCEF();
+#endif
+			init = true;
+		}
+	}
+
     void initCEFProcesses(CefMainArgs args){
 		mainArgs = args;
 	    CefExecuteProcess(mainArgs, app, nullptr);
@@ -67,29 +225,6 @@ namespace webview_cef {
 	        handler.get()->sendKeyEvent(ev);
 		}
     }
-
-    void createBrowser(int64_t textureId, int browserId)
-    {
-		// Specify CEF browser settings here.
-		CefBrowserSettings browser_settings;
-		browser_settings.windowless_frame_rate = 60;
-				
-		CefWindowInfo window_info;
-		window_info.SetAsWindowless(0);
-
-		// create browser
-		CefBrowserHost::CreateBrowser(window_info, handler, "", browser_settings, nullptr, nullptr);
-		handler->setBrowserId(textureId, browserId);
-    }
-
-	void closeBrowser(int browserId)
-    {
-		handler->closeBrowser(browserId);
-    }
-
-	void closeAllBrowser(){
-		handler->CloseAllBrowsers(true);
-	}
 
     void startCEF()
     {
@@ -113,9 +248,39 @@ namespace webview_cef {
 		CefDoMessageLoopWork();
     }
 
-    int HandleMethodCall(std::string name, WValue* values, WValue* response) {
+    int HandleMethodCall(std::string name, WValue* values, WValue** response) {
         int result = -1;
-		if (name.compare("loadUrl") == 0) {
+		if (name.compare("init") == 0){
+			setUserAgent(values);
+			initCefEngine();
+			result = 1;
+		}
+		else if (name.compare("dispose") == 0) {
+			for(auto render : renderers){
+				delete render.second.get();
+			}
+			handler->CloseAllBrowsers(true);
+			result = 1;
+		}
+		else if (name.compare("create") == 0) {
+			std::shared_ptr<WebviewTexture> renderer = createTextureFunc();
+			int64_t textureId = renderer->textureId;
+			renderers[textureId] = renderer;
+			handler->createBrowser(textureId);
+			result = 1;
+			*response = webview_value_new_int(textureId);
+		}
+		else if (name.compare("close") == 0) {
+			int64_t textureId = webview_value_get_int(webview_value_get_list_value(values, 0));
+			int browserId = int(webview_value_get_int(webview_value_get_list_value(values, 1)));
+			if(renderers.find(textureId) != renderers.end()){
+				delete renderers[textureId].get();
+				renderers.erase(textureId);
+			}
+			handler->closeBrowser(browserId);
+			result = 1;
+		}
+		else if (name.compare("loadUrl") == 0) {
 			int browserId = int(webview_value_get_int(webview_value_get_list_value(values, 0)));
 			const auto url = webview_value_get_string(webview_value_get_list_value(values, 1));
 			if(url != nullptr){
@@ -234,9 +399,6 @@ namespace webview_cef {
 		else {
 			result = 0;
 		}
-		if(response == nullptr){
-			response = webview_value_new_null();
-		}
         return result;
 	}
 
@@ -260,141 +422,16 @@ namespace webview_cef {
 		globalUserAgent = CefString(webview_value_get_string(userAgent));
 	}
 
-	void setPaintCallBack(std::function<void(int64_t textureId, const void *, int32_t, int32_t)> callback)	{
-		if (!init)
-		{
-			handler.get()->onPaintCallback = callback;
-			handler.get()->onUrlChangedCb = [](std::string url)
-			{
-				if (invokeFunc)
-				{
-					WValue *wUrl = webview_value_new_string(const_cast<char *>(url.c_str()));
-					invokeFunc("urlChanged", wUrl);
-					webview_value_unref(wUrl);
-				}
-			};
-
-			handler.get()->onTitleChangedCb = [](std::string title)
-			{
-				if (invokeFunc)
-				{
-					WValue *wTitle = webview_value_new_string(const_cast<char *>(title.c_str()));
-					invokeFunc("titleChanged", wTitle);
-					webview_value_unref(wTitle);
-				}
-			};
-
-			handler.get()->onAllCookieVisitedCb = [](std::map<std::string, std::map<std::string, std::string>> cookies)
-			{
-				if (invokeFunc)
-				{
-					WValue* retMap = webview_value_new_map();
-					for (auto &cookie : cookies)
-					{
-						WValue* tempMap = webview_value_new_map();
-						for (auto &c : cookie.second)
-						{
-							WValue * val = webview_value_new_string(const_cast<char *>(c.second.c_str()));
-							webview_value_set_string(tempMap, c.first.c_str(), val);
-							webview_value_unref(val);
-						}
-						webview_value_set_string(retMap, cookie.first.c_str(), tempMap);
-						webview_value_unref(tempMap);
-					}
-					invokeFunc("allCookiesVisited", retMap);
-					webview_value_unref(retMap);
-				}
-			};
-
-			handler.get()->onUrlCookieVisitedCb = [](std::map<std::string, std::map<std::string, std::string>> cookies)
-			{
-				if (invokeFunc)
-				{
-					WValue* retMap = webview_value_new_map();
-					for (auto &cookie : cookies)
-					{
-						WValue* tempMap = webview_value_new_map();
-						for (auto &c : cookie.second)
-						{
-							WValue * val = webview_value_new_string(const_cast<char *>(c.second.c_str()));
-							webview_value_set_string(tempMap, c.first.c_str(), val);
-							webview_value_unref(val);
-						}
-						webview_value_set_string(retMap, cookie.first.c_str(), tempMap);
-						webview_value_unref(tempMap);
-					}
-					invokeFunc("urlCookiesVisited", retMap);
-					webview_value_unref(retMap);
-				}
-			};
-
-			handler.get()->onJavaScriptChannelMessage = [](std::string channelName, std::string message, std::string callbackId, int browserId, std::string frameId)
-			{
-				if (invokeFunc)
-				{
-					WValue* retMap = webview_value_new_map();
-					WValue* channel = webview_value_new_string(const_cast<char *>(channelName.c_str()));
-					WValue* msg = webview_value_new_string(const_cast<char *>(message.c_str()));
-					WValue* cbId = webview_value_new_string(const_cast<char *>(callbackId.c_str()));
-					WValue* bId = webview_value_new_int(browserId);
-					WValue* fId = webview_value_new_string(const_cast<char *>(frameId.c_str()));
-					webview_value_set_string(retMap, "channel", channel);
-					webview_value_set_string(retMap, "message", msg);
-					webview_value_set_string(retMap, "callbackId", cbId);
-					webview_value_set_string(retMap, "browserId", bId);
-					webview_value_set_string(retMap, "frameId", fId);
-					invokeFunc("javascriptChannelMessage", retMap);
-					webview_value_unref(retMap);
-					webview_value_unref(channel);
-					webview_value_unref(msg);
-					webview_value_unref(cbId);
-					webview_value_unref(bId);
-					webview_value_unref(fId);
-				}
-			};
-      
-			handler.get()->onFocusedNodeChangeMessage = [](bool editable)
-			{
-				if (invokeFunc)
-				{
-					WValue* value = webview_value_new_bool(editable);
-					invokeFunc("onFocusedNodeChangeMessage", value);
-					webview_value_unref(value);
-				}
-			};
-
-			handler.get()->onImeCompositionRangeChangedMessage = [](int32_t x, int32_t y)
-			{
-				if (invokeFunc)
-				{
-					WValue *retMap = webview_value_new_map();
-					WValue *xValue = webview_value_new_int(x);
-					WValue *yValue = webview_value_new_int(y);
-					webview_value_set_string(retMap, "x", xValue);
-					webview_value_set_string(retMap, "y", yValue);
-					invokeFunc("onImeCompositionRangeChangedMessage", retMap);
-					webview_value_unref(xValue);
-					webview_value_unref(yValue);
-					webview_value_unref(retMap);
-				}
-			};
-
-#if defined(OS_WIN)
-			//windows run in multi thread
-			new std::thread(startCEF);
-#else
-			//mac、linux run in main thread 
-			startCEF();
-#endif
-			init = true;
-		}
-    }
-
 	void setInvokeMethodFunc(std::function<void(std::string, WValue*)> func){
 		invokeFunc = func;
 	}
 
+	void webview_cef::setCreateTextureFunc(std::function<std::shared_ptr<WebviewTexture>()> func)
+    {
+		createTextureFunc = func;
+    }
+
 	bool getPluginIsFocused() {
 		return isFocused;
-	}
+    }
 }

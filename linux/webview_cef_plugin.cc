@@ -23,7 +23,7 @@ G_DEFINE_TYPE(WebviewCefPlugin, webview_cef_plugin, g_object_get_type())
 
 static FlTextureRegistrar* texture_register;
 
-class WebviewTextureRenderer{
+class WebviewTextureRenderer : public webview_cef::WebviewTexture{
 public:
   WebviewTextureRenderer(){
     texture = webview_cef_texture_new();
@@ -31,7 +31,11 @@ public:
     textureId = (int64_t)texture;
   }
 
-  void onFrame(const void* buffer, int32_t width, int32_t height){
+  virtual ~WebviewTextureRenderer(){
+    fl_texture_registrar_unregister_texture(texture_register, FL_TEXTURE(texture));
+  }
+
+  virtual void onFrame(const void* buffer, int32_t width, int32_t height) override {
     texture->width = width;
     texture->height = height;
 		const auto size = width * height * 4;
@@ -40,10 +44,7 @@ public:
     fl_texture_registrar_mark_texture_frame_available(texture_register, FL_TEXTURE(texture));
   }
   WebviewCefTexture *texture;
-  int64_t textureId;
 };
-
-static std::unordered_map<int64_t,std::shared_ptr<WebviewTextureRenderer>> renderers;
 
 static FlValue* encode_wavlue_to_flvalue(WValue *args){
 	WValueType type = webview_value_get_type(args);
@@ -179,66 +180,24 @@ static void webview_cef_plugin_handle_method_call(
     FlMethodCall *method_call)
 {
   g_autoptr(FlMethodResponse) response = nullptr;
-
   const gchar *method = fl_method_call_get_name(method_call);
-  FlValue *args = fl_method_call_get_args(method_call);
   FlValue *result = nullptr;
-  if(strcmp(method, "init") == 0){
-    WValue *userAgent = encode_flvalue_to_wvalue(args);
-		auto paintcallback = [=](int64_t textureId, const void* buffer, int32_t width, int32_t height) {
-      auto renderer = renderers[textureId];
-      renderer->onFrame(buffer, width, height);
-		};
-    webview_cef::setUserAgent(userAgent);
-    webview_cef::setPaintCallBack(paintcallback);
-    webview_value_unref(userAgent);
-    g_timeout_add(20, [](gpointer data) -> gboolean {
-      webview_cef::doMessageLoopWork();
-      return TRUE;
-    }, NULL);
-    response = FL_METHOD_RESPONSE(fl_method_success_response_new(nullptr));
-  }else if(strcmp(method, "dispose") == 0){
-    for(auto renderer : renderers){
-      delete renderer.second.get();
-    }
-    renderers.clear();
-    webview_cef::closeAllBrowser();
-    response = FL_METHOD_RESPONSE(fl_method_success_response_new(nullptr));
-  }else if(strcmp(method, "create") == 0){
-    int browserId = int(fl_value_get_int(args));
-    std::shared_ptr<WebviewTextureRenderer> renderer = std::make_shared<WebviewTextureRenderer>();
-    int64_t textureId = renderer->textureId;
-    renderers[textureId] = renderer;
-    webview_cef::createBrowser(textureId, browserId);
-    result = fl_value_new_int(textureId);
+  WValue *encodeArgs = encode_flvalue_to_wvalue(fl_method_call_get_args(method_call));
+  WValue *responseArgs = nullptr;
+  int ret = webview_cef::HandleMethodCall(method, encodeArgs, &responseArgs);
+  webview_value_unref(encodeArgs);
+  if (ret > 0){
+    result = encode_wavlue_to_flvalue(responseArgs);
     response = FL_METHOD_RESPONSE(fl_method_success_response_new(result));
-  }else if(strcmp(method, "close") == 0){
-    int64_t textureId = fl_value_get_int(args);
-    int browserId = int(fl_value_get_int(args));
-    auto renderer = renderers[textureId];
-    delete renderer.get();
-    renderers.erase(textureId);
-    webview_cef::closeBrowser(browserId);
-    response = FL_METHOD_RESPONSE(fl_method_success_response_new(nullptr));
-  }else{
-    WValue *encodeArgs = encode_flvalue_to_wvalue(args);
-    WValue *responseArgs = nullptr;
-    int ret = webview_cef::HandleMethodCall(method, encodeArgs, responseArgs);
-    webview_value_unref(encodeArgs);
-    if (ret > 0){
-      result = encode_wavlue_to_flvalue(responseArgs);
-      response = FL_METHOD_RESPONSE(fl_method_success_response_new(result));
-    }
-    else if (ret < 0){
-      result = encode_wavlue_to_flvalue(responseArgs);
-      response = FL_METHOD_RESPONSE(fl_method_error_response_new("error", "error", result));
-    }
-    else{
-      response = FL_METHOD_RESPONSE(fl_method_not_implemented_response_new());
-    }
-    webview_value_unref(responseArgs);
   }
-
+  else if (ret < 0){
+    result = encode_wavlue_to_flvalue(responseArgs);
+    response = FL_METHOD_RESPONSE(fl_method_error_response_new("error", "error", result));
+  }
+  else{
+    response = FL_METHOD_RESPONSE(fl_method_not_implemented_response_new());
+  }
+  webview_value_unref(responseArgs);
   fl_method_call_respond(method_call, response, nullptr);
   if(result != nullptr){
     fl_value_unref(result);
@@ -286,6 +245,12 @@ void webview_cef_plugin_register_with_registrar(FlPluginRegistrar *registrar)
     fl_value_unref(args);
   };
   webview_cef::setInvokeMethodFunc(invoke);
+
+	auto createTexture = [=]() {
+		std::shared_ptr<WebviewTextureRenderer> renderer = std::make_shared<WebviewTextureRenderer>(texture_registrar);
+		return std::dynamic_pointer_cast<webview_cef::WebviewTexture>(renderer);
+	};
+	setCreateTextureFunc(createTexture);
 
   g_object_unref(plugin);
 }

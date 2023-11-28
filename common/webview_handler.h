@@ -19,6 +19,17 @@
   0x00000000  // White SkColor value for background,
               // same as Blink.
 
+struct browser_info{
+    int64_t textureId = 0;
+    CefRefPtr<CefBrowser> browser;
+    uint32_t width = 1;
+    uint32_t height = 1;
+    float dpi = 1.0;
+    bool is_dragging = false;
+    CefRect prev_ime_position = CefRect();
+    bool is_ime_commit = false;
+};
+
 class WebviewHandler : public CefClient,
 public CefDisplayHandler,
 public CefLifeSpanHandler,
@@ -26,14 +37,15 @@ public CefFocusHandler,
 public CefLoadHandler,
 public CefRenderHandler{
 public:
-    std::function<void(int64_t textureId, const void*, int32_t width, int32_t height)> onPaintCallback;
-    std::function<void(std::string url)> onUrlChangedCb;
-    std::function<void(std::string title)> onTitleChangedCb;
-    std::function<void(std::map<std::string, std::map<std::string, std::string>>)> onAllCookieVisitedCb;
-    std::function<void(std::map<std::string, std::map<std::string, std::string>>)> onUrlCookieVisitedCb;
-    std::function<void(std::string, std::string, std::string, int, std::string)> onJavaScriptChannelMessage;
-    std::function<void(bool editable)> onFocusedNodeChangeMessage;
-    std::function<void(int32_t x, int32_t y)> onImeCompositionRangeChangedMessage;
+    std::function<void(int64_t textureId, const void* buffer, int32_t width, int32_t height)> onPaintCallback;
+    std::function<void(int browserId, std::string url)> onUrlChangedCb;
+    std::function<void(int browserId, std::string title)> onTitleChangedCb;
+    std::function<void(std::string, std::string, std::string, int browserId, std::string)> onJavaScriptChannelMessage;
+    std::function<void(int browserId, bool editable)> onFocusedNodeChangeMessage;
+    std::function<void(int browserId, int32_t x, int32_t y)> onImeCompositionRangeChangedMessage;
+    
+    std::function<void(std::map<std::string, std::map<std::string, std::string>> cookies)> onAllCookieVisitedCb;
+    std::function<void(std::map<std::string, std::map<std::string, std::string>> cookies)> onUrlCookieVisitedCb;
 
     explicit WebviewHandler();
     ~WebviewHandler();
@@ -114,8 +126,8 @@ public:
     // Returns true if the Chrome runtime is enabled.
     static bool IsChromeRuntimeEnabled();
 
-    void setBrowserId(int64_t textureId, int browserId, CefRefPtr<CefBrowser> browser = nullptr);
     void closeBrowser(int browserId);
+    void createBrowser(int64_t textureId);
 
     void sendScrollEvent(int browserId, int x, int y, int deltaX, int deltaY);
     void changeSize(int browserId, float a_dpi, int width, int height);
@@ -143,18 +155,9 @@ public:
     
 private:
     bool getCookieVisitor();
-
-    uint32_t width = 1;
-    uint32_t height = 1;
-    float dpi = 1.0;
-    bool is_dragging = false;
-    CefRect prev_ime_position = CefRect();
-    bool is_ime_commit = false;
     
     // List of existing browser windows. Only accessed on the CEF UI thread.
-    std::unordered_map<int,int64_t> browser_textureId_map_;        // browserId -> textureId
-    typedef std::unordered_map<int, CefRefPtr<CefBrowser>> BrowserMap;
-    BrowserMap browser_map_;
+    std::unordered_map<int, browser_info> browser_map_;
     
     // Include the default reference counting implementation.
     IMPLEMENT_REFCOUNTING(WebviewHandler);

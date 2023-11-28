@@ -21,11 +21,43 @@ CGFloat scaleFactor = 0.0;
 
 static NSTimer* _timer;
 
-NSMutableDictionary* renderers = [[NSMutableDictionary alloc] init];
 FlutterMethodChannel* f_channel;
+
+typedef void(^RetainSelfBlock)(void);
 
 @implementation CefWrapper
 @synthesize textureId = _textureId;
+
+{
+    RetainSelfBlock _retainBlock;//通过这个block持有对象，造成循环引用，避免被释放
+}
+
+class WebviewTextureRenderer : public webview_cef::WebviewTexture {
+public:
+    WebviewTextureRenderer(){
+        wrapped = [[CefWrapper alloc] init];
+        textureId = [tr registerTexture:renderer];
+        wrapped.textureId = textureId;
+        // object->_retainBlock = ^{//循环引用
+        //     [object class];
+        // };
+        // self = (__bridge void *)object;
+    }
+
+    virtual ~WebviewTextureRenderer() {
+        [tr unregisterTexture:textureId];
+        [wrapped release];  
+        // [(__bridge id) self breakRetainCycly];
+    }
+
+    virtual void onFrame(const void* buffer, int width, int height) {
+        [wrapped onFrame:buffer width:width height:height];
+        // return [(__bridge id)self onFrame:buffer width:width height:height];
+    }
+
+private:
+    CefWrapper *wrapped;
+}
 
 - (id) init {
     self = [super init];
@@ -265,6 +297,13 @@ FlutterMethodChannel* f_channel;
         [f_channel invokeMethod:[NSString stringWithUTF8String:method.c_str()] arguments:arg];
     };
     webview_cef::setInvokeMethodFunc(invoke);
+
+	auto createTexture = [=]() {
+		std::shared_ptr<WebviewTextureRenderer> renderer = std::make_shared<WebviewTextureRenderer>(texture_registrar);
+		return std::dynamic_pointer_cast<webview_cef::WebviewTexture>(renderer);
+	};
+	webview_cef::setCreateTextureFunc(createTexture);
+
 }
 
 + (void)doMessageLoopWork {
@@ -274,18 +313,7 @@ FlutterMethodChannel* f_channel;
 + (NSObject*) handleMethodCallWrapper: (FlutterMethodCall*)call{
     std::string name = std::string([call.method cStringUsingEncoding:NSUTF8StringEncoding]);
     if(name.compare("init") == 0){
-        WValue *userAgent = [self encode_flvalue_to_wvalue:call.arguments];
-        auto callback = [](int64_t textureId, const void* buffer, int32_t width, int32_t height) {
-            CefWrapper *renderer = [renderers objectForKey:[NSNumber numberWithLong:textureId]];
-            if (renderer != nil) {
-                [renderer onFrame:buffer width:width height:height];
-            }
-        };
         webview_cef::initCEFProcesses();
-        webview_cef::setUserAgent(userAgent);
-        webview_cef::setPaintCallBack(callback);
-        webview_value_unref(userAgent);
-
         _timer = [NSTimer timerWithTimeInterval:0.016f target:self selector:@selector(doMessageLoopWork) userInfo:nil repeats:YES];
         [[NSRunLoop mainRunLoop] addTimer: _timer forMode:NSRunLoopCommonModes];
         
@@ -300,41 +328,18 @@ FlutterMethodChannel* f_channel;
         }];
     }else if(name.compare("dispose") == 0){
         [_timer invalidate];
-        _timer = nil;
-        [renderers removeAllObjects];
-        renderers = nil;
-        webview_cef::closeAllBrowser();
-    }else if(name.compare("create") == 0){
-        int browserId = [((NSNumber *)call.arguments) intValue];
-        CefWrapper *renderer = [[CefWrapper alloc] init];
-        int64_t textureId = [tr registerTexture:renderer];
-        renderer.textureId = textureId;
-        [renderers setObject:renderer forKey:[NSNumber numberWithLong:textureId]];
-        webview_cef::createBrowser(textureId, browserId);
-        return [NSNumber numberWithLong:textureId];
-    }else if(name.compare("close") == 0){
-        NSArray<NSNumber *> *args = (NSArray *)call.arguments;
-        int64_t textureId = [args[0] longValue];
-        int browserId = [args[1] intValue];
-        CefWrapper *renderer = [renderers objectForKey:[NSNumber numberWithLong:textureId]];
-        if (renderer != nil) {
-            [renderers removeObjectForKey:[NSNumber numberWithLong:textureId]];
-            [tr unregisterTexture:textureId];
-            webview_cef::closeBrowser(browserId);
-        }
-    }else{
-        WValue *encodeArgs = [self encode_flvalue_to_wvalue:call.arguments];
-        WValue *responseArgs = nullptr;
-        int ret = webview_cef::HandleMethodCall(name, encodeArgs, responseArgs);
-        webview_value_unref(encodeArgs);
-        if(ret != 0){
-            NSObject *result = [self encode_wvalue_to_flvalue:responseArgs];
-            webview_value_unref(responseArgs);
-            return result;
-        }
-        else{
-            webview_value_unref(responseArgs);
-        }
+    }
+    WValue *encodeArgs = [self encode_flvalue_to_wvalue:call.arguments];
+    WValue *responseArgs = nullptr;
+    int ret = webview_cef::HandleMethodCall(name, encodeArgs, &responseArgs);
+    webview_value_unref(encodeArgs);
+    if(ret != 0){
+        NSObject *result = [self encode_wvalue_to_flvalue:responseArgs];
+        webview_value_unref(responseArgs);
+        return result;
+    }
+    else{
+        webview_value_unref(responseArgs);
     }
     return nil;
 }
