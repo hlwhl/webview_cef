@@ -24,8 +24,8 @@ class WebViewController extends ValueNotifier<bool> {
   Widget get webviewWidget => _webviewWidget ?? const Text("not init!!");
   Widget get loadingWidget => _loadingWidget ?? const Text("loading...");
 
-  Future<void> get ready => _creatingCompleter.future;
   late Completer<void> _creatingCompleter;
+  Future<void> get ready => _creatingCompleter.future;
   bool _isDisposed = false;
   bool _focusEditable = false;
 
@@ -63,7 +63,6 @@ class WebViewController extends ValueNotifier<bool> {
         _textureId = textureId!;
         _webviewWidget = WebView(this);
       });
-      await Future.delayed(const Duration(milliseconds: 100));
       value = true;
       _creatingCompleter.complete();
     } on PlatformException catch (e) {
@@ -146,40 +145,12 @@ class WebViewController extends ValueNotifier<bool> {
         .invokeMethod('imeCommitText', [browserId, composingText]);
   }
 
-  Future<void> setClientFocus(bool focus) {
+  Future<void> setClientFocus(bool focus) async {
+    if (_isDisposed) {
+      return;
+    }
+    assert(value);
     return _pluginChannel.invokeMethod('setClientFocus', [browserId, focus]);
-  }
-
-  Future<void> setCookie(String domain, String key, String val) async {
-    if (_isDisposed) {
-      return;
-    }
-    assert(value);
-    return _pluginChannel.invokeMethod('setCookie', [domain, key, val]);
-  }
-
-  Future<void> deleteCookie(String domain, String key) async {
-    if (_isDisposed) {
-      return;
-    }
-    assert(value);
-    return _pluginChannel.invokeMethod('deleteCookie', [domain, key]);
-  }
-
-  Future<void> visitAllCookies() async {
-    if (_isDisposed) {
-      return;
-    }
-    assert(value);
-    return _pluginChannel.invokeMethod('visitAllCookies');
-  }
-
-  Future<void> visitUrlCookies(String domain, bool isHttpOnly) async {
-    if (_isDisposed) {
-      return;
-    }
-    assert(value);
-    return _pluginChannel.invokeMethod('visitUrlCookies', [domain, isHttpOnly]);
   }
 
   Future<void> setJavaScriptChannels(Set<JavascriptChannel> channels) async {
@@ -293,7 +264,7 @@ class WebViewController extends ValueNotifier<bool> {
 class WebView extends StatefulWidget {
   final WebViewController controller;
 
-  WebView(this.controller, {Key? key}) : super(key: key);
+  const WebView(this.controller, {Key? key}) : super(key: key);
 
   @override
   WebViewState createState() => WebViewState();

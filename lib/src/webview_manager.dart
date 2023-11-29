@@ -22,12 +22,7 @@ class WebviewManager extends ValueNotifier<bool> {
 
   final Map<int, WebViewController> _webViews = <int, WebViewController>{};
 
-  Future<void> get ready async {
-    if (!value) {
-      await Future.delayed(const Duration(milliseconds: 500));
-    }
-    return _creatingCompleter.future;
-  }
+  get ready => _creatingCompleter.future;
 
   Map<String, dynamic> allCookies = {};
 
@@ -53,14 +48,16 @@ class WebviewManager extends ValueNotifier<bool> {
   }
 
   WebviewManager._internal() : super(false) {
-    _initialize();
+    initialize();
   }
 
-  Future<void> _initialize() async {
+  Future<void> initialize() async {
     _creatingCompleter = Completer<void>();
     try {
       await _pluginChannel.invokeMethod('init', globalUserAgent);
       _pluginChannel.setMethodCallHandler(_methodCallhandler);
+      // Wait for the platform to complete initialization.
+      await Future.delayed(const Duration(milliseconds: 300));
       _creatingCompleter.complete();
       value = true;
     } on PlatformException catch (e) {
@@ -69,7 +66,9 @@ class WebviewManager extends ValueNotifier<bool> {
     return _creatingCompleter.future;
   }
 
+  @override
   Future<void> dispose() async {
+    super.dispose();
     await _pluginChannel.invokeMethod('dispose');
     _pluginChannel.setMethodCallHandler(null);
     _webViews.clear();
