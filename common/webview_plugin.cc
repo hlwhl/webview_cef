@@ -431,4 +431,13 @@ namespace webview_cef {
     {
 		createTextureFunc = func;
     }
+	
+	bool getAnyBrowserFocused(){
+		for(auto render : renderers){
+			if(render.second.get()->isFocused){
+				return true;
+			}
+		}
+		return false;
+	}
 }

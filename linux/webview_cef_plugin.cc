@@ -187,6 +187,10 @@ static void webview_cef_plugin_handle_method_call(
   int ret = webview_cef::HandleMethodCall(method, encodeArgs, &responseArgs);
   webview_value_unref(encodeArgs);
   if (ret > 0){
+    g_timeout_add(20, [](gpointer data) -> gboolean {
+      webview_cef::doMessageLoopWork();
+      return TRUE;
+    }, NULL);
     result = encode_wavlue_to_flvalue(responseArgs);
     response = FL_METHOD_RESPONSE(fl_method_success_response_new(result));
   }
@@ -263,7 +267,7 @@ FLUTTER_PLUGIN_EXPORT void initCEFProcesses(int argc, char** argv)
 
 FLUTTER_PLUGIN_EXPORT gboolean processKeyEventForCEF(GtkWidget *widget, GdkEventKey *event, gpointer data)
 {
-  if(webview_cef::getPluginIsFocused())
+  if(webview_cef::getAnyBrowserFocused())
   {
     CefKeyEvent key_event;
     KeyboardCode windows_key_code = GdkEventToWindowsKeyCode(event);

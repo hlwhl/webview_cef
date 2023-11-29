@@ -312,28 +312,26 @@ private:
 
 + (NSObject*) handleMethodCallWrapper: (FlutterMethodCall*)call{
     std::string name = std::string([call.method cStringUsingEncoding:NSUTF8StringEncoding]);
-    if(name.compare("init") == 0){
-        webview_cef::initCEFProcesses();
-        _timer = [NSTimer timerWithTimeInterval:0.016f target:self selector:@selector(doMessageLoopWork) userInfo:nil repeats:YES];
-        [[NSRunLoop mainRunLoop] addTimer: _timer forMode:NSRunLoopCommonModes];
-        
-        [NSEvent addLocalMonitorForEventsMatchingMask:NSEventMaskKeyDown handler:^NSEvent * _Nullable(NSEvent * _Nonnull event) {
-            [self processKeyboardEvent:event];
-            return event;
-        }];
-        
-        [NSEvent addLocalMonitorForEventsMatchingMask:NSEventMaskKeyUp handler:^NSEvent * _Nullable(NSEvent * _Nonnull event) {
-            [self processKeyboardEvent:event];
-            return event;
-        }];
-    }else if(name.compare("dispose") == 0){
-        [_timer invalidate];
-    }
     WValue *encodeArgs = [self encode_flvalue_to_wvalue:call.arguments];
     WValue *responseArgs = nullptr;
     int ret = webview_cef::HandleMethodCall(name, encodeArgs, &responseArgs);
     webview_value_unref(encodeArgs);
     if(ret != 0){
+        if(name.compare("init") == 0){
+            webview_cef::initCEFProcesses();
+            _timer = [NSTimer timerWithTimeInterval:0.016f target:self selector:@selector(doMessageLoopWork) userInfo:nil repeats:YES];
+            [[NSRunLoop mainRunLoop] addTimer: _timer forMode:NSRunLoopCommonModes];
+        
+            [NSEvent addLocalMonitorForEventsMatchingMask:NSEventMaskKeyDown handler:^NSEvent * _Nullable(NSEvent * _Nonnull event) {
+                [self processKeyboardEvent:event];
+                return event;
+            }];
+        
+            [NSEvent addLocalMonitorForEventsMatchingMask:NSEventMaskKeyUp handler:^NSEvent * _Nullable(NSEvent * _Nonnull event) {
+                [self processKeyboardEvent:event];
+                return event;
+            }];
+        }
         NSObject *result = [self encode_wvalue_to_flvalue:responseArgs];
         webview_value_unref(responseArgs);
         return result;
