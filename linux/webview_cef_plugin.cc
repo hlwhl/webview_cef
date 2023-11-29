@@ -247,10 +247,10 @@ void webview_cef_plugin_register_with_registrar(FlPluginRegistrar *registrar)
   webview_cef::setInvokeMethodFunc(invoke);
 
 	auto createTexture = [=]() {
-		std::shared_ptr<WebviewTextureRenderer> renderer = std::make_shared<WebviewTextureRenderer>(texture_registrar);
+		std::shared_ptr<WebviewTextureRenderer> renderer = std::make_shared<WebviewTextureRenderer>();
 		return std::dynamic_pointer_cast<webview_cef::WebviewTexture>(renderer);
 	};
-	setCreateTextureFunc(createTexture);
+	webview_cef::setCreateTextureFunc(createTexture);
 
   g_object_unref(plugin);
 }

@@ -82,8 +82,6 @@ private:
 
     CefRefPtr<WebviewHandler>       m_handler;                          //webview handler for main process
     std::shared_ptr<CefJSBridge>	m_render_js_bridge;                 //js bridge for render process
-    bool							m_last_node_is_editable = false;    //last focused node is editable
-
     // Include the default reference counting implementation.
     IMPLEMENT_REFCOUNTING(WebviewApp);
 };

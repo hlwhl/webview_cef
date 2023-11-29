@@ -96,6 +96,7 @@ void WebviewHandler::OnAddressChange(CefRefPtr<CefBrowser> browser,
 
 void WebviewHandler::OnAfterCreated(CefRefPtr<CefBrowser> browser) {
     CEF_REQUIRE_UI_THREAD();
+    browser_map_[browser->GetIdentifier()].browser = browser;
 }
 
 bool WebviewHandler::DoClose(CefRefPtr<CefBrowser> browser) {
@@ -109,11 +110,8 @@ void WebviewHandler::OnBeforeClose(CefRefPtr<CefBrowser> browser) {
     CEF_REQUIRE_UI_THREAD();
     
     auto bit = browser_map_.find(browser->GetIdentifier());
-    for (; bit != browser_map_.end(); ++bit) {
-        if (bit->second.browser->IsSame(browser)) {
-            browser_map_.erase(bit);
-            break;
-        }
+    if (bit != browser_map_.end()) {
+        browser_map_.erase(bit);
     }
 }
 
@@ -203,16 +201,8 @@ void WebviewHandler::closeBrowser(int browserId)
     browser_map_.erase(it);
 }
 
-void WebviewHandler::createBrowser(int64_t textureId)
+void WebviewHandler::createBrowser()
 {
-#ifdef OS_WIN
-    // On Windows we use multiple processes.
-    if(!CefCurrentlyOn(TID_UI)) {
-        CefPostTask(TID_UI, base::BindOnce(&WebviewHandler::createBrowser, this, textureId));
-        return;
-    }
-#endif
-    CEF_REQUIRE_UI_THREAD();
     // Specify CEF browser settings here.
 	CefBrowserSettings browser_settings;
 	browser_settings.windowless_frame_rate = 60;
@@ -220,19 +210,13 @@ void WebviewHandler::createBrowser(int64_t textureId)
 	CefWindowInfo window_info;
 	window_info.SetAsWindowless(0);
 
-	CefRefPtr<CefDictionaryValue> extra_info = CefDictionaryValue::Create();
-	extra_info->SetString("textureId", std::to_string(textureId));
-
 	// create browser
-	auto browser = CefBrowserHost::CreateBrowserSync(window_info, this, "", browser_settings, extra_info, nullptr);
-    browser_map_[browser->GetIdentifier()].browser = browser;
-    browser_map_[browser->GetIdentifier()].textureId = textureId;
+	CefBrowserHost::CreateBrowser(window_info, this, "", browser_settings, nullptr, nullptr);
 }
 
 void WebviewHandler::sendScrollEvent(int browserId, int x, int y, int deltaX, int deltaY) {
 
     auto it = browser_map_.find(browserId);
-
     if (it != browser_map_.end()) {
         CefMouseEvent ev;
         ev.x = x;
@@ -364,11 +348,10 @@ void WebviewHandler::openDevTools(int browserId) {
     }
 }
 
-void WebviewHandler::imeSetComposition(std::string text)
+void WebviewHandler::imeSetComposition(int browserId, std::string text)
 {
-    auto browser = current_focused_browser_;
-
-    if (!browser.get()) {
+    auto it = browser_map_.find(browserId);
+    if (it==browser_map_.end() || !it->second.browser.get()) {
         return;
     }
 
@@ -387,13 +370,13 @@ void WebviewHandler::imeSetComposition(std::string text)
     // Keeps the caret at the end of the composition
     auto selection_range_end = static_cast<int>(0 + cTextStr.length());
     CefRange selection_range = CefRange(0, selection_range_end);
-    browser->GetHost()->ImeSetComposition(cTextStr, underlines, CefRange(UINT32_MAX, UINT32_MAX), selection_range);
+    it->second.browser->GetHost()->ImeSetComposition(cTextStr, underlines, CefRange(UINT32_MAX, UINT32_MAX), selection_range);
 }
 
-void WebviewHandler::imeCommitText(std::string text)
+void WebviewHandler::imeCommitText(int browserId, std::string text)
 {
-    auto it = browser_map_.find(current_focused_browser_->GetIdentifier());
-    if (!it->second.browser.get()) {
+    auto it = browser_map_.find(browserId);
+    if (it==browser_map_.end() || !it->second.browser.get()) {
         return;
     }
 
@@ -410,12 +393,13 @@ void WebviewHandler::imeCommitText(std::string text)
 
 }
 
-void WebviewHandler::setClientFocus(bool focus)
+void WebviewHandler::setClientFocus(int browserId, bool focus)
 {
-    if (current_focused_browser_ == nullptr || !current_focused_browser_.get()) {
+    auto it = browser_map_.find(browserId);
+    if (it==browser_map_.end() || !it->second.browser.get()) {
         return;
     }
-    current_focused_browser_->GetHost()->SetFocus(focus);
+    it->second.browser->GetHost()->SetFocus(focus);
 }
 
 void WebviewHandler::setCookie(const std::string& domain, const std::string& key, const std::string& value){
@@ -546,6 +530,9 @@ bool WebviewHandler::executeJavaScript(int browserId, const std::string code)
 void WebviewHandler::GetViewRect(CefRefPtr<CefBrowser> browser, CefRect &rect) {
     CEF_REQUIRE_UI_THREAD();
     auto it = browser_map_.find(browser->GetIdentifier());
+    if(it == browser_map_.end() || !it->second.browser.get()) {
+        return;
+    }
     rect.x = rect.y = 0;
     
     if (it->second.width < 1) {
@@ -569,13 +556,16 @@ bool WebviewHandler::GetScreenInfo(CefRefPtr<CefBrowser> browser, CefScreenInfo&
 
 void WebviewHandler::OnPaint(CefRefPtr<CefBrowser> browser, CefRenderHandler::PaintElementType type,
                             const CefRenderHandler::RectList &dirtyRects, const void *buffer, int w, int h) {
-    onPaintCallback(browser_map_[browser->GetIdentifier()].textureId, buffer, w, h);
+    onPaintCallback(browser->GetIdentifier(), buffer, w, h);
 }
 
 void WebviewHandler::OnImeCompositionRangeChanged(CefRefPtr<CefBrowser> browser, const CefRange &selection_range, const CefRenderHandler::RectList &character_bounds)
 {
     CEF_REQUIRE_UI_THREAD();
     auto it = browser_map_.find(browser->GetIdentifier());
+    if(it == browser_map_.end() || !it->second.browser.get()) {
+        return;
+    }
     if (!character_bounds.empty()) {
         if (it->second.is_ime_commit) {
             auto lastCharacter = character_bounds.back();

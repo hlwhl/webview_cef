@@ -20,7 +20,6 @@
               // same as Blink.
 
 struct browser_info{
-    int64_t textureId = 0;
     CefRefPtr<CefBrowser> browser;
     uint32_t width = 1;
     uint32_t height = 1;
@@ -37,7 +36,7 @@ public CefFocusHandler,
 public CefLoadHandler,
 public CefRenderHandler{
 public:
-    std::function<void(int64_t textureId, const void* buffer, int32_t width, int32_t height)> onPaintCallback;
+    std::function<void(int borwserId, const void* buffer, int32_t width, int32_t height)> onPaintCallback;
     std::function<void(int browserId, std::string url)> onUrlChangedCb;
     std::function<void(int browserId, std::string title)> onTitleChangedCb;
     std::function<void(std::string, std::string, std::string, int browserId, std::string)> onJavaScriptChannelMessage;
@@ -127,7 +126,7 @@ public:
     static bool IsChromeRuntimeEnabled();
 
     void closeBrowser(int browserId);
-    void createBrowser(int64_t textureId);
+    void createBrowser();
 
     void sendScrollEvent(int browserId, int x, int y, int deltaX, int deltaY);
     void changeSize(int browserId, float a_dpi, int width, int height);
@@ -140,9 +139,9 @@ public:
     void reload(int browserId);
     void openDevTools(int browserId);
 
-    void imeSetComposition(std::string text);
-    void imeCommitText(std::string text);
-    void setClientFocus(bool focus);
+    void imeSetComposition(int browserId, std::string text);
+    void imeCommitText(int browserId, std::string text);
+    void setClientFocus(int browserId, bool focus);
 
     void setCookie(const std::string& domain, const std::string& key, const std::string& value);
     void deleteCookie(const std::string& domain, const std::string& key);

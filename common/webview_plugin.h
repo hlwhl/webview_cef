@@ -11,6 +11,7 @@ namespace webview_cef {
         virtual ~WebviewTexture(){}
         virtual void onFrame(const void* buffer, int width, int height){}
         int64_t textureId = 0;
+        bool isFocused = false;
     };
 
     void initCEFProcesses(CefMainArgs args);
@@ -23,7 +24,6 @@ namespace webview_cef {
     void setUserAgent(WValue *userAgent);
     void setInvokeMethodFunc(std::function<void(std::string, WValue*)> func);
     void setCreateTextureFunc(std::function<std::shared_ptr<WebviewTexture>()> func);
-    bool getPluginIsFocused();
 }
 
 #endif //WEBVIEW_PLUGIN_H

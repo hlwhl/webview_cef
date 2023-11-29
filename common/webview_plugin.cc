@@ -13,10 +13,9 @@
 
 namespace webview_cef {
 	bool init = false;
-	bool isFocused = false;
 	std::function<void(std::string, WValue*)> invokeFunc;
 	std::function<std::shared_ptr<WebviewTexture>()> createTextureFunc;
-	std::unordered_map<int64_t, std::shared_ptr<WebviewTexture>> renderers;
+	std::unordered_map<int, std::shared_ptr<WebviewTexture>> renderers;
     
     CefRefPtr<WebviewHandler> handler(new WebviewHandler());
     CefRefPtr<WebviewApp> app(new WebviewApp(handler));
@@ -51,9 +50,9 @@ namespace webview_cef {
 	static void initCefEngine() {
 		if (!init)
 		{
-			handler.get()->onPaintCallback = [=](int64_t textureId, const void* buffer, int32_t width, int32_t height) {
-				if (renderers.find(textureId) != renderers.end()) {
-					renderers[textureId]->onFrame(buffer, width, height);
+			handler.get()->onPaintCallback = [=](int browserId, const void* buffer, int32_t width, int32_t height) {
+				if (renderers.find(browserId) != renderers.end()) {
+					renderers[browserId]->onFrame(buffer, width, height);
 				}
 			};
 
@@ -221,9 +220,7 @@ namespace webview_cef {
 
     void sendKeyEvent(CefKeyEvent& ev)
     {
-		if(isFocused){
-	        handler.get()->sendKeyEvent(ev);
-		}
+		handler.get()->sendKeyEvent(ev);
     }
 
     void startCEF()
@@ -264,18 +261,17 @@ namespace webview_cef {
 		}
 		else if (name.compare("create") == 0) {
 			std::shared_ptr<WebviewTexture> renderer = createTextureFunc();
-			int64_t textureId = renderer->textureId;
-			renderers[textureId] = renderer;
-			handler->createBrowser(textureId);
+			int browserId = int(renderers.size()) + 1;
+			renderers[browserId] = renderer;
+			handler->createBrowser();
 			result = 1;
-			*response = webview_value_new_int(textureId);
+			*response = webview_value_new_int(renderer->textureId);
 		}
 		else if (name.compare("close") == 0) {
-			int64_t textureId = webview_value_get_int(webview_value_get_list_value(values, 0));
-			int browserId = int(webview_value_get_int(webview_value_get_list_value(values, 1)));
-			if(renderers.find(textureId) != renderers.end()){
-				delete renderers[textureId].get();
-				renderers.erase(textureId);
+			int browserId = int(webview_value_get_int(webview_value_get_list_value(values, 0)));
+			if(renderers.find(browserId) != renderers.end()){
+				delete renderers[browserId].get();
+				renderers.erase(browserId);
 			}
 			handler->closeBrowser(browserId);
 			result = 1;
@@ -332,18 +328,23 @@ namespace webview_cef {
 			result = 1;
 		}
 		else if (name.compare("imeSetComposition") == 0) {
-			std::string text = webview_value_get_string(values);
-			handler.get()->imeSetComposition(text);
+			int browserId = int(webview_value_get_int(webview_value_get_list_value(values, 0)));
+			const auto text = webview_value_get_string(webview_value_get_list_value(values, 1));
+			handler.get()->imeSetComposition(browserId, text);
 			result = 1;
 		} 
 		else if (name.compare("imeCommitText") == 0) {
-			std::string text = webview_value_get_string(values);
-			handler.get()->imeCommitText(text);
+			int browserId = int(webview_value_get_int(webview_value_get_list_value(values, 0)));
+			const auto text = webview_value_get_string(webview_value_get_list_value(values, 1));
+			handler.get()->imeCommitText(browserId, text);
 			result = 1;
 		} 
 		else if (name.compare("setClientFocus") == 0) {
-			isFocused = webview_value_get_bool(webview_value_get_list_value(values, 0));
-			handler.get()->setClientFocus(isFocused);
+			int browserId = int(webview_value_get_int(webview_value_get_list_value(values, 0)));
+			if (renderers.find(browserId) != renderers.end()) {
+				renderers[browserId].get()->isFocused = webview_value_get_bool(webview_value_get_list_value(values, 1));
+				handler.get()->setClientFocus(browserId, renderers[browserId].get()->isFocused);
+			}
 			result = 1;
 		}
 		else if(name.compare("setCookie") == 0){
@@ -426,12 +427,8 @@ namespace webview_cef {
 		invokeFunc = func;
 	}
 
-	void webview_cef::setCreateTextureFunc(std::function<std::shared_ptr<WebviewTexture>()> func)
+	void setCreateTextureFunc(std::function<std::shared_ptr<WebviewTexture>()> func)
     {
 		createTextureFunc = func;
-    }
-
-	bool getPluginIsFocused() {
-		return isFocused;
     }
 }
