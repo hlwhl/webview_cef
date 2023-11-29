@@ -21,6 +21,7 @@ extern CGFloat scaleFactor;
 }
 @property(nonatomic) int64_t textureId;
 
+- (void)onFrame:(const void *)buffer width:(int64_t)width height:(int64_t)height;
 + (void)setMethodChannel: (FlutterMethodChannel*)channel;
 + (FlutterResult) handleMethodCallWrapper: (FlutterMethodCall*)call;
 

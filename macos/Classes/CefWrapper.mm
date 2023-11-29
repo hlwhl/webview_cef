@@ -28,36 +28,25 @@ typedef void(^RetainSelfBlock)(void);
 @implementation CefWrapper
 @synthesize textureId = _textureId;
 
-{
-    RetainSelfBlock _retainBlock;//通过这个block持有对象，造成循环引用，避免被释放
-}
-
 class WebviewTextureRenderer : public webview_cef::WebviewTexture {
 public:
     WebviewTextureRenderer(){
         wrapped = [[CefWrapper alloc] init];
-        textureId = [tr registerTexture:renderer];
+        textureId = [tr registerTexture:wrapped];
         wrapped.textureId = textureId;
-        // object->_retainBlock = ^{//循环引用
-        //     [object class];
-        // };
-        // self = (__bridge void *)object;
     }
 
     virtual ~WebviewTextureRenderer() {
         [tr unregisterTexture:textureId];
-        [wrapped release];  
-        // [(__bridge id) self breakRetainCycly];
     }
 
     virtual void onFrame(const void* buffer, int width, int height) {
         [wrapped onFrame:buffer width:width height:height];
-        // return [(__bridge id)self onFrame:buffer width:width height:height];
     }
 
 private:
     CefWrapper *wrapped;
-}
+};
 
 - (id) init {
     self = [super init];
@@ -291,6 +280,7 @@ private:
 }
 
 + (void)setMethodChannel: (FlutterMethodChannel*)channel {
+    webview_cef::initCEFProcesses();
     f_channel = channel;
     auto invoke = [=](std::string method, WValue* arguments){
         NSObject *arg = [self encode_wvalue_to_flvalue:arguments];
@@ -299,7 +289,7 @@ private:
     webview_cef::setInvokeMethodFunc(invoke);
 
 	auto createTexture = [=]() {
-		std::shared_ptr<WebviewTextureRenderer> renderer = std::make_shared<WebviewTextureRenderer>(texture_registrar);
+		std::shared_ptr<WebviewTextureRenderer> renderer = std::make_shared<WebviewTextureRenderer>();
 		return std::dynamic_pointer_cast<webview_cef::WebviewTexture>(renderer);
 	};
 	webview_cef::setCreateTextureFunc(createTexture);
@@ -318,7 +308,6 @@ private:
     webview_value_unref(encodeArgs);
     if(ret != 0){
         if(name.compare("init") == 0){
-            webview_cef::initCEFProcesses();
             _timer = [NSTimer timerWithTimeInterval:0.016f target:self selector:@selector(doMessageLoopWork) userInfo:nil repeats:YES];
             [[NSRunLoop mainRunLoop] addTimer: _timer forMode:NSRunLoopCommonModes];
         
