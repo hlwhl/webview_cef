@@ -1,14 +1,9 @@
 import 'dart:async';
-import 'dart:io';
 
-import 'package:flutter/gestures.dart';
 import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
 import 'package:flutter/widgets.dart';
 
-import 'webview_events_listener.dart';
-import 'webview_javascript.dart';
-import 'webview_textinput.dart';
 import 'webview.dart';
 
 class WebviewManager extends ValueNotifier<bool> {
@@ -26,8 +21,7 @@ class WebviewManager extends ValueNotifier<bool> {
 
   Map<String, dynamic> allCookies = {};
 
-  String globalUserAgent =
-      "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/116.0.0.0 Safari/537.36";
+  String globalUserAgent = "";
 
   void setUserAgent(String userAgent) {
     globalUserAgent = userAgent;
@@ -47,9 +41,7 @@ class WebviewManager extends ValueNotifier<bool> {
     return controller;
   }
 
-  WebviewManager._internal() : super(false) {
-    initialize();
-  }
+  WebviewManager._internal() : super(false);
 
   Future<void> initialize() async {
     _creatingCompleter = Completer<void>();

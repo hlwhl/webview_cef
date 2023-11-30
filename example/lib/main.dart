@@ -32,6 +32,9 @@ class _MyAppState extends State<MyApp> {
 
   // Platform messages are asynchronous, so we initialize in an async method.
   Future<void> initPlatformState() async {
+    WebviewManager().setUserAgent(
+        "Mozilla/5.0 (Linux; Android 10; SM-G973F) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/80.0.3987.162 Mobile Safari/537.36");
+    await WebviewManager().initialize();
     String url = "https://flutter.dev/";
     _textController.text = url;
     //unified interface for all platforms set user agent

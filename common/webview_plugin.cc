@@ -9,7 +9,6 @@
 #include <memory>
 #include <thread>
 #include <iostream>
-// #include <mutex>
 
 namespace webview_cef {
 	bool init = false;
@@ -226,7 +225,10 @@ namespace webview_cef {
     void startCEF()
     {
         CefSettings cefs;
-		cefs.windowless_rendering_enabled = true;       
+		cefs.windowless_rendering_enabled = true;
+		if(!globalUserAgent.empty()){
+			CefString(&cefs.user_agent) = globalUserAgent;
+		}
 #ifdef OS_MAC
 		cefs.external_message_pump = true;
     	//CefString(&cefs.browser_subprocess_path) = "/Library/Chaches";
