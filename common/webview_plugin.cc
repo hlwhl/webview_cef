@@ -50,7 +50,7 @@ namespace webview_cef {
 		if (!init)
 		{
 			handler.get()->onPaintCallback = [=](int browserId, const void* buffer, int32_t width, int32_t height) {
-				if (renderers.find(browserId) != renderers.end()) {
+				if (renderers.find(browserId) != renderers.end() && renderers[browserId] != nullptr) {
 					renderers[browserId]->onFrame(buffer, width, height);
 				}
 			};
@@ -256,7 +256,9 @@ namespace webview_cef {
 		}
 		else if (name.compare("dispose") == 0) {
 			for(auto render : renderers){
-				delete render.second.get();
+                if(render.second != nullptr){
+                    render.second.reset();
+                }
 			}
 			handler->CloseAllBrowsers(true);
 			result = 1;
@@ -270,10 +272,9 @@ namespace webview_cef {
 			*response = webview_value_new_int(renderer->textureId);
 		}
 		else if (name.compare("close") == 0) {
-			int browserId = int(webview_value_get_int(webview_value_get_list_value(values, 0)));
+			int browserId = int(webview_value_get_int(values));
 			if(renderers.find(browserId) != renderers.end()){
-				delete renderers[browserId].get();
-				renderers.erase(browserId);
+				renderers[browserId].reset();
 			}
 			handler->closeBrowser(browserId);
 			result = 1;
@@ -343,7 +344,7 @@ namespace webview_cef {
 		} 
 		else if (name.compare("setClientFocus") == 0) {
 			int browserId = int(webview_value_get_int(webview_value_get_list_value(values, 0)));
-			if (renderers.find(browserId) != renderers.end()) {
+			if (renderers.find(browserId) != renderers.end() && renderers[browserId] != nullptr) {
 				renderers[browserId].get()->isFocused = webview_value_get_bool(webview_value_get_list_value(values, 1));
 				handler.get()->setClientFocus(browserId, renderers[browserId].get()->isFocused);
 			}
@@ -436,7 +437,7 @@ namespace webview_cef {
 	
 	bool getAnyBrowserFocused(){
 		for(auto render : renderers){
-			if(render.second.get()->isFocused){
+			if(render.second != nullptr && render.second.get()->isFocused){
 				return true;
 			}
 		}

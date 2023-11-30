@@ -198,7 +198,6 @@ void WebviewHandler::closeBrowser(int browserId)
     if(it != browser_map_.end()){
         it->second.browser->GetHost()->CloseBrowser(true);
     }
-    browser_map_.erase(it);
 }
 
 void WebviewHandler::createBrowser()
@@ -211,7 +210,7 @@ void WebviewHandler::createBrowser()
 	window_info.SetAsWindowless(0);
 
 	// create browser
-	CefBrowserHost::CreateBrowser(window_info, this, "", browser_settings, nullptr, nullptr);
+    CefBrowserHost::CreateBrowser(window_info, this, "", browser_settings, nullptr, nullptr);
 }
 
 void WebviewHandler::sendScrollEvent(int browserId, int x, int y, int deltaX, int deltaY) {

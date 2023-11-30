@@ -21,11 +21,13 @@ class WebViewController extends ValueNotifier<bool> {
   final MethodChannel _pluginChannel;
   Widget? _loadingWidget;
   WebView? _webviewWidget;
-  Widget get webviewWidget => _webviewWidget ?? const Text("not init!!");
+  Widget get webviewWidget => _webviewWidget ?? loadingWidget;
   Widget get loadingWidget => _loadingWidget ?? const Text("loading...");
 
   late Completer<void> _creatingCompleter;
   Future<void> get ready => _creatingCompleter.future;
+  late Completer<void> _firstloadCompleter;
+  Future<void> get firstload => _firstloadCompleter.future;
   bool _isDisposed = false;
   bool _focusEditable = false;
 
@@ -63,7 +65,6 @@ class WebViewController extends ValueNotifier<bool> {
         _textureId = textureId!;
         _webviewWidget = WebView(this);
       });
-      value = true;
       _creatingCompleter.complete();
     } on PlatformException catch (e) {
       _creatingCompleter.completeError(e);
@@ -80,7 +81,7 @@ class WebViewController extends ValueNotifier<bool> {
     await _creatingCompleter.future;
     if (!_isDisposed) {
       _isDisposed = true;
-      await _pluginChannel.invokeMethod('dispose');
+      await _pluginChannel.invokeMethod('close', browserId);
     }
     super.dispose();
   }
@@ -90,8 +91,18 @@ class WebViewController extends ValueNotifier<bool> {
     if (_isDisposed) {
       return;
     }
-    assert(value);
-    return _pluginChannel.invokeMethod('loadUrl', [browserId, url]);
+    if (!value) {
+      _firstloadCompleter = Completer<void>();
+      try {
+        _pluginChannel.invokeMethod('loadUrl', [browserId, url]);
+        _firstloadCompleter.complete();
+        value = true;
+      } catch (e) {
+        _firstloadCompleter.completeError(e);
+      }
+    } else {
+      return _pluginChannel.invokeMethod('loadUrl', [browserId, url]);
+    }
   }
 
   /// Reloads the current document.
