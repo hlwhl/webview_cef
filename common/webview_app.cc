@@ -150,6 +150,14 @@ void WebviewApp::OnBeforeCommandLineProcessing(const CefString &process_type, Ce
 void WebviewApp::OnContextInitialized()
 {
     CEF_REQUIRE_UI_THREAD();
+//    CefBrowserSettings browser_settings;
+//    browser_settings.windowless_frame_rate = 60;
+//                
+//    CefWindowInfo window_info;
+//    window_info.SetAsWindowless(0);
+//
+//    // create browser
+//    CefBrowserHost::CreateBrowser(window_info, m_handler, "", browser_settings, nullptr, nullptr);
     
 }
 

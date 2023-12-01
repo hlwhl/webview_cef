@@ -108,11 +108,6 @@ bool WebviewHandler::DoClose(CefRefPtr<CefBrowser> browser) {
 
 void WebviewHandler::OnBeforeClose(CefRefPtr<CefBrowser> browser) {
     CEF_REQUIRE_UI_THREAD();
-    
-    auto bit = browser_map_.find(browser->GetIdentifier());
-    if (bit != browser_map_.end()) {
-        browser_map_.erase(bit);
-    }
 }
 
 bool WebviewHandler::OnBeforePopup(CefRefPtr<CefBrowser> browser,
@@ -197,6 +192,7 @@ void WebviewHandler::closeBrowser(int browserId)
     auto it = browser_map_.find(browserId);
     if(it != browser_map_.end()){
         it->second.browser->GetHost()->CloseBrowser(true);
+        browser_map_.erase(it);
     }
 }
 

@@ -20,8 +20,8 @@ class WebViewController extends ValueNotifier<bool> {
   }
   final MethodChannel _pluginChannel;
   Widget? _loadingWidget;
-  WebView? _webviewWidget;
-  Widget get webviewWidget => _webviewWidget ?? loadingWidget;
+  late WebView _webviewWidget;
+  Widget get webviewWidget => _webviewWidget;
   Widget get loadingWidget => _loadingWidget ?? const Text("loading...");
 
   late Completer<void> _creatingCompleter;
@@ -61,10 +61,9 @@ class WebViewController extends ValueNotifier<bool> {
     _creatingCompleter = Completer<void>();
     try {
       await WebviewManager().ready;
-      await _pluginChannel.invokeMethod<int>('create').then((textureId) {
-        _textureId = textureId!;
-        _webviewWidget = WebView(this);
-      });
+      _textureId = await _pluginChannel.invokeMethod<int>('create') ?? 0;
+      _webviewWidget = WebView(this);
+      await Future.delayed(const Duration(milliseconds: 200));
       _creatingCompleter.complete();
     } on PlatformException catch (e) {
       _creatingCompleter.completeError(e);
@@ -94,7 +93,7 @@ class WebViewController extends ValueNotifier<bool> {
     if (!value) {
       _firstloadCompleter = Completer<void>();
       try {
-        _pluginChannel.invokeMethod('loadUrl', [browserId, url]);
+        await _pluginChannel.invokeMethod('loadUrl', [browserId, url]);
         _firstloadCompleter.complete();
         value = true;
       } catch (e) {

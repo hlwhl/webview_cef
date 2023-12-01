@@ -308,7 +308,7 @@ private:
     webview_value_unref(encodeArgs);
     if(ret != 0){
         if(name.compare("init") == 0){
-            _timer = [NSTimer timerWithTimeInterval:0.016f target:self selector:@selector(doMessageLoopWork) userInfo:nil repeats:YES];
+            _timer = [NSTimer timerWithTimeInterval:0.02f target:self selector:@selector(doMessageLoopWork) userInfo:nil repeats:YES];
             [[NSRunLoop mainRunLoop] addTimer: _timer forMode:NSRunLoopCommonModes];
         
             [NSEvent addLocalMonitorForEventsMatchingMask:NSEventMaskKeyDown handler:^NSEvent * _Nullable(NSEvent * _Nonnull event) {
