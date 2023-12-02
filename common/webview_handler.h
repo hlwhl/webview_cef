@@ -37,6 +37,8 @@ public CefLoadHandler,
 public CefRenderHandler{
 public:
     std::function<void(int borwserId, const void* buffer, int32_t width, int32_t height)> onPaintCallback;
+    std::function<void(int browserIndex, int browserId)> onBrowserCreated;
+
     std::function<void(int browserId, std::string url)> onUrlChangedCb;
     std::function<void(int browserId, std::string title)> onTitleChangedCb;
     std::function<void(std::string, std::string, std::string, int browserId, std::string)> onJavaScriptChannelMessage;
@@ -126,7 +128,7 @@ public:
     static bool IsChromeRuntimeEnabled();
 
     void closeBrowser(int browserId);
-    void createBrowser();
+    void createBrowser(int browserIndex);
 
     void sendScrollEvent(int browserId, int x, int y, int deltaX, int deltaY);
     void changeSize(int browserId, float a_dpi, int width, int height);

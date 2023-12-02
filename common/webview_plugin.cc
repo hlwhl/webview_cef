@@ -17,7 +17,7 @@ namespace webview_cef {
 	std::unordered_map<int, std::shared_ptr<WebviewTexture>> renderers;
     
     CefRefPtr<WebviewHandler> handler(new WebviewHandler());
-    CefRefPtr<WebviewApp> app(new WebviewApp(handler));
+    CefRefPtr<WebviewApp> app;
     CefMainArgs mainArgs;
 	CefString globalUserAgent;
 
@@ -52,6 +52,24 @@ namespace webview_cef {
 			handler.get()->onPaintCallback = [=](int browserId, const void* buffer, int32_t width, int32_t height) {
 				if (renderers.find(browserId) != renderers.end() && renderers[browserId] != nullptr) {
 					renderers[browserId]->onFrame(buffer, width, height);
+				}
+			};
+
+			handler.get()->onBrowserCreated = [=](int browserIndex, int browserId) {
+				std::shared_ptr<WebviewTexture> renderer = createTextureFunc();
+				renderers[browserId] = renderer;
+				if(invokeFunc){
+					WValue* bIndex = webview_value_new_int(browserIndex);
+					WValue* bId = webview_value_new_int(browserId);
+					WValue* textureId = webview_value_new_int(renderer->textureId);
+					WValue* retMap = webview_value_new_map();
+					webview_value_set_string(retMap, "browserIndex", bIndex);
+					webview_value_set_string(retMap, "browserId", bId);
+					webview_value_set_string(retMap, "textureId", textureId);
+					invokeFunc("browserCreated", retMap);
+					webview_value_unref(bIndex);
+					webview_value_unref(bId);
+					webview_value_unref(retMap);
 				}
 			};
 
@@ -204,6 +222,7 @@ namespace webview_cef {
 
     void initCEFProcesses(CefMainArgs args){
 		mainArgs = args;
+		app = new WebviewApp(handler);
 	    CefExecuteProcess(mainArgs, app, nullptr);
     }
 
@@ -214,6 +233,7 @@ namespace webview_cef {
         	printf("load cef err");
     	}
 #endif
+		app = new WebviewApp(handler);
 		CefExecuteProcess(mainArgs, app, nullptr);
 	}
 
@@ -260,16 +280,14 @@ namespace webview_cef {
                     render.second.reset();
                 }
 			}
+			renderers.clear();
 			handler->CloseAllBrowsers(true);
 			result = 1;
 		}
 		else if (name.compare("create") == 0) {
-			std::shared_ptr<WebviewTexture> renderer = createTextureFunc();
-			int browserId = int(renderers.size()) + 1;
-			renderers[browserId] = renderer;
-			handler->createBrowser();
+			int browserIndex = int(webview_value_get_int(values));
+			handler->createBrowser(browserIndex);
 			result = 1;
-			*response = webview_value_new_int(renderer->textureId);
 		}
 		else if (name.compare("close") == 0) {
 			int browserId = int(webview_value_get_int(values));

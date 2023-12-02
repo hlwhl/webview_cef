@@ -14,7 +14,7 @@ import 'webview_textinput.dart';
 // const MethodChannel _pluginChannel = MethodChannel("webview_cef");
 
 class WebViewController extends ValueNotifier<bool> {
-  WebViewController(this._pluginChannel, this._browserId, {Widget? loading})
+  WebViewController(this._pluginChannel, this._index, {Widget? loading})
       : super(false) {
     _loadingWidget = loading;
   }
@@ -31,13 +31,19 @@ class WebViewController extends ValueNotifier<bool> {
   bool _isDisposed = false;
   bool _focusEditable = false;
 
-  final int _browserId;
+  final int _index;
+  late int _browserId;
   late int _textureId;
-  get browserId => _browserId;
   final Map<String, JavascriptChannel> _javascriptChannels =
       <String, JavascriptChannel>{};
   WebviewEventsListener? _listener;
   WebviewEventsListener? get listener => _listener;
+
+  get onBrowserCreated => (final int browserId, final int textureId) {
+        _browserId = browserId;
+        _textureId = textureId;
+        // _creatingCompleter.complete();
+      };
 
   get onJavascriptChannelMessage => (final String channelName,
           final String message, final String callbackId, final String frameId) {
@@ -61,9 +67,9 @@ class WebViewController extends ValueNotifier<bool> {
     _creatingCompleter = Completer<void>();
     try {
       await WebviewManager().ready;
-      _textureId = await _pluginChannel.invokeMethod<int>('create') ?? 0;
-      _webviewWidget = WebView(this);
+      await _pluginChannel.invokeMethod('create', _index);
       await Future.delayed(const Duration(milliseconds: 200));
+      _webviewWidget = WebView(this);
       _creatingCompleter.complete();
     } on PlatformException catch (e) {
       _creatingCompleter.completeError(e);
@@ -80,7 +86,8 @@ class WebViewController extends ValueNotifier<bool> {
     await _creatingCompleter.future;
     if (!_isDisposed) {
       _isDisposed = true;
-      await _pluginChannel.invokeMethod('close', browserId);
+      WebviewManager().removeWebView(_browserId);
+      await _pluginChannel.invokeMethod('close', _browserId);
     }
     super.dispose();
   }
@@ -93,14 +100,14 @@ class WebViewController extends ValueNotifier<bool> {
     if (!value) {
       _firstloadCompleter = Completer<void>();
       try {
-        await _pluginChannel.invokeMethod('loadUrl', [browserId, url]);
+        await _pluginChannel.invokeMethod('loadUrl', [_browserId, url]);
         _firstloadCompleter.complete();
         value = true;
       } catch (e) {
         _firstloadCompleter.completeError(e);
       }
     } else {
-      return _pluginChannel.invokeMethod('loadUrl', [browserId, url]);
+      return _pluginChannel.invokeMethod('loadUrl', [_browserId, url]);
     }
   }
 
@@ -110,7 +117,7 @@ class WebViewController extends ValueNotifier<bool> {
       return;
     }
     assert(value);
-    return _pluginChannel.invokeMethod('reload', browserId);
+    return _pluginChannel.invokeMethod('reload', _browserId);
   }
 
   Future<void> goForward() async {
@@ -118,7 +125,7 @@ class WebViewController extends ValueNotifier<bool> {
       return;
     }
     assert(value);
-    return _pluginChannel.invokeMethod('goForward', browserId);
+    return _pluginChannel.invokeMethod('goForward', _browserId);
   }
 
   Future<void> goBack() async {
@@ -126,7 +133,7 @@ class WebViewController extends ValueNotifier<bool> {
       return;
     }
     assert(value);
-    return _pluginChannel.invokeMethod('goBack', browserId);
+    return _pluginChannel.invokeMethod('goBack', _browserId);
   }
 
   Future<void> openDevTools() async {
@@ -134,7 +141,7 @@ class WebViewController extends ValueNotifier<bool> {
       return;
     }
     assert(value);
-    return _pluginChannel.invokeMethod('openDevTools', browserId);
+    return _pluginChannel.invokeMethod('openDevTools', _browserId);
   }
 
   Future<void> imeSetComposition(String composingText) async {
@@ -143,7 +150,7 @@ class WebViewController extends ValueNotifier<bool> {
     }
     assert(value);
     return _pluginChannel
-        .invokeMethod('imeSetComposition', [browserId, composingText]);
+        .invokeMethod('imeSetComposition', [_browserId, composingText]);
   }
 
   Future<void> imeCommitText(String composingText) async {
@@ -152,7 +159,7 @@ class WebViewController extends ValueNotifier<bool> {
     }
     assert(value);
     return _pluginChannel
-        .invokeMethod('imeCommitText', [browserId, composingText]);
+        .invokeMethod('imeCommitText', [_browserId, composingText]);
   }
 
   Future<void> setClientFocus(bool focus) async {
@@ -160,7 +167,7 @@ class WebViewController extends ValueNotifier<bool> {
       return;
     }
     assert(value);
-    return _pluginChannel.invokeMethod('setClientFocus', [browserId, focus]);
+    return _pluginChannel.invokeMethod('setClientFocus', [_browserId, focus]);
   }
 
   Future<void> setJavaScriptChannels(Set<JavascriptChannel> channels) async {
@@ -175,7 +182,7 @@ class WebViewController extends ValueNotifier<bool> {
     }
 
     return _pluginChannel.invokeMethod('setJavaScriptChannels',
-        [browserId, _extractJavascriptChannelNames(channels).toList()]);
+        [_browserId, _extractJavascriptChannelNames(channels).toList()]);
   }
 
   Future<void> sendJavaScriptChannelCallBack(
@@ -185,7 +192,7 @@ class WebViewController extends ValueNotifier<bool> {
     }
     assert(value);
     return _pluginChannel.invokeMethod('sendJavaScriptChannelCallBack',
-        [error, result, callbackId, browserId, frameId]);
+        [error, result, callbackId, _browserId, frameId]);
   }
 
   Future<void> executeJavaScript(String code) async {
@@ -193,7 +200,7 @@ class WebViewController extends ValueNotifier<bool> {
       return;
     }
     assert(value);
-    return _pluginChannel.invokeMethod('executeJavaScript', [browserId, code]);
+    return _pluginChannel.invokeMethod('executeJavaScript', [_browserId, code]);
   }
 
   /// Moves the virtual cursor to [position].
@@ -203,7 +210,7 @@ class WebViewController extends ValueNotifier<bool> {
     }
     assert(value);
     return _pluginChannel.invokeMethod(
-        'cursorMove', [browserId, position.dx.round(), position.dy.round()]);
+        'cursorMove', [_browserId, position.dx.round(), position.dy.round()]);
   }
 
   Future<void> _cursorDragging(Offset position) async {
@@ -212,7 +219,7 @@ class WebViewController extends ValueNotifier<bool> {
     }
     assert(value);
     return _pluginChannel.invokeMethod('cursorDragging',
-        [browserId, position.dx.round(), position.dy.round()]);
+        [_browserId, position.dx.round(), position.dy.round()]);
   }
 
   Future<void> _cursorClickDown(Offset position) async {
@@ -221,7 +228,7 @@ class WebViewController extends ValueNotifier<bool> {
     }
     assert(value);
     return _pluginChannel.invokeMethod('cursorClickDown',
-        [browserId, position.dx.round(), position.dy.round()]);
+        [_browserId, position.dx.round(), position.dy.round()]);
   }
 
   Future<void> _cursorClickUp(Offset position) async {
@@ -229,8 +236,8 @@ class WebViewController extends ValueNotifier<bool> {
       return;
     }
     assert(value);
-    return _pluginChannel.invokeMethod(
-        'cursorClickUp', [browserId, position.dx.round(), position.dy.round()]);
+    return _pluginChannel.invokeMethod('cursorClickUp',
+        [_browserId, position.dx.round(), position.dy.round()]);
   }
 
   /// Sets the horizontal and vertical scroll delta.
@@ -240,7 +247,7 @@ class WebViewController extends ValueNotifier<bool> {
     }
     assert(value);
     return _pluginChannel.invokeMethod('setScrollDelta',
-        [browserId, position.dx.round(), position.dy.round(), dx, dy]);
+        [_browserId, position.dx.round(), position.dy.round(), dx, dy]);
   }
 
   /// Sets the surface size to the provided [size].
@@ -250,7 +257,7 @@ class WebViewController extends ValueNotifier<bool> {
     }
     assert(value);
     return _pluginChannel
-        .invokeMethod('setSize', [browserId, dpi, size.width, size.height]);
+        .invokeMethod('setSize', [_browserId, dpi, size.width, size.height]);
   }
 
   Set<String> _extractJavascriptChannelNames(Set<JavascriptChannel> channels) {

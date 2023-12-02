@@ -30,18 +30,13 @@ namespace webview_cef {
 
 		virtual ~WebviewTextureRenderer() {
 			std::lock_guard<std::mutex> autolock(mutex_);
-			if (pixel_buffer && pixel_buffer->buffer) {
-				delete[] pixel_buffer->buffer;
-			}
 			if(registrar_){
 				registrar_->UnregisterTexture(textureId);
-        		registrar_ = nullptr;
 			}
 		}
 
 		const FlutterDesktopPixelBuffer *CopyPixelBuffer(size_t width, size_t height) const{
 			std::lock_guard<std::mutex> autolock(mutex_);
-    		// copyNum_++;
     		return pixel_buffer.get();
 		}
 

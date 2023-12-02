@@ -17,6 +17,10 @@ class WebviewManager extends ValueNotifier<bool> {
 
   final Map<int, WebViewController> _webViews = <int, WebViewController>{};
 
+  final Map<int, WebViewController> _tempWebViews = <int, WebViewController>{};
+
+  int nextIndex = 1;
+
   get ready => _creatingCompleter.future;
 
   Map<String, dynamic> allCookies = {};
@@ -34,11 +38,17 @@ class WebviewManager extends ValueNotifier<bool> {
   }
 
   WebViewController createWebView(Widget? loading) {
-    int browserId = _webViews.length + 1;
+    int browserIndex = nextIndex++;
     final controller =
-        WebViewController(_pluginChannel, browserId, loading: loading);
-    _webViews[browserId] = controller;
+        WebViewController(_pluginChannel, browserIndex, loading: loading);
+    _tempWebViews[browserIndex] = controller;
     return controller;
+  }
+
+  void removeWebView(int browserId) {
+    if (browserId > 0) {
+      _webViews.remove(browserId);
+    }
   }
 
   WebviewManager._internal() : super(false);
@@ -68,6 +78,14 @@ class WebviewManager extends ValueNotifier<bool> {
 
   Future<void> _methodCallhandler(MethodCall call) async {
     switch (call.method) {
+      case "browserCreated":
+        int browserIndex = call.arguments["browserIndex"] as int;
+        int browserId = call.arguments["browserId"] as int;
+        _webViews[browserId] = _tempWebViews[browserIndex]!;
+        _webViews[browserId]
+            ?.onBrowserCreated(browserId, call.arguments["textureId"] as int);
+        _tempWebViews.remove(browserIndex);
+        return;
       case "urlChanged":
         int browserId = call.arguments["browserId"] as int;
         _webViews[browserId]
@@ -94,7 +112,7 @@ class WebviewManager extends ValueNotifier<bool> {
             call.arguments['channel'] as String,
             call.arguments['message'] as String,
             call.arguments['callbackId'] as String,
-            call.arguments['frameId'] as int);
+            call.arguments['frameId'] as String);
         return;
       case 'onFocusedNodeChangeMessage':
         int browserId = call.arguments['browserId'] as int;

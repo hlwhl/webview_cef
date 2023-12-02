@@ -172,8 +172,8 @@ void WebviewHandler::CloseAllBrowsers(bool force_close) {
     
     for (auto& it : browser_map_){
         it.second.browser->GetHost()->CloseBrowser(force_close);
+        it.second.browser = nullptr;
     }
-    browser_map_.clear();
 }
 
 // static
@@ -192,11 +192,12 @@ void WebviewHandler::closeBrowser(int browserId)
     auto it = browser_map_.find(browserId);
     if(it != browser_map_.end()){
         it->second.browser->GetHost()->CloseBrowser(true);
-        browser_map_.erase(it);
+        it->second.browser = nullptr;
+
     }
 }
 
-void WebviewHandler::createBrowser()
+void WebviewHandler::createBrowser(int browserIndex)
 {
     // Specify CEF browser settings here.
 	CefBrowserSettings browser_settings;
@@ -206,7 +207,10 @@ void WebviewHandler::createBrowser()
 	window_info.SetAsWindowless(0);
 
 	// create browser
+    int newBroserId = int(browser_map_.size() + 1);
+    browser_map_[newBroserId] = browser_info();
     CefBrowserHost::CreateBrowser(window_info, this, "", browser_settings, nullptr, nullptr);
+    onBrowserCreated(browserIndex, newBroserId);
 }
 
 void WebviewHandler::sendScrollEvent(int browserId, int x, int y, int deltaX, int deltaY) {
@@ -336,7 +340,7 @@ void WebviewHandler::openDevTools(int browserId) {
     auto it = browser_map_.find(browserId);
     if (it != browser_map_.end()) {
         CefWindowInfo windowInfo;
-#ifdef _WIN32
+#ifdef OS_WIN
         windowInfo.SetAsPopup(nullptr, "DevTools");
 #endif
         it->second.browser->GetHost()->ShowDevTools(windowInfo, this, CefBrowserSettings(), CefPoint());
