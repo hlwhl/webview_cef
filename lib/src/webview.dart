@@ -15,14 +15,20 @@ import 'webview_textinput.dart';
 
 class WebViewController extends ValueNotifier<bool> {
   WebViewController(this._pluginChannel, this._index,
-      {Widget? loading, bool? popup})
+      {Widget? loading, bool? popup, String? name, int? height, int? width})
       : super(false) {
     _loadingWidget = loading;
     _isPopup = popup ?? false;
+    _name = name ?? "";
+    _height = height ?? 600;
+    _width = width ?? 800;
   }
   final MethodChannel _pluginChannel;
   Widget? _loadingWidget;
   bool? _isPopup;
+  String? _name;
+  int? _height;
+  int? _width;
 
   late WebView _webviewWidget;
   Widget get webviewWidget => _webviewWidget;
@@ -70,7 +76,17 @@ class WebViewController extends ValueNotifier<bool> {
     _creatingCompleter = Completer<void>();
     try {
       await WebviewManager().ready;
-      await _pluginChannel.invokeMethod('create', [_index, url, _isPopup]);
+      if (_isPopup!) {
+        await _pluginChannel.invokeMethod('createPopup', [
+          _index,
+          url,
+          _name,
+          _height,
+          _width,
+        ]);
+      } else {
+        await _pluginChannel.invokeMethod('create', [_index, url]);
+      }
       await Future.delayed(const Duration(milliseconds: 100));
       if (!_isPopup!) {
         _webviewWidget = WebView(this);

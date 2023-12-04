@@ -128,7 +128,17 @@ public:
     static bool IsChromeRuntimeEnabled();
 
     void closeBrowser(int browserId);
-    void createBrowser(int browserIndex, std::string url, bool bPopup = false);
+    void createBrowser(
+        int browserIndex, 
+        std::string url,
+        CefWindowInfo window_info = CefWindowInfo(),
+        CefBrowserSettings browser_settings = CefBrowserSettings());
+    void createBrowserPopup(
+        int browserIndex, 
+        std::string url, 
+        std::string name, 
+        int height, 
+        int width);
 
     void sendScrollEvent(int browserId, int x, int y, int deltaX, int deltaY);
     void changeSize(int browserId, float a_dpi, int width, int height);

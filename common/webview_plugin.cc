@@ -209,14 +209,7 @@ namespace webview_cef {
 				}
 			};
 
-#if defined(OS_WIN)
-			//windows run in multi thread
-			new std::thread(startCEF);
-#else
-			//mac、linux run in main thread 
 			startCEF();
-#endif
-			init = true;
 		}
 	}
 
@@ -249,18 +242,15 @@ namespace webview_cef {
 		if(!globalUserAgent.empty()){
 			CefString(&cefs.user_agent) = globalUserAgent;
 		}
-#ifdef OS_MAC
-		cefs.external_message_pump = true;
-    	//CefString(&cefs.browser_subprocess_path) = "/Library/Chaches";
-#else
-		cefs.no_sandbox = true;
-#endif
-		CefInitialize(mainArgs, cefs, app.get(), nullptr);
-
 #ifdef OS_WIN
-		CefRunMessageLoop();
-		CefShutdown();
+		//cef run in another thread on windows
+		cefs.multi_threaded_message_loop = true;
+#else
+		//cef run in main thread on Linux/MacOS, message loop handle by MainApplication
+		cefs.external_message_pump = true;
+    	//CefString(&cefs.browser_subprocess_path) = "/Library/Chaches"; //the helper Program path
 #endif
+		init = CefInitialize(mainArgs, cefs, app.get(), nullptr);
     }
 
     void doMessageLoopWork(){
@@ -287,9 +277,16 @@ namespace webview_cef {
 		else if (name.compare("create") == 0) {
 			int browserIndex = int(webview_value_get_int(webview_value_get_list_value(values, 0)));
 			std::string url = webview_value_get_string(webview_value_get_list_value(values, 1));
-			bool bPopup = webview_value_get_bool(webview_value_get_list_value(values, 2));
-			handler->createBrowser(browserIndex, url, bPopup);
+			handler->createBrowser(browserIndex, url);
 			result = 1;
+		}
+		else if (name.compare("createPopup") == 0) {
+			int browserIndex = int(webview_value_get_int(webview_value_get_list_value(values, 0)));
+			std::string url = webview_value_get_string(webview_value_get_list_value(values, 1));
+			std::string strName = webview_value_get_string(webview_value_get_list_value(values, 2));
+			int height = int(webview_value_get_int(webview_value_get_list_value(values, 3)));
+			int width = int(webview_value_get_int(webview_value_get_list_value(values, 4)));
+			handler->createBrowserPopup(browserIndex, url, strName, height, width);
 		}
 		else if (name.compare("close") == 0) {
 			int browserId = int(webview_value_get_int(values));

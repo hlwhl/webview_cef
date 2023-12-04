@@ -16,9 +16,12 @@ class MyApp extends StatefulWidget {
 
 class _MyAppState extends State<MyApp> {
   final WebViewController _controller =
-      WebviewManager().createWebView(const Text("not initialized"));
-  final WebViewController _controller2 =
-      WebviewManager().createWindow(const Text("not initialized"));
+      WebviewManager().createWebView(loading: const Text("not initialized"));
+  final WebViewController _controller2 = WebviewManager().createWindow(
+      loading: const Text("not initialized"),
+      name: "test",
+      height: 600,
+      width: 800);
   final _textController = TextEditingController();
   String title = "";
   Map<String, dynamic> allCookies = {};

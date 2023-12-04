@@ -37,7 +37,7 @@ class WebviewManager extends ValueNotifier<bool> {
     }
   }
 
-  WebViewController createWebView(Widget? loading) {
+  WebViewController createWebView({Widget? loading}) {
     int browserIndex = nextIndex++;
     final controller =
         WebViewController(_pluginChannel, browserIndex, loading: loading);
@@ -45,11 +45,16 @@ class WebviewManager extends ValueNotifier<bool> {
     return controller;
   }
 
-  WebViewController createWindow(Widget? loading) {
+  WebViewController createWindow(
+      {Widget? loading, String? name, int? height, int? width}) {
     //loading is not used now
     int browserIndex = nextIndex++;
     final controller = WebViewController(_pluginChannel, browserIndex,
-        loading: loading, popup: true);
+        loading: loading,
+        popup: true,
+        name: name,
+        height: height,
+        width: width);
     _tempWebViews[browserIndex] = controller;
     return controller;
   }
