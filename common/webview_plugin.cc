@@ -16,7 +16,7 @@ namespace webview_cef {
 	std::function<std::shared_ptr<WebviewTexture>()> createTextureFunc;
 	std::unordered_map<int, std::shared_ptr<WebviewTexture>> renderers;
     
-    CefRefPtr<WebviewHandler> handler(new WebviewHandler());
+    CefRefPtr<WebviewHandler> handler;
     CefRefPtr<WebviewApp> app;
     CefMainArgs mainArgs;
 	CefString globalUserAgent;
@@ -222,8 +222,7 @@ namespace webview_cef {
 
     void initCEFProcesses(CefMainArgs args){
 		mainArgs = args;
-		app = new WebviewApp(handler);
-	    CefExecuteProcess(mainArgs, app, nullptr);
+	 	initCEFProcesses();
     }
 
 	void initCEFProcesses(){
@@ -233,6 +232,7 @@ namespace webview_cef {
         	printf("load cef err");
     	}
 #endif
+		handler = new WebviewHandler();
 		app = new WebviewApp(handler);
 		CefExecuteProcess(mainArgs, app, nullptr);
 	}
@@ -285,8 +285,10 @@ namespace webview_cef {
 			result = 1;
 		}
 		else if (name.compare("create") == 0) {
-			int browserIndex = int(webview_value_get_int(values));
-			handler->createBrowser(browserIndex);
+			int browserIndex = int(webview_value_get_int(webview_value_get_list_value(values, 0)));
+			std::string url = webview_value_get_string(webview_value_get_list_value(values, 1));
+			bool bPopup = webview_value_get_bool(webview_value_get_list_value(values, 2));
+			handler->createBrowser(browserIndex, url, bPopup);
 			result = 1;
 		}
 		else if (name.compare("close") == 0) {

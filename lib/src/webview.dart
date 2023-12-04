@@ -14,20 +14,22 @@ import 'webview_textinput.dart';
 // const MethodChannel _pluginChannel = MethodChannel("webview_cef");
 
 class WebViewController extends ValueNotifier<bool> {
-  WebViewController(this._pluginChannel, this._index, {Widget? loading})
+  WebViewController(this._pluginChannel, this._index,
+      {Widget? loading, bool? popup})
       : super(false) {
     _loadingWidget = loading;
+    _isPopup = popup ?? false;
   }
   final MethodChannel _pluginChannel;
   Widget? _loadingWidget;
+  bool? _isPopup;
+
   late WebView _webviewWidget;
   Widget get webviewWidget => _webviewWidget;
   Widget get loadingWidget => _loadingWidget ?? const Text("loading...");
 
   late Completer<void> _creatingCompleter;
   Future<void> get ready => _creatingCompleter.future;
-  late Completer<void> _firstloadCompleter;
-  Future<void> get firstload => _firstloadCompleter.future;
   bool _isDisposed = false;
   bool _focusEditable = false;
 
@@ -42,7 +44,8 @@ class WebViewController extends ValueNotifier<bool> {
   get onBrowserCreated => (final int browserId, final int textureId) {
         _browserId = browserId;
         _textureId = textureId;
-        // _creatingCompleter.complete();
+        value = true;
+        _creatingCompleter.complete();
       };
 
   get onJavascriptChannelMessage => (final String channelName,
@@ -60,17 +63,18 @@ class WebViewController extends ValueNotifier<bool> {
       _onImeCompositionRangeChangedMessage;
 
   /// Initializes the underlying platform view.
-  Future<void> initialize() async {
+  Future<void> initialize(String url) async {
     if (_isDisposed) {
       return Future<void>.value();
     }
     _creatingCompleter = Completer<void>();
     try {
       await WebviewManager().ready;
-      await _pluginChannel.invokeMethod('create', _index);
-      await Future.delayed(const Duration(milliseconds: 200));
-      _webviewWidget = WebView(this);
-      _creatingCompleter.complete();
+      await _pluginChannel.invokeMethod('create', [_index, url, _isPopup]);
+      await Future.delayed(const Duration(milliseconds: 100));
+      if (!_isPopup!) {
+        _webviewWidget = WebView(this);
+      }
     } on PlatformException catch (e) {
       _creatingCompleter.completeError(e);
     }
@@ -97,18 +101,8 @@ class WebViewController extends ValueNotifier<bool> {
     if (_isDisposed) {
       return;
     }
-    if (!value) {
-      _firstloadCompleter = Completer<void>();
-      try {
-        await _pluginChannel.invokeMethod('loadUrl', [_browserId, url]);
-        _firstloadCompleter.complete();
-        value = true;
-      } catch (e) {
-        _firstloadCompleter.completeError(e);
-      }
-    } else {
-      return _pluginChannel.invokeMethod('loadUrl', [_browserId, url]);
-    }
+    assert(value);
+    return _pluginChannel.invokeMethod('loadUrl', [_browserId, url]);
   }
 
   /// Reloads the current document.

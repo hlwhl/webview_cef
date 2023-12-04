@@ -96,7 +96,9 @@ void WebviewHandler::OnAddressChange(CefRefPtr<CefBrowser> browser,
 
 void WebviewHandler::OnAfterCreated(CefRefPtr<CefBrowser> browser) {
     CEF_REQUIRE_UI_THREAD();
-    browser_map_[browser->GetIdentifier()].browser = browser;
+    if(browser_map_.find(browser->GetIdentifier()) != browser_map_.end()) {
+        browser_map_[browser->GetIdentifier()].browser = browser;
+    }
 }
 
 bool WebviewHandler::DoClose(CefRefPtr<CefBrowser> browser) {
@@ -197,20 +199,25 @@ void WebviewHandler::closeBrowser(int browserId)
     }
 }
 
-void WebviewHandler::createBrowser(int browserIndex)
+void WebviewHandler::createBrowser(int browserIndex, std::string url, bool bPopup)
 {
     // Specify CEF browser settings here.
 	CefBrowserSettings browser_settings;
 	browser_settings.windowless_frame_rate = 60;
 				
 	CefWindowInfo window_info;
-	window_info.SetAsWindowless(0);
+    if(bPopup){
+        window_info.SetAsPopup(nullptr, "");
+    }
+    else {
+        window_info.SetAsWindowless(0);
+    }
 
 	// create browser
     int newBroserId = int(browser_map_.size() + 1);
     browser_map_[newBroserId] = browser_info();
-    CefBrowserHost::CreateBrowser(window_info, this, "", browser_settings, nullptr, nullptr);
-    onBrowserCreated(browserIndex, newBroserId);
+     CefBrowserHost::CreateBrowser(window_info, this, url, browser_settings, nullptr, nullptr);
+     onBrowserCreated(browserIndex, newBroserId);
 }
 
 void WebviewHandler::sendScrollEvent(int browserId, int x, int y, int deltaX, int deltaY) {

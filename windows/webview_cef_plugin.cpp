@@ -16,7 +16,7 @@
 #include <mutex>
 
 namespace webview_cef {
-
+	std::thread::id mainThreadId;
 	class WebviewTextureRenderer : public WebviewTexture{
 	public:
 		WebviewTextureRenderer(flutter::TextureRegistrar* texture_registrar) {
@@ -198,11 +198,18 @@ namespace webview_cef {
 				plugin_pointer->HandleMethodCall(call, std::move(result));
 			});
 
+		mainThreadId = std::this_thread::get_id();
+
 		auto invoke = [=](std::string method, WValue* arguments) {
+			if (std::this_thread::get_id() != mainThreadId) {
+				DWORD threadId = static_cast<DWORD>(std::hash<std::thread::id>{}(mainThreadId));
+				PostThreadMessage(threadId, WM_USER + 1, 0, 0);
+			}
 			flutter::EncodableValue args = encode_wvalue_to_flvalue(arguments);
 			channel->InvokeMethod(method, std::make_unique<flutter::EncodableValue>(args));
-  		};
-  		setInvokeMethodFunc(invoke);
+		};
+		setInvokeMethodFunc(invoke);
+
 
 		auto createTexture = [=]() {
 			std::shared_ptr<WebviewTextureRenderer> renderer = std::make_shared<WebviewTextureRenderer>(texture_registrar);

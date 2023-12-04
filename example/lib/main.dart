@@ -18,8 +18,7 @@ class _MyAppState extends State<MyApp> {
   final WebViewController _controller =
       WebviewManager().createWebView(const Text("not initialized"));
   final WebViewController _controller2 =
-      WebviewManager().createWebView(const Text("not initialized"));
-
+      WebviewManager().createWindow(const Text("not initialized"));
   final _textController = TextEditingController();
   String title = "";
   Map<String, dynamic> allCookies = {};
@@ -33,7 +32,7 @@ class _MyAppState extends State<MyApp> {
   // Platform messages are asynchronous, so we initialize in an async method.
   Future<void> initPlatformState() async {
     WebviewManager().setUserAgent(
-        "Mozilla/5.0 (Linux; Android 10; SM-G973F) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/80.0.3987.162 Mobile Safari/537.36");
+        "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/94.0.4586.0 Safari/537.36 Edg/94.0.971.0");
     await WebviewManager().initialize();
     String url = "https://flutter.dev/";
     _textController.text = url;
@@ -49,10 +48,8 @@ class _MyAppState extends State<MyApp> {
       },
     ));
 
-    await _controller.initialize();
-    await _controller2.initialize();
-    await _controller.loadUrl(_textController.text);
-    _controller2.loadUrl("www.baidu.com");
+    await _controller.initialize(_textController.text);
+    // await _controller2.initialize("www.baidu.com");
     // ignore: prefer_collection_literals
     final Set<JavascriptChannel> jsChannels = [
       JavascriptChannel(
@@ -70,6 +67,8 @@ class _MyAppState extends State<MyApp> {
     _controller.setJavaScriptChannels(jsChannels);
     //also you can build your own jssdk by execute JavaScript code to CEF
     _controller.executeJavaScript("function abc(e){console.log(e)}");
+
+    _controller2.initialize("www.baidu.com");
 
     // If the widget was removed from the tree while the asynchronous platform
     // message was in flight, we want to discard the reply rather than calling
@@ -155,9 +154,9 @@ class _MyAppState extends State<MyApp> {
               _controller.value
                   ? Expanded(child: _controller.webviewWidget)
                   : _controller.loadingWidget,
-              _controller2.value
-                  ? Expanded(child: _controller2.webviewWidget)
-                  : _controller2.loadingWidget,
+              // _controller2.value
+              //     ? Expanded(child: _controller2.webviewWidget)
+              //     : _controller2.loadingWidget,
             ],
           ))
         ],

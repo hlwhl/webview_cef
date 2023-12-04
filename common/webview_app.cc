@@ -113,6 +113,7 @@ void WebviewApp::OnBeforeCommandLineProcessing(const CefString &process_type, Ce
 		command_line->AppendSwitch("allow-running-insecure-content");                           //allow running insecure content in secure pages
 		// Don't create a "GPUCache" directory when cache-path is unspecified.
 		command_line->AppendSwitch("disable-gpu-shader-disk-cache");                            //disable gpu shader disk cache
+        command_line->AppendSwitch("no-sanbox");                       
 
 		//http://www.chromium.org/developers/design-documents/process-models
 		if (m_uMode == 1)
@@ -243,8 +244,9 @@ void WebviewApp::OnWebKitInitialized()
 
 void WebviewApp::OnBrowserCreated(CefRefPtr<CefBrowser> browser, CefRefPtr<CefDictionaryValue> extra_info)
 {
-    if (!m_render_js_bridge.get())
+    if (!m_render_js_bridge.get()) {
         m_render_js_bridge.reset(new CefJSBridge);
+    }
 }
 
 void WebviewApp::SetProcessMode(uint32_t uMode)

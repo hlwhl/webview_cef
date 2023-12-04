@@ -45,6 +45,15 @@ class WebviewManager extends ValueNotifier<bool> {
     return controller;
   }
 
+  WebViewController createWindow(Widget? loading) {
+    //loading is not used now
+    int browserIndex = nextIndex++;
+    final controller = WebViewController(_pluginChannel, browserIndex,
+        loading: loading, popup: true);
+    _tempWebViews[browserIndex] = controller;
+    return controller;
+  }
+
   void removeWebView(int browserId) {
     if (browserId > 0) {
       _webViews.remove(browserId);
