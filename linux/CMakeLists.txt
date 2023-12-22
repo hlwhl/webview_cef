@@ -74,6 +74,11 @@ add_subdirectory(${CEF_LIBCEF_DLL_WRAPPER_PATH} libcef_dll_wrapper)
 # Find required libraries and update compiler/linker variables.
 FIND_LINUX_LIBRARIES("gmodule-2.0 gtk+-3.0 gthread-2.0 gtk+-unix-print-3.0 xi")
 
+find_program(XCLIP_EXECUTABLE xclip)
+if(NOT XCLIP_EXECUTABLE)
+  message(AUTHOR_WARNING "xclip executable not found. Users need it to paste text into CEF Area.")
+endif()
+
 # Executable target.
 # add_executable(${CEF_TARGET} ${CEFCLIENT_SRCS})
 SET_EXECUTABLE_TARGET_PROPERTIES(${CEF_TARGET})
@@ -89,7 +94,7 @@ set_target_properties(${CEF_TARGET} PROPERTIES RUNTIME_OUTPUT_DIRECTORY ${CEF_TA
 add_definitions("-DGTK_DISABLE_DEPRECATED")
 
 # Set SUID permissions on the chrome-sandbox target.
-SET_LINUX_SUID_PERMISSIONS("${CEF_TARGET}" "${CEF_TARGET_OUT_DIR}/chrome-sandbox")
+# SET_LINUX_SUID_PERMISSIONS("${CEF_TARGET}" "${CEF_TARGET_OUT_DIR}/chrome-sandbox")
 
 #set CEF binary and resource files which need to copy to the target output directory
 set(cef_library_list "")

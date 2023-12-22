@@ -64,7 +64,7 @@ static FlValue* encode_wavlue_to_flvalue(WValue *args){
       FlValue * ret = fl_value_new_list();
       size_t len = webview_value_get_len(args);
       for (size_t i = 0; i < len; i++) {
-        FlValue * val = encode_wavlue_to_flvalue(webview_value_get_value(args, i));
+        FlValue * val = encode_wavlue_to_flvalue(webview_value_get_list_value(args, i));
         fl_value_append(ret, val);
         fl_value_unref(val);
       }
@@ -167,6 +167,7 @@ static void webview_cef_plugin_handle_method_call(
 			texture->width = width;
       texture->height = height;
 			const auto size = width * height * 4;
+      delete texture->buffer;
 			texture->buffer = new uint8_t[size];
 			webview_cef::SwapBufferFromBgraToRgba((void*)texture->buffer, buffer, width, height);
       fl_texture_registrar_mark_texture_frame_available(texture_register, FL_TEXTURE(texture));
@@ -274,7 +275,15 @@ FLUTTER_PLUGIN_EXPORT gboolean processKeyEventForCEF(GtkWidget *widget, GdkEvent
       // We need to treat the enter key as a key press of character \r.  This
       // is apparently just how webkit handles it and what it expects.
       key_event.unmodified_character = '\r';
-    } else {
+    }
+    else if(windows_key_code == VKEY_V && EVENTFLAG_CONTROL_DOWN && event->type == GDK_KEY_PRESS){
+      //try to fix copy request freeze process problem,(flutter engine will send a copy request when ctrl+v pressed)
+      int res = 0;
+      if(system("xclip -o -sel clipboard | xclip -i -sel clipboard  &>/dev/null") == 0){
+        res = system("xclip -o -sel clipboard | xclip -i &>/dev/null");
+      }
+    }
+    else {
       // FIXME: fix for non BMP chars
       key_event.unmodified_character =
           static_cast<int>(gdk_keyval_to_unicode(event->keyval));

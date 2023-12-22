@@ -70,17 +70,47 @@ bool WebviewHandler::OnProcessMessageReceived(
 void WebviewHandler::OnTitleChange(CefRefPtr<CefBrowser> browser,
                                   const CefString& title) {
     //todo: title change
-    if(onTitleChangedCb) {
-        onTitleChangedCb(title);
+    if(onTitleChangedEvent) {
+        onTitleChangedEvent(title);
     }
 }
 
 void WebviewHandler::OnAddressChange(CefRefPtr<CefBrowser> browser,
                              CefRefPtr<CefFrame> frame,
                      const CefString& url) {
-    if(onUrlChangedCb) {
-        onUrlChangedCb(url);
+    if(onUrlChangedEvent) {
+        onTitleChangedEvent(url);
     }
+}
+
+bool WebviewHandler::OnCursorChange(CefRefPtr<CefBrowser> browser,
+                            CefCursorHandle cursor,
+                            cef_cursor_type_t type,
+                            const CefCursorInfo& custom_cursor_info){
+    if(onCursorChangedEvent) {
+        onCursorChangedEvent(type);
+        return true;
+    }
+    return false;
+}
+
+bool WebviewHandler::OnTooltip(CefRefPtr<CefBrowser> browser, CefString& text) {
+    if(onTooltipEvent) {
+        onTooltipEvent(text);
+        return true;
+    }
+    return false;
+}
+
+bool WebviewHandler::OnConsoleMessage(CefRefPtr<CefBrowser> browser,
+                                      cef_log_severity_t level,
+                                      const CefString& message,
+                                      const CefString& source,
+                                      int line){
+    if(onConsoleMessageEvent){
+        onConsoleMessageEvent(level, message, source, line);
+    }
+    return false;
 }
 
 void WebviewHandler::OnAfterCreated(CefRefPtr<CefBrowser> browser) {

@@ -7,6 +7,7 @@ import 'package:flutter/widgets.dart';
 
 import 'webview_events_listener.dart';
 import 'webview_javascript.dart';
+import 'webview_tooltip.dart';
 
 const MethodChannel _pluginChannel = MethodChannel("webview_cef");
 
@@ -45,10 +46,10 @@ class WebViewController extends ValueNotifier<bool> {
   Future<void> _methodCallhandler(MethodCall call) async {
     if (_listener == null) return;
     switch (call.method) {
-      case "urlChanged":
+      case "onUrlChangedEvent":
         _listener?.onUrlChanged?.call(call.arguments);
         return;
-      case "titleChanged":
+      case "onTitleChangedEvent":
         _listener?.onTitleChanged?.call(call.arguments);
         return;
       case "allCookiesVisited":
@@ -63,6 +64,19 @@ class WebViewController extends ValueNotifier<bool> {
             call.arguments['message'],
             call.arguments['callbackId'],
             call.arguments['frameId']);
+        break;
+      case 'onTooltipEvent':
+        onToolTip?.call(call.arguments['text']);
+        break;
+      case 'onCursorChangedEvent':
+        onCursorChanged?.call(call.arguments['type']);
+        break;
+      case 'onConsoleMessageEvent':
+        _listener?.onConsoleMessage?.call(
+            call.arguments['level'],
+            call.arguments['message'],
+            call.arguments['source'],
+            call.arguments['line']);
         break;
       default:
     }
@@ -274,6 +288,9 @@ class WebViewController extends ValueNotifier<bool> {
     }
     assert(_extractJavascriptChannelNames(channels).length == channels.length);
   }
+
+  Function(String)? onToolTip;
+  Function(int)? onCursorChanged;
 }
 
 class WebView extends StatefulWidget {
@@ -288,12 +305,44 @@ class WebView extends StatefulWidget {
 class WebViewState extends State<WebView> {
   final GlobalKey _key = GlobalKey();
   late final _focusNode = FocusNode();
+  WebviewTooltip? _tooltip;
+  MouseCursor _mouseType = SystemMouseCursors.basic;
 
   WebViewController get _controller => widget.controller;
 
   @override
   void initState() {
     super.initState();
+
+    _controller.onToolTip = (final String text) {
+      _tooltip ??= WebviewTooltip(_key.currentContext!);
+      _tooltip?.showToolTip(text);
+    };
+
+    _controller.onCursorChanged = (int type) {
+      switch (type) {
+        case 0:
+          _mouseType = SystemMouseCursors.basic;
+          break;
+        case 1:
+          _mouseType = SystemMouseCursors.precise;
+          break;
+        case 2:
+          _mouseType = SystemMouseCursors.click;
+          break;
+        case 3:
+          _mouseType = SystemMouseCursors.text;
+          break;
+        case 4:
+          _mouseType = SystemMouseCursors.wait;
+          break;
+        default:
+          _mouseType = SystemMouseCursors.basic;
+          break;
+      }
+      setState(() {});
+    };
+
     // Report initial surface size
     WidgetsBinding.instance
         .addPostFrameCallback((_) => _reportSurfaceSize(context));
@@ -323,6 +372,7 @@ class WebViewState extends State<WebView> {
         child: Listener(
           onPointerHover: (ev) {
             _controller._cursorMove(ev.localPosition);
+            _tooltip?.cursorOffset = ev.position;
           },
           onPointerDown: (ev) {
             if (!_focusNode.hasFocus) {
@@ -351,7 +401,10 @@ class WebViewState extends State<WebView> {
             _controller._setScrollDelta(event.localPosition,
                 event.panDelta.dx.round(), event.panDelta.dy.round());
           },
-          child: Texture(textureId: _controller._textureId),
+          child: MouseRegion(
+            cursor: _mouseType,
+            child: Texture(textureId: _controller._textureId),
+          ),
         ),
       ),
     );
