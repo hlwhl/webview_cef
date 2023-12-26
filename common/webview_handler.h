@@ -18,9 +18,15 @@ public CefLifeSpanHandler,
 public CefLoadHandler,
 public CefRenderHandler{
 public:
+    //Paint callback
     std::function<void(const void*, int32_t width, int32_t height)> onPaintCallback;
-    std::function<void(std::string url)> onUrlChangedCb;
-    std::function<void(std::string title)> onTitleChangedCb;
+    //cef message event
+    std::function<void(std::string url)> onUrlChangedEvent;
+    std::function<void(std::string title)> onTitleChangedEvent;
+    std::function<void(int type)>onCursorChangedEvent;
+    std::function<void(std::string text)> onTooltipEvent;
+    std::function<void(int level, std::string message, std::string source, int line)>onConsoleMessageEvent;
+    //custom action callback or webpage event
     std::function<void(std::map<std::string, std::map<std::string, std::string>>)> onAllCookieVisitedCb;
     std::function<void(std::map<std::string, std::map<std::string, std::string>>)> onUrlCookieVisitedCb;
     std::function<void(std::string, std::string, std::string, std::string)> onJavaScriptChannelMessage;
@@ -54,6 +60,16 @@ public:
     virtual void OnAddressChange(CefRefPtr<CefBrowser> browser,
                                  CefRefPtr<CefFrame> frame,
                                  const CefString& url) override;
+    virtual bool OnCursorChange(CefRefPtr<CefBrowser> browser,
+                                CefCursorHandle cursor,
+                                cef_cursor_type_t type,
+                                const CefCursorInfo& custom_cursor_info) override;
+    virtual bool OnTooltip(CefRefPtr<CefBrowser> browser, CefString& text) override;
+    virtual bool OnConsoleMessage(CefRefPtr<CefBrowser> browser,
+                                  cef_log_severity_t level,
+                                  const CefString& message,
+                                  const CefString& source,
+                                  int line) override;
     
     // CefLifeSpanHandler methods:
     virtual void OnAfterCreated(CefRefPtr<CefBrowser> browser) override;

@@ -58,7 +58,7 @@ FlutterMethodChannel* f_channel;
             int len = webview_value_get_len(args);
             NSMutableArray* array = [NSMutableArray arrayWithCapacity:len];
             for(int i = 0; i < len; i++) {
-                WValue* item = webview_value_get_value(args, i);
+                WValue* item = webview_value_get_list_value(args, i);
                 [array addObject:[self encode_wvalue_to_flvalue:item]];
             }
             return array;

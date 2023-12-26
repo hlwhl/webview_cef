@@ -66,7 +66,7 @@ namespace webview_cef {
 				flutter::EncodableList ret;
 				size_t len = webview_value_get_len(args);
 				for (size_t i = 0; i < len; i++) {
-                	ret.push_back(encode_wvalue_to_flvalue(webview_value_get_value(args, i)));
+                	ret.push_back(encode_wvalue_to_flvalue(webview_value_get_list_value(args, i)));
 				}
 				return ret;
 			}

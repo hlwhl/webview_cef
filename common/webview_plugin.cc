@@ -16,8 +16,8 @@ namespace webview_cef {
 	bool isFocused = false;
 	std::function<void(std::string, WValue*)> invokeFunc;
     
-    CefRefPtr<WebviewHandler> handler(new WebviewHandler());
-    CefRefPtr<WebviewApp> app(new WebviewApp(handler));
+    CefRefPtr<WebviewHandler> handler;
+    CefRefPtr<WebviewApp> app;
     CefMainArgs mainArgs;
 
 	static int cursorAction(WValue *args, std::string name) {
@@ -46,7 +46,7 @@ namespace webview_cef {
 
     void initCEFProcesses(CefMainArgs args){
 		mainArgs = args;
-	    CefExecuteProcess(mainArgs, app, nullptr);
+	    initCEFProcesses();
     }
 
 	void initCEFProcesses(){
@@ -56,6 +56,8 @@ namespace webview_cef {
         	printf("load cef err");
     	}
 #endif
+    	handler = new WebviewHandler();
+    	app = new WebviewApp(handler);
 		CefExecuteProcess(mainArgs, app, nullptr);
 	}
 
@@ -70,18 +72,17 @@ namespace webview_cef {
 #ifndef OS_MAC
 		cefs.no_sandbox = true;
 #endif
-        
-#ifdef OS_MAC
+
+#ifdef OS_WIN
+		//cef message loop run in another thread on windows
+		cefs.multi_threaded_message_loop = true;
+#else
+		//cef message loop handle by MainApplication
 		cefs.external_message_pump = true;
-    	//CefString(&cefs.browser_subprocess_path) = "/Library/Chaches";
+    	//CefString(&cefs.browser_subprocess_path) = "/Library/Chaches"; //the helper Program path
 #endif
 
 		CefInitialize(mainArgs, cefs, app.get(), nullptr);
-
-#ifdef OS_WIN
-		CefRunMessageLoop();
-		CefShutdown();
-#endif
 	}
 
     void doMessageLoopWork()
@@ -91,7 +92,13 @@ namespace webview_cef {
 
     int HandleMethodCall(std::string name, WValue* values, WValue* response) {
         int result = -1;
-		if (name.compare("loadUrl") == 0) {
+		if(name.compare("dispose") == 0){
+			// we don't need to dispose the texture, texture will be disposed by flutter engine
+			// int64_t textureId = webview_value_get_int(values);
+			CefShutdown();
+			result = 1;
+		}
+		else if (name.compare("loadUrl") == 0) {
 			if (const auto url = webview_value_get_string(values)) {
 				handler.get()->loadUrl(url);
 				result = 1;
@@ -213,23 +220,65 @@ namespace webview_cef {
 		if (!init)
 		{
 			handler.get()->onPaintCallback = callback;
-			handler.get()->onUrlChangedCb = [](std::string url)
+			handler.get()->onUrlChangedEvent = [](std::string url)
 			{
 				if (invokeFunc)
 				{
 					WValue *wUrl = webview_value_new_string(const_cast<char *>(url.c_str()));
-					invokeFunc("urlChanged", wUrl);
+					invokeFunc("onUrlChangedEvent", wUrl);
 					webview_value_unref(wUrl);
 				}
 			};
 
-			handler.get()->onTitleChangedCb = [](std::string title)
+			handler.get()->onTitleChangedEvent = [](std::string title)
 			{
 				if (invokeFunc)
 				{
 					WValue *wTitle = webview_value_new_string(const_cast<char *>(title.c_str()));
-					invokeFunc("titleChanged", wTitle);
+					invokeFunc("onTitleChangedEvent", wTitle);
 					webview_value_unref(wTitle);
+				}
+			};
+
+			handler.get()->onTooltipEvent = [](std::string text) {
+				if (invokeFunc) {
+					WValue* wText = webview_value_new_string(const_cast<char*>(text.c_str()));
+					WValue* retMap = webview_value_new_map();
+					webview_value_set_string(retMap, "text", wText);
+					invokeFunc("onTooltipEvent", retMap);
+					webview_value_unref(wText);
+					webview_value_unref(retMap);
+				}
+			};
+
+			handler.get()->onCursorChangedEvent = [](int type) {
+				if(invokeFunc){
+					WValue* wType = webview_value_new_int(type);
+					WValue* retMap = webview_value_new_map();
+					webview_value_set_string(retMap, "type", wType);
+					invokeFunc("onCursorChangedEvent", retMap);
+					webview_value_unref(wType);
+					webview_value_unref(retMap);
+				}
+			};
+
+			handler.get()->onConsoleMessageEvent = [](int level, std::string message, std::string source, int line){
+				if(invokeFunc){
+					WValue* wLevel = webview_value_new_int(level);
+					WValue* wMessage = webview_value_new_string(const_cast<char*>(message.c_str()));
+					WValue* wSource = webview_value_new_string(const_cast<char*>(source.c_str()));
+					WValue* wLine = webview_value_new_int(line);
+					WValue* retMap = webview_value_new_map();
+					webview_value_set_string(retMap, "level", wLevel);
+					webview_value_set_string(retMap, "message", wMessage);
+					webview_value_set_string(retMap, "source", wSource);
+					webview_value_set_string(retMap, "line", wLine);
+					invokeFunc("onConsoleMessageEvent", retMap);
+					webview_value_unref(wLevel);
+					webview_value_unref(wMessage);
+					webview_value_unref(wSource);
+					webview_value_unref(wLine);
+					webview_value_unref(retMap);
 				}
 			};
 
@@ -298,14 +347,7 @@ namespace webview_cef {
 					webview_value_unref(fId);
 				}
 			};
-
-#if defined(OS_WIN)
-			//windows run in multi thread
-			new std::thread(startCEF);
-#else
-			//mac、linux run in main thread 
 			startCEF();
-#endif
 			init = true;
 		}
     }
