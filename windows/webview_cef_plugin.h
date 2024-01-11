@@ -11,7 +11,7 @@ namespace webview_cef {
 
 class WebviewCefPlugin : public flutter::Plugin {
  public:
-  static void RegisterWithRegistrar(flutter::PluginRegistrarWindows *registrar);
+  static void RegisterWithRegistrar(FlutterDesktopPluginRegistrarRef registrar);
 
   WebviewCefPlugin();
 
@@ -21,11 +21,13 @@ class WebviewCefPlugin : public flutter::Plugin {
   WebviewCefPlugin(const WebviewCefPlugin&) = delete;
   WebviewCefPlugin& operator=(const WebviewCefPlugin&) = delete;
 
+static void handleMessageProc(UINT message, WPARAM wparam, LPARAM lparam);
+
  private:
   // Called when a method is called on this plugin's channel from Dart.
   void HandleMethodCall(
       const flutter::MethodCall<flutter::EncodableValue> &method_call,
-      std::unique_ptr<flutter::MethodResult<flutter::EncodableValue>> result);
+      std::shared_ptr<flutter::MethodResult<flutter::EncodableValue>> result);
 };
 
 }  // namespace webview_cef

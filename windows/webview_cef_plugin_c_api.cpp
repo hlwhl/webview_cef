@@ -6,9 +6,7 @@
 
 void WebviewCefPluginCApiRegisterWithRegistrar(
 	FlutterDesktopPluginRegistrarRef registrar) {
-	webview_cef::WebviewCefPlugin::RegisterWithRegistrar(
-		flutter::PluginRegistrarManager::GetInstance()
-		->GetRegistrar<flutter::PluginRegistrarWindows>(registrar));
+	webview_cef::WebviewCefPlugin::RegisterWithRegistrar(registrar);
 }
 
 FLUTTER_PLUGIN_EXPORT void initCEFProcesses() {
@@ -99,8 +97,12 @@ int GetCefKeyboardModifiers(WPARAM wparam, LPARAM lparam) {
 	return modifiers;
 }
 
-FLUTTER_PLUGIN_EXPORT void processKeyEventForCEF(unsigned int message, unsigned __int64 wParam, __int64 lParam)
+FLUTTER_PLUGIN_EXPORT void handleWndProcForCEF(unsigned int message, unsigned __int64 wParam, __int64 lParam)
 {
+	if(message == WM_USER + 1){
+		webview_cef::WebviewCefPlugin::handleMessageProc(message, wParam, lParam);
+		return;
+	}
 	if (message != WM_SYSCHAR && message != WM_SYSKEYDOWN && message != WM_SYSKEYUP && message != WM_KEYDOWN && message != WM_KEYUP && message != WM_CHAR) return;
 	CefKeyEvent event;
 	event.windows_key_code = (int)wParam;

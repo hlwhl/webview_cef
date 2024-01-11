@@ -373,49 +373,32 @@ void WebviewHandler::deleteCookie(const std::string& domain, const std::string& 
     }
 }
 
-bool WebviewHandler::getCookieVisitor(){
-    if(!m_CookieVisitor.get())
-    {
-        m_CookieVisitor = new WebviewCookieVisitor();
-        m_CookieVisitor->setOnVisitComplete([=](std::map<std::string, std::map<std::string, std::string>> cookies){
-            if(cookies.size() == 1){
-                if(onUrlCookieVisitedCb){
-                    onUrlCookieVisitedCb(cookies);
-                }
-            }else if(cookies.size() > 1){
-                if(onAllCookieVisitedCb){
-                    onAllCookieVisitedCb(cookies);
-                }
-            }
-        });
-        if (!m_CookieVisitor.get())
-		{
-			return false;
-		}
-    }
-    return true;
-}
-
-bool WebviewHandler::visitAllCookies(){
+bool WebviewHandler::visitAllCookies(std::function<void(std::map<std::string, std::map<std::string, std::string>>)> callback){
     CefRefPtr<CefCookieManager> manager = CefCookieManager::GetGlobalManager(nullptr);
-    if (!manager || !getCookieVisitor())
+    if (!manager)
 	{
 		return false;
 	}
 
-    return manager->VisitAllCookies(m_CookieVisitor);
+    CefRefPtr<WebviewCookieVisitor> cookieVisitor = new WebviewCookieVisitor();
+    cookieVisitor->setOnVisitComplete(callback);
+
+    return manager->VisitAllCookies(cookieVisitor);
 }
 
-bool WebviewHandler::visitUrlCookies(const std::string& domain, const bool& isHttpOnly){
+bool WebviewHandler::visitUrlCookies(const std::string& domain, const bool& isHttpOnly, std::function<void(std::map<std::string, std::map<std::string, std::string>>)> callback){
     CefRefPtr<CefCookieManager> manager = CefCookieManager::GetGlobalManager(nullptr);
-    if (!manager || !getCookieVisitor())
+    if (!manager)
 	{
 		return false;
 	}
+
+    CefRefPtr<WebviewCookieVisitor> cookieVisitor = new WebviewCookieVisitor();
+    cookieVisitor->setOnVisitComplete(callback);
 
     std::string httpDomain = "https://" + domain + "/cookiestorage";
 
-    return manager->VisitUrlCookies(httpDomain, isHttpOnly, m_CookieVisitor);
+    return manager->VisitUrlCookies(httpDomain, isHttpOnly, cookieVisitor);
 }
 
 bool WebviewHandler::setJavaScriptChannels(const std::vector<std::string> channels)

@@ -41,7 +41,7 @@ int APIENTRY wWinMain(_In_ HINSTANCE instance, _In_opt_ HINSTANCE prev,
     ::DispatchMessage(&msg);
     
     //add this line to enable cef keybord input
-    processKeyEventForCEF(msg.message, msg.wParam, msg.lParam);
+    handleWndProcForCEF(msg.message, msg.wParam, msg.lParam);
   }
 
   ::CoUninitialize();

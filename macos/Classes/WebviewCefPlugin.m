@@ -17,6 +17,6 @@
 }
 
 - (void)handleMethodCall:(FlutterMethodCall*)call result:(FlutterResult)result {
-    result([CefWrapper handleMethodCallWrapper:call]);
+    [CefWrapper handleMethodCallWrapper:call result:result];
 }
 @end
