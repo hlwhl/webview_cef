@@ -26,7 +26,9 @@ class WebviewTooltip {
           locale: Localizations.localeOf(context),
           textDirection: TextDirection.ltr,
           text: TextSpan(text: text, style: _textStyle),
-        )..layout(maxWidth: 500, minWidth: 1);
+          maxLines: 5,
+          ellipsis: '...',
+        )..layout(maxWidth: width - 16);
         if (cursorOffset.dy + textPainter.height + 25 > height) {
           cursorOffset =
               Offset(cursorOffset.dx, height - textPainter.height - 10);
@@ -61,9 +63,10 @@ class WebviewTooltip {
                   BoxShadow(blurRadius: 2, color: Colors.black.withOpacity(.2))
                 ],
               ),
-              child: Text(
-                text,
-                style: _textStyle,
+              child: RichText(
+                text: TextSpan(text: text, style: _textStyle),
+                maxLines: 5,
+                overflow: TextOverflow.ellipsis,
               ),
             ),
           ),

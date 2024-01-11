@@ -52,12 +52,6 @@ class WebViewController extends ValueNotifier<bool> {
       case "onTitleChangedEvent":
         _listener?.onTitleChanged?.call(call.arguments);
         return;
-      case "allCookiesVisited":
-        _listener?.onAllCookiesVisited?.call(Map.from(call.arguments));
-        return;
-      case "urlCookiesVisited":
-        _listener?.onUrlCookiesVisited?.call(Map.from(call.arguments));
-        return;
       case 'javascriptChannelMessage':
         _handleJavascriptChannelMessage(
             call.arguments['channel'],
@@ -159,7 +153,7 @@ class WebViewController extends ValueNotifier<bool> {
     return _pluginChannel.invokeMethod('deleteCookie', [domain, key]);
   }
 
-  Future<void> visitAllCookies() async {
+  Future<dynamic> visitAllCookies() async {
     if (_isDisposed) {
       return;
     }
@@ -167,7 +161,7 @@ class WebViewController extends ValueNotifier<bool> {
     return _pluginChannel.invokeMethod('visitAllCookies');
   }
 
-  Future<void> visitUrlCookies(String domain, bool isHttpOnly) async {
+  Future<dynamic> visitUrlCookies(String domain, bool isHttpOnly) async {
     if (_isDisposed) {
       return;
     }
@@ -200,7 +194,7 @@ class WebViewController extends ValueNotifier<bool> {
         'sendJavaScriptChannelCallBack', [error, result, callbackId, frameId]);
   }
 
-  Future<void> executeJavaScript(String code) async {
+  Future<dynamic> executeJavaScript(String code) async {
     if (_isDisposed) {
       return;
     }

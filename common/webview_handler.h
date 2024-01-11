@@ -26,9 +26,7 @@ public:
     std::function<void(int type)>onCursorChangedEvent;
     std::function<void(std::string text)> onTooltipEvent;
     std::function<void(int level, std::string message, std::string source, int line)>onConsoleMessageEvent;
-    //custom action callback or webpage event
-    std::function<void(std::map<std::string, std::map<std::string, std::string>>)> onAllCookieVisitedCb;
-    std::function<void(std::map<std::string, std::map<std::string, std::string>>)> onUrlCookieVisitedCb;
+    //webpage message
     std::function<void(std::string, std::string, std::string, std::string)> onJavaScriptChannelMessage;
 
     explicit WebviewHandler();
@@ -124,16 +122,14 @@ public:
     
     void setCookie(const std::string& domain, const std::string& key, const std::string& value);
     void deleteCookie(const std::string& domain, const std::string& key);
-    bool visitAllCookies();
-    bool visitUrlCookies(const std::string& domain, const bool& isHttpOnly);
+    bool visitAllCookies(std::function<void(std::map<std::string, std::map<std::string, std::string>>)> callback);
+    bool visitUrlCookies(const std::string& domain, const bool& isHttpOnly, std::function<void(std::map<std::string, std::map<std::string, std::string>>)> callback);
 
     bool setJavaScriptChannels(const std::vector<std::string> channels);
     bool sendJavaScriptChannelCallBack(const bool error, const std::string result, const std::string callbackId, const std::string frameId);
     bool executeJavaScript(const std::string code);
     
 private:
-    bool getCookieVisitor();
-
     uint32_t width = 1;
     uint32_t height = 1;
     float dpi = 1.0;
@@ -146,7 +142,6 @@ private:
     // Include the default reference counting implementation.
     IMPLEMENT_REFCOUNTING(WebviewHandler);
 
-    CefRefPtr<WebviewCookieVisitor> m_CookieVisitor;
 };
 
 #endif  // CEF_TESTS_CEFSIMPLE_SIMPLE_HANDLER_H_
