@@ -86,6 +86,17 @@ bool CefJSHandler::Execute(const CefString& name,
 		int reqID = CefJSBridge::GetNextReqID();
 		retval = CefV8Value::CreateInt(reqID);
 	}
+	else if (name == "EvaluateCallback") {
+		CefString callbackId = arguments[0]->GetStringValue();
+		CefString result = arguments[1]->GetStringValue();
+		if (!js_bridge_->EvaluateCallback(callbackId, result)) {
+			std::ostringstream strStream;
+			strStream << "Failed to callback:  " << callbackId.c_str() << ".";
+			strStream.flush();
+
+			exception = strStream.str();
+		}
+	}
 	else {
 		exception = "NativeHost no this fun.";
 	}
@@ -124,6 +135,22 @@ bool CefJSBridge::StartRequest(int reqId,
 
 	return false;
 }
+
+bool CefJSBridge::EvaluateCallback(const CefString& callbackId, const CefString& result){
+	CefRefPtr<CefV8Context> context = CefV8Context::GetCurrentContext();
+	if(context){
+		CefRefPtr<CefFrame> frame = context->GetFrame();
+		if(frame){
+			CefRefPtr<CefProcessMessage> message = CefProcessMessage::Create(kEvaluateCallbackMessage);
+			message->GetArgumentList()->SetString(0, callbackId);
+			message->GetArgumentList()->SetString(1, result);
+			frame->SendProcessMessage(PID_BROWSER, message);
+			return true;
+		}
+	}
+	return false;
+}
+
 
 int CefJSBridge::GetNextReqID()
 {

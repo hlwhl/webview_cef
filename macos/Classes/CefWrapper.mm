@@ -288,9 +288,9 @@ FlutterMethodChannel* f_channel;
         result([NSNumber numberWithLong:textureId]);
     }else{
         WValue *encodeArgs = [self encode_flvalue_to_wvalue:call.arguments];
-        int ret = webview_cef::HandleMethodCall(name, encodeArgs, [=](int ret, WValue* args){
+        webview_cef::HandleMethodCall(name, encodeArgs, [=](int ret, WValue* args){
             if(ret != 0){
-                result([self encode_wvalue_to_flvalue:args])
+                result([self encode_wvalue_to_flvalue:args]);
             }
             else{
                 result(nil);

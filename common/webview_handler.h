@@ -9,6 +9,7 @@
 
 #include <functional>
 #include <list>
+#include <unordered_map>
 
 #include "webview_cookieVisitor.h"
 
@@ -122,12 +123,12 @@ public:
     
     void setCookie(const std::string& domain, const std::string& key, const std::string& value);
     void deleteCookie(const std::string& domain, const std::string& key);
-    bool visitAllCookies(std::function<void(std::map<std::string, std::map<std::string, std::string>>)> callback);
-    bool visitUrlCookies(const std::string& domain, const bool& isHttpOnly, std::function<void(std::map<std::string, std::map<std::string, std::string>>)> callback);
+    void visitAllCookies(std::function<void(std::map<std::string, std::map<std::string, std::string>>)> callback);
+    void visitUrlCookies(const std::string& domain, const bool& isHttpOnly, std::function<void(std::map<std::string, std::map<std::string, std::string>>)> callback);
 
-    bool setJavaScriptChannels(const std::vector<std::string> channels);
-    bool sendJavaScriptChannelCallBack(const bool error, const std::string result, const std::string callbackId, const std::string frameId);
-    bool executeJavaScript(const std::string code);
+    void setJavaScriptChannels(const std::vector<std::string> channels);
+    void sendJavaScriptChannelCallBack(const bool error, const std::string result, const std::string callbackId, const std::string frameId);
+    void executeJavaScript(const std::string code, std::function<void(std::string)> callback = nullptr);
     
 private:
     uint32_t width = 1;
@@ -138,6 +139,8 @@ private:
     // List of existing browser windows. Only accessed on the CEF UI thread.
     typedef std::list<CefRefPtr<CefBrowser>> BrowserList;
     BrowserList browser_list_;
+
+    std::unordered_map<std::string, std::function<void(std::string)>> js_callbacks_;
     
     // Include the default reference counting implementation.
     IMPLEMENT_REFCOUNTING(WebviewHandler);

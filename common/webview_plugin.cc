@@ -219,6 +219,14 @@ namespace webview_cef {
 			handler.get()->executeJavaScript(code);
 			result(1, nullptr);
 		}
+		else if(name.compare("evaluateJavascript") == 0){
+			const auto code = webview_value_get_string(webview_value_get_list_value(values, 0));
+			handler.get()->executeJavaScript(code, [=](std::string values){
+				WValue* retValue = webview_value_new_string(values.c_str());
+				result(1, retValue);
+				webview_value_unref(retValue);
+			});
+		}
 		else {
 			result = 0;
 		}
