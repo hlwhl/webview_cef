@@ -194,12 +194,20 @@ class WebViewController extends ValueNotifier<bool> {
         'sendJavaScriptChannelCallBack', [error, result, callbackId, frameId]);
   }
 
-  Future<dynamic> executeJavaScript(String code) async {
+  Future<void> executeJavaScript(String code) async {
     if (_isDisposed) {
       return;
     }
     assert(value);
     return _pluginChannel.invokeMethod('executeJavaScript', [code]);
+  }
+
+  Future<dynamic> evaluateJavascript(String code) async {
+    if (_isDisposed) {
+      return;
+    }
+    assert(value);
+    return _pluginChannel.invokeMethod('evaluateJavascript', [code]);
   }
 
   /// Moves the virtual cursor to [position].

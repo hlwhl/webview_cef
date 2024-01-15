@@ -9,6 +9,7 @@
 
 static const char kJSCallCppFunctionMessage[] = "JSCallCppFunction";		 //js call c++ message
 static const char kExecuteJsCallbackMessage[] = "ExecuteJsCallback";		 //c++ call js message
+static const char kEvaluateCallbackMessage[] = "EvaluateCallback";		 //js callback c++ message
 static const char kFocusedNodeChangedMessage[] = "FocusedNodeChanged";		 //elements that capture focus in web pages changed message
 
 class CefJSBridge
@@ -22,6 +23,7 @@ public:
 public:
 	static int  GetNextReqID();
 	bool StartRequest(int reqId, const CefString& strCmd, const CefString& strCallback, const CefString& strArgs);
+	bool EvaluateCallback(const CefString& callbackId, const CefString& result);
 
 	bool CallCppFunction(const CefString& function_name, const CefString& params, CefRefPtr<CefV8Value> callback, CefRefPtr<CefV8Value> rawdata);
 	void RemoveCallbackFuncWithFrame(CefRefPtr<CefFrame> frame);
