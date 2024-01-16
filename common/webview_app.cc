@@ -119,7 +119,7 @@ void WebviewApp::OnBeforeCommandLineProcessing(const CefString &process_type, Ce
 		if (m_uMode == 1)
 		{
 			command_line->AppendSwitch("process-per-site");                                     //each site in its own process
-			command_line->AppendSwitchWithValue("--renderer-process-limit ", "8");              //limit renderer process count to decrease memory usage
+			command_line->AppendSwitchWithValue("renderer-process-limit ", "8");              //limit renderer process count to decrease memory usage
 		}
 		else if (m_uMode == 2)
 		{
@@ -127,10 +127,27 @@ void WebviewApp::OnBeforeCommandLineProcessing(const CefString &process_type, Ce
 		}
 		else if (m_uMode == 3)
 		{
-			command_line->AppendSwitch("--single-process");                                     //all in one process
+			command_line->AppendSwitch("single-process");                                     //all in one process
 		}
 		command_line->AppendSwitchWithValue("autoplay-policy", "no-user-gesture-required");     //autoplay policy for media
-		// for unsafe domain, add domain to whitelist
+
+        //Support cross domain requests
+        std::string values = command_line->GetSwitchValue("disable-features");
+        if (values == "")
+        {
+            values = "SameSiteByDefaultCookies,CookiesWithoutSameSiteMustBeSecure";
+        }
+        else
+        {
+            values += ",SameSiteByDefaultCookies,CookiesWithoutSameSiteMustBeSecure";
+        }
+        if (values.find("CalculateNativeWinOcclusion") == size_t(-1))
+        {
+            values += ",CalculateNativeWinOcclusion";
+        }
+
+        command_line->AppendSwitchWithValue("disable-features", values);
+        // for unsafe domain, add domain to whitelist
 		if (!m_strFilterDomain.empty())
 		{
 			command_line->AppendSwitch("ignore-certificate-errors");                            //ignore certificate errors

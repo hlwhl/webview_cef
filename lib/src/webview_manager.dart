@@ -13,7 +13,9 @@ class WebviewManager extends ValueNotifier<bool> {
 
   late Completer<void> _creatingCompleter;
 
-  final MethodChannel _pluginChannel = const MethodChannel("webview_cef");
+  late MethodChannel pluginChannel;
+
+  static const mainChannelName = 'webview_cef';
 
   final Map<int, WebViewController> _webViews = <int, WebViewController>{};
 
@@ -25,12 +27,6 @@ class WebviewManager extends ValueNotifier<bool> {
 
   Map<String, dynamic> allCookies = {};
 
-  String globalUserAgent = "";
-
-  void setUserAgent(String userAgent) {
-    globalUserAgent = userAgent;
-  }
-
   void _handleVisitCookies(Map<String, dynamic> cookies) {
     for (final key in cookies.keys) {
       allCookies[key] = cookies[key];
@@ -40,7 +36,7 @@ class WebviewManager extends ValueNotifier<bool> {
   WebViewController createWebView({Widget? loading}) {
     int browserIndex = nextIndex++;
     final controller =
-        WebViewController(_pluginChannel, browserIndex, loading: loading);
+        WebViewController(pluginChannel, browserIndex, loading: loading);
     _tempWebViews[browserIndex] = controller;
     return controller;
   }
@@ -49,7 +45,7 @@ class WebviewManager extends ValueNotifier<bool> {
       {Widget? loading, String? name, int? height, int? width}) {
     //loading is not used now
     int browserIndex = nextIndex++;
-    final controller = WebViewController(_pluginChannel, browserIndex,
+    final controller = WebViewController(pluginChannel, browserIndex,
         loading: loading,
         popup: true,
         name: name,
@@ -70,8 +66,8 @@ class WebviewManager extends ValueNotifier<bool> {
   Future<void> initialize() async {
     _creatingCompleter = Completer<void>();
     try {
-      await _pluginChannel.invokeMethod('init', globalUserAgent);
-      _pluginChannel.setMethodCallHandler(_methodCallhandler);
+      await pluginChannel.invokeMethod('init');
+      pluginChannel.setMethodCallHandler(methodCallhandler);
       // Wait for the platform to complete initialization.
       await Future.delayed(const Duration(milliseconds: 300));
       _creatingCompleter.complete();
@@ -85,21 +81,18 @@ class WebviewManager extends ValueNotifier<bool> {
   @override
   Future<void> dispose() async {
     super.dispose();
-    await _pluginChannel.invokeMethod('dispose');
-    _pluginChannel.setMethodCallHandler(null);
+    await pluginChannel.invokeMethod('dispose');
+    pluginChannel.setMethodCallHandler(null);
     _webViews.clear();
   }
 
-  Future<void> _methodCallhandler(MethodCall call) async {
+  void onBrowserCreated(int browserIndex, int browserId) {
+    _webViews[browserId] = _tempWebViews[browserIndex]!;
+    _tempWebViews.remove(browserIndex);
+  }
+
+  Future<void> methodCallhandler(MethodCall call) async {
     switch (call.method) {
-      case "browserCreated":
-        int browserIndex = call.arguments["browserIndex"] as int;
-        int browserId = call.arguments["browserId"] as int;
-        _webViews[browserId] = _tempWebViews[browserIndex]!;
-        _webViews[browserId]
-            ?.onBrowserCreated(browserId, call.arguments["textureId"] as int);
-        _tempWebViews.remove(browserIndex);
-        return;
       case "urlChanged":
         int browserId = call.arguments["browserId"] as int;
         _webViews[browserId]
@@ -113,6 +106,14 @@ class WebviewManager extends ValueNotifier<bool> {
             ?.listener
             ?.onTitleChanged
             ?.call(call.arguments["title"] as String);
+        return;
+      case "onConsoleMessage":
+        int browserId = call.arguments["browserId"] as int;
+        _webViews[browserId]?.listener?.onConsoleMessage?.call(
+            call.arguments["level"] as int,
+            call.arguments["message"] as String,
+            call.arguments["source"] as String,
+            call.arguments["line"] as int);
         return;
       case "allCookiesVisited":
         _handleVisitCookies(Map.from(call.arguments));
@@ -128,6 +129,16 @@ class WebviewManager extends ValueNotifier<bool> {
             call.arguments['callbackId'] as String,
             call.arguments['frameId'] as String);
         return;
+      case 'onTooltip':
+        int browserId = call.arguments['browserId'] as int;
+        _webViews[browserId]?.onToolTip?.call(call.arguments['text'] as String);
+        return;
+      case 'onCursorChanged':
+        int browserId = call.arguments['browserId'] as int;
+        _webViews[browserId]
+            ?.onCursorChanged
+            ?.call(call.arguments['type'] as int);
+        return;
       case 'onFocusedNodeChangeMessage':
         int browserId = call.arguments['browserId'] as int;
         bool editable = call.arguments['editable'] as bool;
@@ -135,8 +146,9 @@ class WebviewManager extends ValueNotifier<bool> {
         return;
       case 'onImeCompositionRangeChangedMessage':
         int browserId = call.arguments['browserId'] as int;
-        _webViews[browserId]?.onImeCompositionRangeChangedMessage?.call(
-            call.arguments['x'] as double, call.arguments['y'] as double);
+        _webViews[browserId]
+            ?.onImeCompositionRangeChangedMessage
+            ?.call(call.arguments['x'] as int, call.arguments['y'] as int);
         return;
       default:
     }
@@ -144,21 +156,21 @@ class WebviewManager extends ValueNotifier<bool> {
 
   Future<void> setCookie(String domain, String key, String val) async {
     assert(value);
-    return _pluginChannel.invokeMethod('setCookie', [domain, key, val]);
+    return pluginChannel.invokeMethod('setCookie', [domain, key, val]);
   }
 
   Future<void> deleteCookie(String domain, String key) async {
     assert(value);
-    return _pluginChannel.invokeMethod('deleteCookie', [domain, key]);
+    return pluginChannel.invokeMethod('deleteCookie', [domain, key]);
   }
 
   Future<void> visitAllCookies() async {
     assert(value);
-    return _pluginChannel.invokeMethod('visitAllCookies');
+    return pluginChannel.invokeMethod('visitAllCookies');
   }
 
   Future<void> visitUrlCookies(String domain, bool isHttpOnly) async {
     assert(value);
-    return _pluginChannel.invokeMethod('visitUrlCookies', [domain, isHttpOnly]);
+    return pluginChannel.invokeMethod('visitUrlCookies', [domain, isHttpOnly]);
   }
 }

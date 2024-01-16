@@ -4,8 +4,7 @@ class JavascriptMessage {
   /// Constructs a JavaScript message object.
   ///
   /// The `message` parameter must not be null.
-  const JavascriptMessage(this.message, this.callbackId, this.frameId)
-      : assert(message != null && frameId != null);
+  const JavascriptMessage(this.message, this.callbackId, this.frameId);
 
   /// The contents of the message that was sent by the JavaScript code.
   final String message;

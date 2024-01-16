@@ -16,6 +16,10 @@
 #import "../../common/webview_value.h"
 #include <thread>
 
+#define CEF_USER_AGENT  "Mozilla/5.0 (Macintosh; Intel Mac OS X 10_15_7) AppleWebKit/605.1.15 (KHTML, like Gecko) \
+                        Infoflow/macOS SysVersion/13.4 AppID/0 AppVersion/2.3.28.5 JsVersion/62 Launch/web \
+                        DistType/1 machi/2.3.28.5 JsVersion/62 OSVersion/13.4"
+
 NSObject<FlutterTextureRegistry>* tr;
 CGFloat scaleFactor = 0.0;
 
@@ -83,7 +87,7 @@ private:
             int64_t len = webview_value_get_len(args);
             NSMutableArray* array = [NSMutableArray arrayWithCapacity:len];
             for(int64_t i = 0; i < len; i++) {
-                WValue* item = webview_value_get_value(args, i);
+                WValue* item = webview_value_get_list_value(args, i);
                 [array addObject:[self encode_wvalue_to_flvalue:item]];
             }
             return array;
@@ -92,10 +96,11 @@ private:
             int64_t len = webview_value_get_len(args);
             NSMutableDictionary* dic = [NSMutableDictionary dictionaryWithCapacity:len];
             for(int i = 0; i < len; i++) {
-                NSString *key = [self encode_wvalue_to_flvalue:webview_value_get_key(args, i)];
                 WValue *value = webview_value_get_value(args, i);
+                WValue *key = webview_value_get_key(args, i);
+                NSString *nsKkey = [self encode_wvalue_to_flvalue:key];
                 if (key != nil && value != nil) {
-                    [dic setObject:[self encode_wvalue_to_flvalue:value] forKey:key];
+                    [dic setObject:[self encode_wvalue_to_flvalue:value] forKey:nsKkey];
                 }
             }
             return dic;
@@ -280,7 +285,7 @@ private:
 }
 
 + (void)setMethodChannel: (FlutterMethodChannel*)channel {
-    webview_cef::initCEFProcesses();
+    webview_cef::initCEFProcesses(CEF_USER_AGENT);
     f_channel = channel;
     auto invoke = [=](std::string method, WValue* arguments){
         NSObject *arg = [self encode_wvalue_to_flvalue:arguments];
@@ -308,7 +313,7 @@ private:
     webview_value_unref(encodeArgs);
     if(ret != 0){
         if(name.compare("init") == 0){
-            _timer = [NSTimer timerWithTimeInterval:0.02f target:self selector:@selector(doMessageLoopWork) userInfo:nil repeats:YES];
+            _timer = [NSTimer timerWithTimeInterval:0.016f target:self selector:@selector(doMessageLoopWork) userInfo:nil repeats:YES];
             [[NSRunLoop mainRunLoop] addTimer: _timer forMode:NSRunLoopCommonModes];
         
             [NSEvent addLocalMonitorForEventsMatchingMask:NSEventMaskKeyDown handler:^NSEvent * _Nullable(NSEvent * _Nonnull event) {

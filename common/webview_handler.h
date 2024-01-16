@@ -39,8 +39,13 @@ public:
     std::function<void(int borwserId, const void* buffer, int32_t width, int32_t height)> onPaintCallback;
     std::function<void(int browserIndex, int browserId)> onBrowserCreated;
 
+    //display callback
     std::function<void(int browserId, std::string url)> onUrlChangedCb;
     std::function<void(int browserId, std::string title)> onTitleChangedCb;
+    std::function<void(int browserId, int type)>onCursorChanged;
+    std::function<void(int browserId, std::string text)> onTooltip;
+    std::function<void(int browserId, int level, std::string message, std::string source, int line)>onConsoleMessage;
+
     std::function<void(std::string, std::string, std::string, int browserId, std::string)> onJavaScriptChannelMessage;
     std::function<void(int browserId, bool editable)> onFocusedNodeChangeMessage;
     std::function<void(int browserId, int32_t x, int32_t y)> onImeCompositionRangeChangedMessage;
@@ -80,6 +85,16 @@ public:
     virtual void OnAddressChange(CefRefPtr<CefBrowser> browser,
                                  CefRefPtr<CefFrame> frame,
                                  const CefString& url) override;
+    virtual bool OnCursorChange(CefRefPtr<CefBrowser> browser,
+                                CefCursorHandle cursor,
+                                cef_cursor_type_t type,
+                                const CefCursorInfo& custom_cursor_info) override;
+    virtual bool OnTooltip(CefRefPtr<CefBrowser> browser, CefString& text) override;
+    //virtual bool OnConsoleMessage(CefRefPtr<CefBrowser> browser,
+    //                              cef_log_severity_t level,
+    //                              const CefString& message,
+    //                              const CefString& source,
+    //                              int line) override;
     
     // CefLifeSpanHandler methods:
     virtual void OnAfterCreated(CefRefPtr<CefBrowser> browser) override;
@@ -118,7 +133,6 @@ public:
                                DragOperationsMask allowed_ops,
                                int x,
                                int y) override;
-
     virtual void OnImeCompositionRangeChanged(CefRefPtr<CefBrowser> browser,const CefRange& selection_range,const CefRenderHandler::RectList& character_bounds) override;
 
     // Request that all existing browser windows close.
@@ -128,13 +142,11 @@ public:
     static bool IsChromeRuntimeEnabled();
 
     void closeBrowser(int browserId);
-    void createBrowser(
-        int browserIndex, 
+    int createBrowser(
         std::string url,
-        CefWindowInfo window_info = CefWindowInfo(),
-        CefBrowserSettings browser_settings = CefBrowserSettings());
-    void createBrowserPopup(
-        int browserIndex, 
+        const CefWindowInfo &window_info,
+        const CefBrowserSettings &browser_settings);
+    int createBrowserPopup(
         std::string url, 
         std::string name, 
         int height, 

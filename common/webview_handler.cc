@@ -7,6 +7,7 @@
 #include <sstream>
 #include <string>
 #include <iostream>
+#include <unordered_map>
 
 #include "include/base/cef_callback.h"
 #include "include/cef_app.h"
@@ -81,18 +82,47 @@ bool WebviewHandler::OnProcessMessageReceived(
 void WebviewHandler::OnTitleChange(CefRefPtr<CefBrowser> browser,
                                   const CefString& title) {
     //todo: title change
-    if(onTitleChangedCb) {
+    if(!browser->IsPopup() && onTitleChangedCb) {
         onTitleChangedCb(browser->GetIdentifier(), title);
     }
 }
 
 void WebviewHandler::OnAddressChange(CefRefPtr<CefBrowser> browser,
-                             CefRefPtr<CefFrame> frame,
-                     const CefString& url) {
-    if(onUrlChangedCb) {
+                                     CefRefPtr<CefFrame> frame,
+                                     const CefString& url) {
+    if(!browser->IsPopup() && onUrlChangedCb) {
         onUrlChangedCb(browser->GetIdentifier(), url);
     }
 }
+bool WebviewHandler::OnCursorChange(CefRefPtr<CefBrowser> browser,
+                                    CefCursorHandle cursor,
+                                    cef_cursor_type_t type,
+                                    const CefCursorInfo& custom_cursor_info){
+    if(!browser->IsPopup() && onCursorChanged) {
+        onCursorChanged(browser->GetIdentifier(), type);
+        return true;
+    }
+    return false;
+}
+
+bool WebviewHandler::OnTooltip(CefRefPtr<CefBrowser> browser, CefString& text) {
+    if(!browser->IsPopup() && onTooltip) {
+        onTooltip(browser->GetIdentifier(), text);
+        return true;
+    }
+    return false;
+}
+
+//bool WebviewHandler::OnConsoleMessage(CefRefPtr<CefBrowser> browser,
+//                                      cef_log_severity_t level,
+//                                      const CefString& message,
+//                                      const CefString& source,
+//                                      int line){
+    //if(onConsoleMessage){
+    //    onConsoleMessage(browser->GetIdentifier(), level, message, source, line);
+    //} 
+    //return true;
+//}
 
 void WebviewHandler::OnAfterCreated(CefRefPtr<CefBrowser> browser) {
     CEF_REQUIRE_UI_THREAD();
@@ -176,6 +206,7 @@ void WebviewHandler::CloseAllBrowsers(bool force_close) {
         it.second.browser->GetHost()->CloseBrowser(force_close);
         it.second.browser = nullptr;
     }
+    browser_map_.clear();
 }
 
 // static
@@ -195,27 +226,20 @@ void WebviewHandler::closeBrowser(int browserId)
     if(it != browser_map_.end()){
         it->second.browser->GetHost()->CloseBrowser(true);
         it->second.browser = nullptr;
-
+        browser_map_.erase(it);
     }
 }
 
-void WebviewHandler::createBrowser(int browserIndex, std::string url, CefWindowInfo window_info, CefBrowserSettings browser_settings)
+int WebviewHandler::createBrowser(std::string url, const CefWindowInfo &window_info, const CefBrowserSettings &browser_settings)
 {
-    // Specify CEF browser settings here.
-	browser_settings.windowless_frame_rate = 60;
-
-    if (window_info.style == 0) {
-        window_info.SetAsWindowless(0);
-    }
-
 	// create browser
     int newBroserId = int(browser_map_.size() + 1);
     browser_map_[newBroserId] = browser_info();
-     CefBrowserHost::CreateBrowser(window_info, this, url, browser_settings, nullptr, nullptr);
-     onBrowserCreated(browserIndex, newBroserId);
+    CefBrowserHost::CreateBrowser(window_info, this, url, browser_settings, nullptr, nullptr);
+    return newBroserId;
 }
 
-void WebviewHandler::createBrowserPopup(int browserIndex, std::string url , std::string name, int height, int width) {
+int WebviewHandler::createBrowserPopup(std::string url , std::string name, int height, int width) {
     CefBrowserSettings browser_settings;
 
     CefWindowInfo window_info;
@@ -228,7 +252,7 @@ void WebviewHandler::createBrowserPopup(int browserIndex, std::string url , std:
     window_info.bounds.width = width;
     CefString(&window_info.window_name) = name;
 
-    createBrowser(browserIndex, url, CefWindowInfo(window_info), browser_settings);
+    return createBrowser(url, CefWindowInfo(window_info), browser_settings);
 }
 
 void WebviewHandler::sendScrollEvent(int browserId, int x, int y, int deltaX, int deltaY) {
@@ -314,6 +338,31 @@ bool WebviewHandler::StartDragging(CefRefPtr<CefBrowser> browser,
         it->second.is_dragging = true;
     }
     return true;
+}
+
+void WebviewHandler::OnImeCompositionRangeChanged(CefRefPtr<CefBrowser> browser, const CefRange &selection_range, const CefRenderHandler::RectList &character_bounds)
+{
+    CEF_REQUIRE_UI_THREAD();
+    auto it = browser_map_.find(browser->GetIdentifier());
+    if(it == browser_map_.end() || !it->second.browser.get() || browser->IsPopup()) {
+        return;
+    }
+    if (!character_bounds.empty()) {
+        if (it->second.is_ime_commit) {
+            auto lastCharacter = character_bounds.back();
+            it->second.prev_ime_position = lastCharacter;
+            onImeCompositionRangeChangedMessage(browser->GetIdentifier(), lastCharacter.x + lastCharacter.width, lastCharacter.y + lastCharacter.height);
+            it->second.is_ime_commit = false;
+        }
+        else
+        {
+            auto firstCharacter = character_bounds.front();
+            if (firstCharacter != it->second.prev_ime_position) {
+                it->second.prev_ime_position = firstCharacter;
+                onImeCompositionRangeChangedMessage(browser->GetIdentifier(), firstCharacter.x, firstCharacter.y + firstCharacter.height);
+            }
+        }
+    }
 }
 
 void WebviewHandler::sendKeyEvent(CefKeyEvent& ev)
@@ -530,14 +579,12 @@ bool WebviewHandler::executeJavaScript(int browserId, const std::string code)
     if(!code.empty())
     {
         auto bit = browser_map_.find(browserId);
-        if(bit != browser_map_.end()){
-            if (bit->second.browser.get()) {
+        if(bit != browser_map_.end() && bit->second.browser.get()){
                 //TODO: this code is not true on muti tab
                 CefRefPtr<CefFrame> frame = bit->second.browser->GetMainFrame();
                 if (frame) {
 			        frame->ExecuteJavaScript(code, frame->GetURL(), 0);
 			        return true;
-		        }
             }
         }
     }
@@ -547,7 +594,7 @@ bool WebviewHandler::executeJavaScript(int browserId, const std::string code)
 void WebviewHandler::GetViewRect(CefRefPtr<CefBrowser> browser, CefRect &rect) {
     CEF_REQUIRE_UI_THREAD();
     auto it = browser_map_.find(browser->GetIdentifier());
-    if(it == browser_map_.end() || !it->second.browser.get()) {
+    if(it == browser_map_.end() || !it->second.browser.get() || browser->IsPopup()) {
         return;
     }
     rect.x = rect.y = 0;
@@ -573,30 +620,10 @@ bool WebviewHandler::GetScreenInfo(CefRefPtr<CefBrowser> browser, CefScreenInfo&
 
 void WebviewHandler::OnPaint(CefRefPtr<CefBrowser> browser, CefRenderHandler::PaintElementType type,
                             const CefRenderHandler::RectList &dirtyRects, const void *buffer, int w, int h) {
+    if (browser->IsPopup()) {
+        return;
+    }
     onPaintCallback(browser->GetIdentifier(), buffer, w, h);
 }
 
-void WebviewHandler::OnImeCompositionRangeChanged(CefRefPtr<CefBrowser> browser, const CefRange &selection_range, const CefRenderHandler::RectList &character_bounds)
-{
-    CEF_REQUIRE_UI_THREAD();
-    auto it = browser_map_.find(browser->GetIdentifier());
-    if(it == browser_map_.end() || !it->second.browser.get()) {
-        return;
-    }
-    if (!character_bounds.empty()) {
-        if (it->second.is_ime_commit) {
-            auto lastCharacter = character_bounds.back();
-            it->second.prev_ime_position = lastCharacter;
-            onImeCompositionRangeChangedMessage(browser->GetIdentifier(), lastCharacter.x + lastCharacter.width, lastCharacter.y + lastCharacter.height);
-            it->second.is_ime_commit = false;
-        }
-        else
-        {
-            auto firstCharacter = character_bounds.front();
-            if (firstCharacter != it->second.prev_ime_position) {
-                it->second.prev_ime_position = firstCharacter;
-                onImeCompositionRangeChangedMessage(browser->GetIdentifier(), firstCharacter.x, firstCharacter.y + firstCharacter.height);
-            }
-        }
-    }
-}
+

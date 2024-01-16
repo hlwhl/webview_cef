@@ -3,7 +3,12 @@
 
 @implementation WebviewCefPlugin
 
+static BOOL registered = NO;
+
 + (void)registerWithRegistrar:(NSObject<FlutterPluginRegistrar>*)registrar {
+    if(registered)
+        return;
+    registered = YES;
     FlutterMethodChannel* channel = [FlutterMethodChannel
                                      methodChannelWithName:@"webview_cef"
                                      binaryMessenger:[registrar messenger]];

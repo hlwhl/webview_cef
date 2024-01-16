@@ -1,6 +1,7 @@
 import 'dart:async';
 
 import 'package:flutter/material.dart';
+import 'package:flutter/services.dart';
 import 'package:webview_cef/webview_cef.dart';
 
 void main() {
@@ -15,29 +16,31 @@ class MyApp extends StatefulWidget {
 }
 
 class _MyAppState extends State<MyApp> {
-  final WebViewController _controller =
-      WebviewManager().createWebView(loading: const Text("not initialized"));
-  final WebViewController _controller2 = WebviewManager().createWindow(
-      loading: const Text("not initialized"),
-      name: "test",
-      height: 600,
-      width: 800);
+  late WebViewController _controller;
+  // late WebViewController _controller2;
   final _textController = TextEditingController();
   String title = "";
   Map<String, dynamic> allCookies = {};
 
   @override
   void initState() {
+    WebviewManager().pluginChannel = const MethodChannel(
+        WebviewManager.mainChannelName, StandardMethodCodec());
+    _controller =
+        WebviewManager().createWebView(loading: const Text("not initialized"));
+    // _controller2 = WebviewManager().createWindow(
+    //   loading: const Text("not initialized"),
+    //   name: "test",
+    //   height: 600,
+    //   width: 800);
     super.initState();
     initPlatformState();
   }
 
   // Platform messages are asynchronous, so we initialize in an async method.
   Future<void> initPlatformState() async {
-    WebviewManager().setUserAgent(
-        "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/94.0.4586.0 Safari/537.36 Edg/94.0.971.0");
     await WebviewManager().initialize();
-    String url = "https://flutter.dev/";
+    String url = "www.baidu.com";
     _textController.text = url;
     //unified interface for all platforms set user agent
     _controller.setWebviewListener(WebviewEventsListener(
@@ -71,7 +74,7 @@ class _MyAppState extends State<MyApp> {
     //also you can build your own jssdk by execute JavaScript code to CEF
     _controller.executeJavaScript("function abc(e){console.log(e)}");
 
-    _controller2.initialize("www.baidu.com");
+    // _controller2.initialize("www.baidu.com");
 
     // If the widget was removed from the tree while the asynchronous platform
     // message was in flight, we want to discard the reply rather than calling

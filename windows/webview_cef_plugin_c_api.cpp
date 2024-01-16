@@ -4,22 +4,28 @@
 
 #include "webview_cef_plugin.h"
 
+static bool registered = false;
 void WebviewCefPluginCApiRegisterWithRegistrar(
-	FlutterDesktopPluginRegistrarRef registrar) {
-	webview_cef::WebviewCefPlugin::RegisterWithRegistrar(
-		flutter::PluginRegistrarManager::GetInstance()
-		->GetRegistrar<flutter::PluginRegistrarWindows>(registrar));
+	FlutterDesktopPluginRegistrarRef registrar)
+{
+	if (registered)
+		return;
+	webview_cef::WebviewCefPlugin::RegisterWithRegistrar(registrar);
+	registered = true;
 }
 
-FLUTTER_PLUGIN_EXPORT void initCEFProcesses() {
-  	webview_cef::initCEFProcesses();
+FLUTTER_PLUGIN_EXPORT void initCEFProcesses(std::string userAgent)
+{
+	webview_cef::initCEFProcesses(userAgent);
 }
 
-bool IsKeyDown(WPARAM wparam) {
+bool IsKeyDown(WPARAM wparam)
+{
 	return (GetKeyState((int)wparam) & 0x8000) != 0;
 }
 
-int GetCefKeyboardModifiers(WPARAM wparam, LPARAM lparam) {
+int GetCefKeyboardModifiers(WPARAM wparam, LPARAM lparam)
+{
 	int modifiers = 0;
 	if (IsKeyDown(VK_SHIFT))
 		modifiers |= EVENTFLAG_SHIFT_DOWN;
@@ -34,7 +40,8 @@ int GetCefKeyboardModifiers(WPARAM wparam, LPARAM lparam) {
 	if (::GetKeyState(VK_CAPITAL) & 1)
 		modifiers |= EVENTFLAG_CAPS_LOCK_ON;
 
-	switch (wparam) {
+	switch (wparam)
+	{
 	case VK_RETURN:
 		if ((lparam >> 16) & KF_EXTENDED)
 			modifiers |= EVENTFLAG_IS_KEY_PAD;
@@ -99,14 +106,18 @@ int GetCefKeyboardModifiers(WPARAM wparam, LPARAM lparam) {
 	return modifiers;
 }
 
-FLUTTER_PLUGIN_EXPORT void processKeyEventForCEF(unsigned int message, unsigned __int64 wParam, __int64 lParam)
+FLUTTER_PLUGIN_EXPORT void HandleWndProc(unsigned int message, unsigned __int64 wParam, __int64 lParam)
 {
-	if (message != WM_SYSCHAR && message != WM_SYSKEYDOWN && message != WM_SYSKEYUP && message != WM_KEYDOWN && message != WM_KEYUP && message != WM_CHAR) return;
+	if (message == WM_USER + 1) {
+		webview_cef::WebviewCefPlugin::handleMessageProc(message,wParam,lParam);
+	}
+	if (message != WM_SYSCHAR && message != WM_SYSKEYDOWN && message != WM_SYSKEYUP && message != WM_KEYDOWN && message != WM_KEYUP && message != WM_CHAR)
+		return;
 	CefKeyEvent event;
 	event.windows_key_code = (int)wParam;
 	event.native_key_code = (int)lParam;
 	event.is_system_key = message == WM_SYSCHAR || message == WM_SYSKEYDOWN ||
-		message == WM_SYSKEYUP;
+						  message == WM_SYSKEYUP;
 
 	if (message == WM_KEYDOWN || message == WM_SYSKEYDOWN)
 		event.type = KEYEVENT_RAWKEYDOWN;
@@ -118,7 +129,8 @@ FLUTTER_PLUGIN_EXPORT void processKeyEventForCEF(unsigned int message, unsigned 
 
 	// mimic alt-gr check behaviour from
 	// src/ui/events/win/events_win_utils.cc: GetModifiersFromKeyState
-	if ((event.type == KEYEVENT_CHAR) && IsKeyDown(VK_RMENU)) {
+	if ((event.type == KEYEVENT_CHAR) && IsKeyDown(VK_RMENU))
+	{
 		// reverse AltGr detection taken from PlatformKeyMap::UsesAltGraph
 		// instead of checking all combination for ctrl-alt, just check current char
 		HKL current_layout = ::GetKeyboardLayout(0);
@@ -131,7 +143,8 @@ FLUTTER_PLUGIN_EXPORT void processKeyEventForCEF(unsigned int message, unsigned 
 		// 4 Either ALT key is pressed.
 		SHORT scan_res = ::VkKeyScanExW((WCHAR)wParam, current_layout);
 		constexpr auto ctrlAlt = (2 | 4);
-		if (((scan_res >> 8) & ctrlAlt) == ctrlAlt) {  // ctrl-alt pressed
+		if (((scan_res >> 8) & ctrlAlt) == ctrlAlt)
+		{ // ctrl-alt pressed
 			event.modifiers &= ~(EVENTFLAG_CONTROL_DOWN | EVENTFLAG_ALT_DOWN);
 			event.modifiers |= EVENTFLAG_ALTGR_DOWN;
 		}

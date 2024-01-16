@@ -4,28 +4,30 @@ import 'dart:io';
 import 'package:flutter/gestures.dart';
 import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
-import 'package:flutter/widgets.dart';
-import 'package:webview_cef/src/webview_manager.dart';
 
+import 'webview_manager.dart';
 import 'webview_events_listener.dart';
 import 'webview_javascript.dart';
 import 'webview_textinput.dart';
-
-// const MethodChannel _pluginChannel = MethodChannel("webview_cef");
+import 'webview_tooltip.dart';
 
 class WebViewController extends ValueNotifier<bool> {
   WebViewController(this._pluginChannel, this._index,
-      {Widget? loading, bool? popup, String? name, int? height, int? width})
+      {Widget? loading,
+      bool popup = false,
+      String? name,
+      int? height,
+      int? width})
       : super(false) {
     _loadingWidget = loading;
-    _isPopup = popup ?? false;
+    _isPopup = popup;
     _name = name ?? "";
     _height = height ?? 600;
     _width = width ?? 800;
   }
   final MethodChannel _pluginChannel;
   Widget? _loadingWidget;
-  bool? _isPopup;
+  late bool _isPopup;
   String? _name;
   int? _height;
   int? _width;
@@ -47,13 +49,6 @@ class WebViewController extends ValueNotifier<bool> {
   WebviewEventsListener? _listener;
   WebviewEventsListener? get listener => _listener;
 
-  get onBrowserCreated => (final int browserId, final int textureId) {
-        _browserId = browserId;
-        _textureId = textureId;
-        value = true;
-        _creatingCompleter.complete();
-      };
-
   get onJavascriptChannelMessage => (final String channelName,
           final String message, final String callbackId, final String frameId) {
         if (_javascriptChannels.containsKey(channelName)) {
@@ -64,6 +59,8 @@ class WebViewController extends ValueNotifier<bool> {
         }
       };
 
+  get onToolTip => _onToolTip;
+  get onCursorChanged => _onCursorChanged;
   get onFocusedNodeChangeMessage => _onFocusedNodeChangeMessage;
   get onImeCompositionRangeChangedMessage =>
       _onImeCompositionRangeChangedMessage;
@@ -76,19 +73,24 @@ class WebViewController extends ValueNotifier<bool> {
     _creatingCompleter = Completer<void>();
     try {
       await WebviewManager().ready;
+      List args;
       if (_isPopup!) {
-        await _pluginChannel.invokeMethod('createPopup', [
-          _index,
+        args = await _pluginChannel.invokeMethod('createPopup', [
           url,
           _name,
           _height,
           _width,
         ]);
       } else {
-        await _pluginChannel.invokeMethod('create', [_index, url]);
+        args = await _pluginChannel.invokeMethod('create', url);
       }
+      _browserId = args[0] as int;
+      _textureId = _isPopup ? 0 : args[1] as int;
+      value = true;
+      _creatingCompleter.complete();
+      WebviewManager().onBrowserCreated(_index, _browserId);
       await Future.delayed(const Duration(milliseconds: 100));
-      if (!_isPopup!) {
+      if (!_isPopup) {
         _webviewWidget = WebView(this);
       }
     } on PlatformException catch (e) {
@@ -284,8 +286,10 @@ class WebViewController extends ValueNotifier<bool> {
     assert(_extractJavascriptChannelNames(channels).length == channels.length);
   }
 
+  Function(String)? _onToolTip;
+  Function(int)? _onCursorChanged;
   Function(bool editable)? _onFocusedNodeChangeMessage;
-  Function(double, double)? _onImeCompositionRangeChangedMessage;
+  Function(int, int)? _onImeCompositionRangeChangedMessage;
 }
 
 class WebView extends StatefulWidget {
@@ -302,6 +306,8 @@ class WebViewState extends State<WebView> with WebeViewTextInput {
   String _composingText = '';
   late final _focusNode = FocusNode();
   bool isPrimaryFocus = false;
+  WebviewTooltip? _tooltip;
+  MouseCursor _mouseType = SystemMouseCursors.basic;
 
   WebViewController get _controller => widget.controller;
 
@@ -349,7 +355,37 @@ class WebViewState extends State<WebView> with WebeViewTextInput {
 
     _controller._onImeCompositionRangeChangedMessage = (x, y) {
       final box = _key.currentContext!.findRenderObject() as RenderBox;
-      updateIMEComposionPosition(x, y, box.localToGlobal(Offset.zero));
+      updateIMEComposionPosition(
+          x.toDouble(), y.toDouble(), box.localToGlobal(Offset.zero));
+    };
+
+    _controller._onToolTip = (final String text) {
+      _tooltip ??= WebviewTooltip(_key.currentContext!);
+      _tooltip?.showToolTip(text);
+    };
+
+    _controller._onCursorChanged = (int type) {
+      switch (type) {
+        case 0:
+          _mouseType = SystemMouseCursors.basic;
+          break;
+        case 1:
+          _mouseType = SystemMouseCursors.precise;
+          break;
+        case 2:
+          _mouseType = SystemMouseCursors.click;
+          break;
+        case 3:
+          _mouseType = SystemMouseCursors.text;
+          break;
+        case 4:
+          _mouseType = SystemMouseCursors.wait;
+          break;
+        default:
+          _mouseType = SystemMouseCursors.basic;
+          break;
+      }
+      setState(() {});
     };
 
     // Report initial surface size
@@ -392,6 +428,7 @@ class WebViewState extends State<WebView> with WebeViewTextInput {
         child: Listener(
           onPointerHover: (ev) {
             _controller._cursorMove(ev.localPosition);
+            _tooltip?.cursorOffset = ev.localPosition;
           },
           onPointerDown: (ev) {
             if (!_focusNode.hasFocus) {
@@ -421,7 +458,10 @@ class WebViewState extends State<WebView> with WebeViewTextInput {
             _controller._setScrollDelta(event.localPosition,
                 event.panDelta.dx.round(), event.panDelta.dy.round());
           },
-          child: Texture(textureId: _controller._textureId),
+          child: MouseRegion(
+            cursor: _mouseType,
+            child: Texture(textureId: _controller._textureId),
+          ),
         ),
       ),
     );

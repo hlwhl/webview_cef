@@ -11,7 +11,7 @@ namespace webview_cef {
 
 class WebviewCefPlugin : public flutter::Plugin {
  public:
-  static void RegisterWithRegistrar(flutter::PluginRegistrarWindows *registrar);
+  static void RegisterWithRegistrar(FlutterDesktopPluginRegistrarRef registrar);
 
   WebviewCefPlugin();
 
@@ -20,6 +20,8 @@ class WebviewCefPlugin : public flutter::Plugin {
   // Disallow copy and assign.
   WebviewCefPlugin(const WebviewCefPlugin&) = delete;
   WebviewCefPlugin& operator=(const WebviewCefPlugin&) = delete;
+
+  static void handleMessageProc(UINT message, WPARAM wparam, LPARAM lparam);
 
  private:
   // Called when a method is called on this plugin's channel from Dart.
