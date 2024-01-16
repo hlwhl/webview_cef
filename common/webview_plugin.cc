@@ -16,10 +16,10 @@ namespace webview_cef {
 	std::function<void(std::string, WValue*)> invokeFunc;
 	std::function<std::shared_ptr<WebviewTexture>()> createTextureFunc;
 	std::unordered_map<int, std::shared_ptr<WebviewTexture>> renderers;
-    
-    CefRefPtr<WebviewHandler> handler;
-    CefRefPtr<WebviewApp> app;
-    CefMainArgs mainArgs;
+
+	CefRefPtr<WebviewHandler> handler;
+	CefRefPtr<WebviewApp> app;
+	CefMainArgs mainArgs;
 
 	static int cursorAction(WValue *args, std::string name) {
 		if (!args || webview_value_get_len(args) != 3) {
@@ -55,7 +55,7 @@ namespace webview_cef {
 				}
 			};
 
-			handler.get()->onTooltip = [](int browserId, std::string text) {
+			handler.get()->onTooltipEvent = [](int browserId, std::string text) {
 				if (invokeFunc) {
 					WValue* bId = webview_value_new_int(browserId);
 					WValue* wText = webview_value_new_string(const_cast<char*>(text.c_str()));
@@ -69,7 +69,7 @@ namespace webview_cef {
 				}
 			};
 
-			handler.get()->onCursorChanged = [](int browserId, int type) {
+			handler.get()->onCursorChangedEvent = [](int browserId, int type) {
 				if(invokeFunc){
 					WValue* bId = webview_value_new_int(browserId);
 					WValue* wType = webview_value_new_int(type);
@@ -83,7 +83,7 @@ namespace webview_cef {
 				}
 			};
 
-			handler.get()->onConsoleMessage = [](int browserId, int level, std::string message, std::string source, int line){
+			handler.get()->onConsoleMessageEvent = [](int browserId, int level, std::string message, std::string source, int line){
 				if(invokeFunc){
 					WValue* bId = webview_value_new_int(browserId);
 					WValue* wLevel = webview_value_new_int(level);
@@ -106,7 +106,7 @@ namespace webview_cef {
 				}
 			};
 
-			handler.get()->onUrlChangedCb = [](int browserId, std::string url)
+			handler.get()->onUrlChangedEvent = [](int browserId, std::string url)
 			{
 				if (invokeFunc)
 				{
@@ -122,7 +122,7 @@ namespace webview_cef {
 				}
 			};
 
-			handler.get()->onTitleChangedCb = [](int browserId, std::string title)
+			handler.get()->onTitleChangedEvent = [](int browserId, std::string title)
 			{
 				if (invokeFunc)
 				{
@@ -134,50 +134,6 @@ namespace webview_cef {
 					invokeFunc("titleChanged", retMap);
 					webview_value_unref(bId);
 					webview_value_unref(wTitle);
-					webview_value_unref(retMap);
-				}
-			};
-
-			handler.get()->onAllCookieVisitedCb = [](std::map<std::string, std::map<std::string, std::string>> cookies)
-			{
-				if (invokeFunc)
-				{
-					WValue* retMap = webview_value_new_map();
-					for (auto& cookie : cookies)
-					{
-						WValue* tempMap = webview_value_new_map();
-						for (auto& c : cookie.second)
-						{
-							WValue* val = webview_value_new_string(const_cast<char*>(c.second.c_str()));
-							webview_value_set_string(tempMap, c.first.c_str(), val);
-							webview_value_unref(val);
-						}
-						webview_value_set_string(retMap, cookie.first.c_str(), tempMap);
-						webview_value_unref(tempMap);
-					}
-					invokeFunc("allCookiesVisited", retMap);
-					webview_value_unref(retMap);
-				}
-			};
-
-			handler.get()->onUrlCookieVisitedCb = [](std::map<std::string, std::map<std::string, std::string>> cookies)
-			{
-				if (invokeFunc)
-				{
-					WValue* retMap = webview_value_new_map();
-					for (auto& cookie : cookies)
-					{
-						WValue* tempMap = webview_value_new_map();
-						for (auto& c : cookie.second)
-						{
-							WValue* val = webview_value_new_string(const_cast<char*>(c.second.c_str()));
-							webview_value_set_string(tempMap, c.first.c_str(), val);
-							webview_value_unref(val);
-						}
-						webview_value_set_string(retMap, cookie.first.c_str(), tempMap);
-						webview_value_unref(tempMap);
-					}
-					invokeFunc("urlCookiesVisited", retMap);
 					webview_value_unref(retMap);
 				}
 			};
@@ -246,17 +202,17 @@ namespace webview_cef {
 		}
 	}
 
-    void initCEFProcesses(CefMainArgs args, std::string userAgent){
+	void initCEFProcesses(CefMainArgs args, std::string userAgent){
 		mainArgs = args;
-	 	initCEFProcesses(userAgent);
-    }
+		initCEFProcesses(userAgent);
+	}
 
 	void initCEFProcesses(std::string userAgent){
 #ifdef OS_MAC
 		CefScopedLibraryLoader loader;
-    	if(!loader.LoadInMain()) {
-        	printf("load cef err");
-    	}
+		if(!loader.LoadInMain()) {
+			printf("load cef err");
+		}
 #endif
 		handler = new WebviewHandler();
 		app = new WebviewApp(handler);
@@ -264,21 +220,21 @@ namespace webview_cef {
 		startCEF(userAgent);
 	}
 
-    void sendKeyEvent(CefKeyEvent& ev)
-    {
+	void sendKeyEvent(CefKeyEvent& ev)
+	{
 		handler.get()->sendKeyEvent(ev);
 		if(ev.type == KEYEVENT_RAWKEYDOWN && ev.windows_key_code == 0x7B && (ev.modifiers & EVENTFLAG_CONTROL_DOWN) != 0){
 			for(auto render : renderers){
 				if(render.second.get()->isFocused){
-	    			handler.get()->openDevTools(render.first);
+					handler.get()->openDevTools(render.first);
 				}
 			}
 		}
-    }
+	}
 
-    void startCEF(std::string userAgent)
-    {
-        CefSettings cefs;
+	void startCEF(std::string userAgent)
+	{
+		CefSettings cefs;
 		cefs.windowless_rendering_enabled = true;
 		cefs.no_sandbox = true;
 		if(!userAgent.empty()){
@@ -290,50 +246,39 @@ namespace webview_cef {
 #else
 		//cef message loop handle by MainApplication
 		cefs.external_message_pump = true;
-    	//CefString(&cefs.browser_subprocess_path) = "/Library/Chaches"; //the helper Program path
+		//CefString(&cefs.browser_subprocess_path) = "/Library/Chaches"; //the helper Program path
 #endif
 		CefInitialize(mainArgs, cefs, app.get(), nullptr);
-    }
+	}
 
-    void doMessageLoopWork(){
+	void doMessageLoopWork(){
 		CefDoMessageLoopWork();
-    }
+	}
 
-    int HandleMethodCall(std::string name, WValue* values, WValue** response) {
-        int result = -1;
+    void HandleMethodCall(std::string name, WValue* values, std::function<void(int ,WValue*)> result) {
 		if (name.compare("init") == 0){
 			initCallback();
-			result = 1;
+			result(1, nullptr);
 		}
-		else if (name.compare("dispose") == 0) {
+		if(name.compare("dispose") == 0){
+			// we don't need to dispose the texture, texture will be disposed by flutter engine
 			CefShutdown();
-			renderers.clear();
-			result = 1;
+			result(1, nullptr);
 		}
 		else if (name.compare("create") == 0) {
 			std::string url = webview_value_get_string(values);
 			CefBrowserSettings browser_settings;
 			browser_settings.windowless_frame_rate = 30;
 			CefWindowInfo window_info;
-    		window_info.SetAsWindowless(0);
+			window_info.SetAsWindowless(0);
 			int browserId = handler->createBrowser(url, window_info, browser_settings);
 			std::shared_ptr<WebviewTexture> renderer = createTextureFunc();
 			renderers[browserId] = renderer;
-			*response = webview_value_new_list();
-			webview_value_append(*response, webview_value_new_int(browserId));
-			webview_value_append(*response, webview_value_new_int(renderer->textureId));
-			result = 1;
-		}
-		else if (name.compare("createPopup") == 0) {
-			std::string url = webview_value_get_string(webview_value_get_list_value(values, 0));
-			std::string strName = webview_value_get_string(webview_value_get_list_value(values, 1));
-			int height = int(webview_value_get_int(webview_value_get_list_value(values, 2)));
-			int width = int(webview_value_get_int(webview_value_get_list_value(values, 3)));
-			int browserId = handler->createBrowserPopup(url, strName, height, width);
-			renderers[browserId] = nullptr;
-			*response = webview_value_new_list();
-			webview_value_append(*response, webview_value_new_int(browserId));
-			result = 1;
+			WValue *response = webview_value_new_list();
+			webview_value_append(response, webview_value_new_int(browserId));
+			webview_value_append(response, webview_value_new_int(renderer->textureId));
+			result(1, response);
+			webview_value_unref(response);
 		}
 		else if (name.compare("close") == 0) {
 			int browserId = int(webview_value_get_int(values));
@@ -341,14 +286,14 @@ namespace webview_cef {
 				renderers[browserId].reset();
 			}
 			handler->closeBrowser(browserId);
-			result = 1;
+			result(1, nullptr);
 		}
 		else if (name.compare("loadUrl") == 0) {
 			int browserId = int(webview_value_get_int(webview_value_get_list_value(values, 0)));
 			const auto url = webview_value_get_string(webview_value_get_list_value(values, 1));
 			if(url != nullptr){
 				handler.get()->loadUrl(browserId, url);
-				result = 1;			
+				result(1, nullptr);
 			}
 		}
 		else if (name.compare("setSize") == 0) {
@@ -357,13 +302,13 @@ namespace webview_cef {
 			const auto width = webview_value_get_double(webview_value_get_list_value(values, 2));
 			const auto height = webview_value_get_double(webview_value_get_list_value(values, 3));
 			handler.get()->changeSize(browserId, (float)dpi, (int)std::round(width), (int)std::round(height));
-			result = 1;
+			result(1, nullptr);
 		}
 		else if (name.compare("cursorClickDown") == 0 
 			|| name.compare("cursorClickUp") == 0 
 			|| name.compare("cursorMove") == 0 
 			|| name.compare("cursorDragging") == 0) {
-			result = cursorAction(values, name);
+			result(cursorAction(values, name), nullptr);
 		}
 		else if (name.compare("setScrollDelta") == 0) {
 			int browserId = int(webview_value_get_int(webview_value_get_list_value(values, 0)));
@@ -372,39 +317,39 @@ namespace webview_cef {
 			auto deltaX = webview_value_get_int(webview_value_get_list_value(values, 3));
 			auto deltaY = webview_value_get_int(webview_value_get_list_value(values, 4));
 			handler.get()->sendScrollEvent(browserId, (int)x, (int)y, (int)deltaX, (int)deltaY);
-			result = 1;
+			result(1, nullptr);
 		}
 		else if (name.compare("goForward") == 0) {
 			int browserId = int(webview_value_get_int(values));
 			handler.get()->goForward(browserId);
-			result = 1;
+			result(1, nullptr);
 		}
 		else if (name.compare("goBack") == 0) {
 			int browserId = int(webview_value_get_int(values));
 			handler.get()->goBack(browserId);
-			result = 1;
+			result(1, nullptr);
 		}
 		else if (name.compare("reload") == 0) {
 			int browserId = int(webview_value_get_int(values));
 			handler.get()->reload(browserId);
-			result = 1;
+			result(1, nullptr);
 		}
 		else if (name.compare("openDevTools") == 0) {			
 			int browserId = int(webview_value_get_int(values));
 			handler.get()->openDevTools(browserId);
-			result = 1;
+			result(1, nullptr);
 		}
 		else if (name.compare("imeSetComposition") == 0) {
 			int browserId = int(webview_value_get_int(webview_value_get_list_value(values, 0)));
 			const auto text = webview_value_get_string(webview_value_get_list_value(values, 1));
 			handler.get()->imeSetComposition(browserId, text);
-			result = 1;
+			result(1, nullptr);
 		} 
 		else if (name.compare("imeCommitText") == 0) {
 			int browserId = int(webview_value_get_int(webview_value_get_list_value(values, 0)));
 			const auto text = webview_value_get_string(webview_value_get_list_value(values, 1));
 			handler.get()->imeCommitText(browserId, text);
-			result = 1;
+			result(1, nullptr);
 		} 
 		else if (name.compare("setClientFocus") == 0) {
 			int browserId = int(webview_value_get_int(webview_value_get_list_value(values, 0)));
@@ -412,30 +357,60 @@ namespace webview_cef {
 				renderers[browserId].get()->isFocused = webview_value_get_bool(webview_value_get_list_value(values, 1));
 				handler.get()->setClientFocus(browserId, renderers[browserId].get()->isFocused);
 			}
-			result = 1;
+			result(1, nullptr);
 		}
 		else if(name.compare("setCookie") == 0){
 			const auto domain = webview_value_get_string(webview_value_get_list_value(values, 0));
 			const auto key = webview_value_get_string(webview_value_get_list_value(values, 1));
 			const auto value = webview_value_get_string(webview_value_get_list_value(values, 2));
 			handler.get()->setCookie(domain, key, value);
-			result = 1;	
+			result(1, nullptr);
 		}
 		else if (name.compare("deleteCookie") == 0) {
 			const auto domain = webview_value_get_string(webview_value_get_list_value(values, 0));
 			const auto key = webview_value_get_string(webview_value_get_list_value(values, 1));
 			handler.get()->deleteCookie(domain, key);
-			result = 1;	
+			result(1, nullptr);
 		}
 		else if (name.compare("visitAllCookies") == 0) {
-			handler.get()->visitAllCookies();
-			result = 1;	
+			handler.get()->visitAllCookies([=](std::map<std::string, std::map<std::string, std::string>> cookies){
+				WValue* retMap = webview_value_new_map();
+				for (auto &cookie : cookies)
+				{
+					WValue* tempMap = webview_value_new_map();
+					for (auto &c : cookie.second)
+					{
+						WValue * val = webview_value_new_string(const_cast<char *>(c.second.c_str()));
+						webview_value_set_string(tempMap, c.first.c_str(), val);
+						webview_value_unref(val);
+					}
+					webview_value_set_string(retMap, cookie.first.c_str(), tempMap);
+					webview_value_unref(tempMap);
+				}
+				result(1, retMap);	
+				webview_value_unref(retMap);
+			});
 		}
 		else if (name.compare("visitUrlCookies") == 0) {
 			const auto domain = webview_value_get_string(webview_value_get_list_value(values, 0));
 			const auto isHttpOnly = webview_value_get_bool(webview_value_get_list_value(values, 1));
-			handler.get()->visitUrlCookies(domain, isHttpOnly);
-			result = 1;	
+			handler.get()->visitUrlCookies(domain, isHttpOnly,[=](std::map<std::string, std::map<std::string, std::string>> cookies){
+				WValue* retMap = webview_value_new_map();
+				for (auto &cookie : cookies)
+				{
+					WValue* tempMap = webview_value_new_map();
+					for (auto &c : cookie.second)
+					{
+						WValue * val = webview_value_new_string(const_cast<char *>(c.second.c_str()));
+						webview_value_set_string(tempMap, c.first.c_str(), val);
+						webview_value_unref(val);
+					}
+					webview_value_set_string(retMap, cookie.first.c_str(), tempMap);
+					webview_value_unref(tempMap);
+				}
+				result(1, retMap);	
+				webview_value_unref(retMap);
+			});
 		}
 		else if(name.compare("setJavaScriptChannels") == 0){
 			int browserId = int(webview_value_get_int(webview_value_get_list_value(values, 0)));
@@ -447,7 +422,7 @@ namespace webview_cef {
 				channels.push_back(channel);
 			}
 			handler.get()->setJavaScriptChannels(browserId, channels);
-			result = 1;	
+			result(1, nullptr);
 		}
 		else if (name.compare("sendJavaScriptChannelCallBack") == 0) {
 			const auto error = webview_value_get_bool(webview_value_get_list_value(values, 0));
@@ -456,18 +431,26 @@ namespace webview_cef {
 			const auto browserId = int(webview_value_get_int(webview_value_get_list_value(values, 3)));
 			const auto frameId = webview_value_get_string(webview_value_get_list_value(values, 4));
 			handler.get()->sendJavaScriptChannelCallBack(error, ret, callbackId, browserId, frameId);
-			result = 1;	
+			result(1, nullptr);
 		}
 		else if(name.compare("executeJavaScript") == 0){
 			int browserId = int(webview_value_get_int(webview_value_get_list_value(values, 0)));
 			const auto code = webview_value_get_string(webview_value_get_list_value(values, 1));
 			handler.get()->executeJavaScript(browserId, code);
-			result = 1;	
+			result(1, nullptr);
+		}
+		else if(name.compare("evaluateJavascript") == 0){
+			int browserId = int(webview_value_get_int(webview_value_get_list_value(values, 0)));
+			const auto code = webview_value_get_string(webview_value_get_list_value(values, 1));
+			handler.get()->executeJavaScript(browserId, code, [=](std::string values){
+				WValue* retValue = webview_value_new_string(values.c_str());
+				result(1, retValue);
+				webview_value_unref(retValue);
+			});
 		}
 		else {
 			result = 0;
 		}
-        return result;
 	}
 
 	void SwapBufferFromBgraToRgba(void* _dest, const void* _src, int width, int height) {
@@ -491,9 +474,9 @@ namespace webview_cef {
 	}
 
 	void setCreateTextureFunc(std::function<std::shared_ptr<WebviewTexture>()> func)
-    {
+	{
 		createTextureFunc = func;
-    }
+	}
 	
 	bool getAnyBrowserFocused(){
 		for(auto render : renderers){

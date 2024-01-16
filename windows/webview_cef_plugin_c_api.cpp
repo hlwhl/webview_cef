@@ -4,14 +4,9 @@
 
 #include "webview_cef_plugin.h"
 
-static bool registered = false;
 void WebviewCefPluginCApiRegisterWithRegistrar(
-	FlutterDesktopPluginRegistrarRef registrar)
-{
-	if (registered)
-		return;
+	FlutterDesktopPluginRegistrarRef registrar) {
 	webview_cef::WebviewCefPlugin::RegisterWithRegistrar(registrar);
-	registered = true;
 }
 
 FLUTTER_PLUGIN_EXPORT void initCEFProcesses(std::string userAgent)
@@ -106,10 +101,11 @@ int GetCefKeyboardModifiers(WPARAM wparam, LPARAM lparam)
 	return modifiers;
 }
 
-FLUTTER_PLUGIN_EXPORT void HandleWndProc(unsigned int message, unsigned __int64 wParam, __int64 lParam)
+FLUTTER_PLUGIN_EXPORT void handleWndProcForCEF(unsigned int message, unsigned __int64 wParam, __int64 lParam)
 {
-	if (message == WM_USER + 1) {
-		webview_cef::WebviewCefPlugin::handleMessageProc(message,wParam,lParam);
+	if(message == WM_USER + 1){
+		webview_cef::WebviewCefPlugin::handleMessageProc(message, wParam, lParam);
+		return;
 	}
 	if (message != WM_SYSCHAR && message != WM_SYSKEYDOWN && message != WM_SYSKEYUP && message != WM_KEYDOWN && message != WM_KEYUP && message != WM_CHAR)
 		return;

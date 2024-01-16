@@ -13,7 +13,8 @@ class WebviewTooltip {
   TooltipStatus _eStatus = TooltipStatus.hide;
   Offset cursorOffset = Offset.zero;
   late RenderBox _box;
-  final TextStyle _textStyle = const TextStyle(color: Colors.black);
+  final TextStyle _textStyle =
+      const TextStyle(color: Colors.black, fontSize: 14);
 
   void _buildOverlayEntry(String text) {
     //往Overlay中插入插入OverlayEntry
@@ -22,9 +23,12 @@ class WebviewTooltip {
         double height = _box.size.height;
         double width = _box.size.width;
         TextPainter textPainter = TextPainter(
+          locale: Localizations.localeOf(context),
           textDirection: TextDirection.ltr,
           text: TextSpan(text: text, style: _textStyle),
-        )..layout();
+          maxLines: 5,
+          ellipsis: '...',
+        )..layout(maxWidth: width - 16);
         if (cursorOffset.dy + textPainter.height + 25 > height) {
           cursorOffset =
               Offset(cursorOffset.dx, height - textPainter.height - 10);
@@ -50,6 +54,7 @@ class WebviewTooltip {
           child: Material(
             color: Colors.transparent,
             child: Container(
+              width: textPainter.width + 16,
               padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 4),
               decoration: BoxDecoration(
                 color: Colors.white,
@@ -58,9 +63,10 @@ class WebviewTooltip {
                   BoxShadow(blurRadius: 2, color: Colors.black.withOpacity(.2))
                 ],
               ),
-              child: Text(
-                text,
-                style: _textStyle,
+              child: RichText(
+                text: TextSpan(text: text, style: _textStyle),
+                maxLines: 5,
+                overflow: TextOverflow.ellipsis,
               ),
             ),
           ),

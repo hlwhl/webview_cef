@@ -239,6 +239,11 @@ void WebviewApp::OnWebKitInitialized()
                     }
                 }
 
+                external.EvaluateCallback = (nReqID, result) => {
+                    native function EvaluateCallback();
+                    EvaluateCallback(nReqID, result);
+                }
+
 				external.StartRequest  = (nReqID, strCmd, strCallBack, strArgs, strLog) => {
 					native function StartRequest();
 					StartRequest(nReqID, strCmd, strCallBack, strArgs, strLog);

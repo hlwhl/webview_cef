@@ -215,6 +215,15 @@ class WebViewController extends ValueNotifier<bool> {
     return _pluginChannel.invokeMethod('executeJavaScript', [_browserId, code]);
   }
 
+  Future<dynamic> evaluateJavascript(String code) async {
+    if (_isDisposed) {
+      return;
+    }
+    assert(value);
+    return _pluginChannel
+        .invokeMethod('evaluateJavascript', [_browserId, code]);
+  }
+
   /// Moves the virtual cursor to [position].
   Future<void> _cursorMove(Offset position) async {
     if (_isDisposed) {
@@ -428,7 +437,7 @@ class WebViewState extends State<WebView> with WebeViewTextInput {
         child: Listener(
           onPointerHover: (ev) {
             _controller._cursorMove(ev.localPosition);
-            _tooltip?.cursorOffset = ev.localPosition;
+            _tooltip?.cursorOffset = ev.position;
           },
           onPointerDown: (ev) {
             if (!_focusNode.hasFocus) {

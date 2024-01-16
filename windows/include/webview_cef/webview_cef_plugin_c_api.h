@@ -19,7 +19,7 @@ FLUTTER_PLUGIN_EXPORT void WebviewCefPluginCApiRegisterWithRegistrar(
 
 FLUTTER_PLUGIN_EXPORT void initCEFProcesses(std::string userAgent = "");
 
-FLUTTER_PLUGIN_EXPORT void HandleWndProc(unsigned int message, unsigned __int64 wParam, __int64 lParam);
+FLUTTER_PLUGIN_EXPORT void handleWndProcForCEF(unsigned int message, unsigned __int64 wParam, __int64 lParam);
 
 #if defined(__cplusplus)
 }  // extern "C"

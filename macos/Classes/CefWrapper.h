@@ -23,7 +23,7 @@ extern CGFloat scaleFactor;
 
 - (void)onFrame:(const void *)buffer width:(int64_t)width height:(int64_t)height;
 + (void)setMethodChannel: (FlutterMethodChannel*)channel;
-+ (FlutterResult) handleMethodCallWrapper: (FlutterMethodCall*)call;
++ (void)handleMethodCallWrapper: (FlutterMethodCall*)call result:(FlutterResult)result;
 
 @end
 

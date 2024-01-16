@@ -7,6 +7,7 @@
 #include <sstream>
 #include <string>
 #include <iostream>
+#include <chrono>
 #include <unordered_map>
 
 #include "include/base/cef_callback.h"
@@ -76,53 +77,65 @@ bool WebviewHandler::OnProcessMessageReceived(
         onJavaScriptChannelMessage(
             fun_name,param,std::to_string(js_callback_id), browser->GetIdentifier(), std::to_string(frame->GetIdentifier()));
     }
+    else if(message_name == kEvaluateCallbackMessage){
+        CefString callbackId = message->GetArgumentList()->GetString(0);
+        CefString param = message->GetArgumentList()->GetString(1);
+        if(!callbackId.empty() && !param.empty()){
+            auto it = js_callbacks_.find(callbackId.ToString());
+            if(it != js_callbacks_.end()){
+                it->second(param.ToString());
+                js_callbacks_.erase(it);
+            }
+        }
+    }
     return false;
 }
 
 void WebviewHandler::OnTitleChange(CefRefPtr<CefBrowser> browser,
                                   const CefString& title) {
     //todo: title change
-    if(!browser->IsPopup() && onTitleChangedCb) {
-        onTitleChangedCb(browser->GetIdentifier(), title);
+    if(onTitleChangedEvent) {
+        onTitleChangedEvent(browser->GetIdentifier(), title);
     }
 }
 
 void WebviewHandler::OnAddressChange(CefRefPtr<CefBrowser> browser,
-                                     CefRefPtr<CefFrame> frame,
-                                     const CefString& url) {
-    if(!browser->IsPopup() && onUrlChangedCb) {
-        onUrlChangedCb(browser->GetIdentifier(), url);
+                             CefRefPtr<CefFrame> frame,
+                     const CefString& url) {
+    if(onUrlChangedEvent) {
+        onTitleChangedEvent(browser->GetIdentifier(), url);
     }
 }
+
 bool WebviewHandler::OnCursorChange(CefRefPtr<CefBrowser> browser,
-                                    CefCursorHandle cursor,
-                                    cef_cursor_type_t type,
-                                    const CefCursorInfo& custom_cursor_info){
-    if(!browser->IsPopup() && onCursorChanged) {
-        onCursorChanged(browser->GetIdentifier(), type);
+                            CefCursorHandle cursor,
+                            cef_cursor_type_t type,
+                            const CefCursorInfo& custom_cursor_info){
+    if(onCursorChangedEvent) {
+        onCursorChangedEvent(browser->GetIdentifier(), type);
         return true;
     }
     return false;
 }
 
 bool WebviewHandler::OnTooltip(CefRefPtr<CefBrowser> browser, CefString& text) {
-    if(!browser->IsPopup() && onTooltip) {
-        onTooltip(browser->GetIdentifier(), text);
+    if(onTooltipEvent) {
+        onTooltipEvent(browser->GetIdentifier(), text);
         return true;
     }
     return false;
 }
 
-//bool WebviewHandler::OnConsoleMessage(CefRefPtr<CefBrowser> browser,
-//                                      cef_log_severity_t level,
-//                                      const CefString& message,
-//                                      const CefString& source,
-//                                      int line){
-    //if(onConsoleMessage){
-    //    onConsoleMessage(browser->GetIdentifier(), level, message, source, line);
-    //} 
-    //return true;
-//}
+bool WebviewHandler::OnConsoleMessage(CefRefPtr<CefBrowser> browser,
+                                      cef_log_severity_t level,
+                                      const CefString& message,
+                                      const CefString& source,
+                                      int line){
+    if(onConsoleMessageEvent){
+        onConsoleMessageEvent(browser->GetIdentifier(), level, message, source, line);
+    }
+    return false;
+}
 
 void WebviewHandler::OnAfterCreated(CefRefPtr<CefBrowser> browser) {
     CEF_REQUIRE_UI_THREAD();
@@ -496,52 +509,35 @@ void WebviewHandler::deleteCookie(const std::string& domain, const std::string& 
     }
 }
 
-bool WebviewHandler::getCookieVisitor(){
-    if(!m_CookieVisitor.get())
-    {
-        m_CookieVisitor = new WebviewCookieVisitor();
-        m_CookieVisitor->setOnVisitComplete([=](std::map<std::string, std::map<std::string, std::string>> cookies){
-            if(cookies.size() == 1){
-                if(onUrlCookieVisitedCb){
-                    onUrlCookieVisitedCb(cookies);
-                }
-            }else if(cookies.size() > 1){
-                if(onAllCookieVisitedCb){
-                    onAllCookieVisitedCb(cookies);
-                }
-            }
-        });
-        if (!m_CookieVisitor.get())
-		{
-			return false;
-		}
-    }
-    return true;
-}
-
-bool WebviewHandler::visitAllCookies(){
+void WebviewHandler::visitAllCookies(std::function<void(std::map<std::string, std::map<std::string, std::string>>)> callback){
     CefRefPtr<CefCookieManager> manager = CefCookieManager::GetGlobalManager(nullptr);
-    if (!manager || !getCookieVisitor())
+    if (!manager)
 	{
-		return false;
+		return;
 	}
 
-    return manager->VisitAllCookies(m_CookieVisitor);
+    CefRefPtr<WebviewCookieVisitor> cookieVisitor = new WebviewCookieVisitor();
+    cookieVisitor->setOnVisitComplete(callback);
+
+    manager->VisitAllCookies(cookieVisitor);
 }
 
-bool WebviewHandler::visitUrlCookies(const std::string& domain, const bool& isHttpOnly){
+void WebviewHandler::visitUrlCookies(const std::string& domain, const bool& isHttpOnly, std::function<void(std::map<std::string, std::map<std::string, std::string>>)> callback){
     CefRefPtr<CefCookieManager> manager = CefCookieManager::GetGlobalManager(nullptr);
-    if (!manager || !getCookieVisitor())
+    if (!manager)
 	{
-		return false;
+		return;
 	}
+
+    CefRefPtr<WebviewCookieVisitor> cookieVisitor = new WebviewCookieVisitor();
+    cookieVisitor->setOnVisitComplete(callback);
 
     std::string httpDomain = "https://" + domain + "/cookiestorage";
 
-    return manager->VisitUrlCookies(httpDomain, isHttpOnly, m_CookieVisitor);
+    manager->VisitUrlCookies(httpDomain, isHttpOnly, cookieVisitor);
 }
 
-bool WebviewHandler::setJavaScriptChannels(int browserId, const std::vector<std::string> channels)
+void WebviewHandler::setJavaScriptChannels(int browserId, const std::vector<std::string> channels)
 {
     std::string extensionCode = "";
     for(auto& channel : channels)
@@ -551,10 +547,10 @@ bool WebviewHandler::setJavaScriptChannels(int browserId, const std::vector<std:
         extensionCode += channel;
         extensionCode += "',e,r)};";
     }
-    return executeJavaScript(browserId, extensionCode);
+    executeJavaScript(browserId, extensionCode);
 }
 
-bool WebviewHandler::sendJavaScriptChannelCallBack(const bool error, const std::string result, const std::string callbackId, const int browserId, const std::string frameId)
+void WebviewHandler::sendJavaScriptChannelCallBack(const bool error, const std::string result, const std::string callbackId, const int browserId, const std::string frameId)
 {
     CefRefPtr<CefProcessMessage> message = CefProcessMessage::Create(kExecuteJsCallbackMessage);
     CefRefPtr<CefListValue> args = message->GetArgumentList();
@@ -567,14 +563,18 @@ bool WebviewHandler::sendJavaScriptChannelCallBack(const bool error, const std::
         if (frame->GetIdentifier() == atoll(frameId.c_str()))
         {
             frame->SendProcessMessage(PID_RENDERER, message);
-            return true;
         }
     }
-
-    return false;
 }
 
-bool WebviewHandler::executeJavaScript(int browserId, const std::string code)
+static std::string GetCallbackId()
+{
+    auto time = std::chrono::time_point_cast<std::chrono::milliseconds>(std::chrono::system_clock::now());
+	time_t timestamp = time.time_since_epoch().count();
+    return std::to_string(timestamp);
+} 
+
+void WebviewHandler::executeJavaScript(int browserId, const std::string code, std::function<void(std::string)> callback)
 {
     if(!code.empty())
     {
@@ -583,12 +583,20 @@ bool WebviewHandler::executeJavaScript(int browserId, const std::string code)
                 //TODO: this code is not true on muti tab
                 CefRefPtr<CefFrame> frame = bit->second.browser->GetMainFrame();
                 if (frame) {
-			        frame->ExecuteJavaScript(code, frame->GetURL(), 0);
-			        return true;
+                    std::string finalCode = code;
+                    if(callback != nullptr){
+                        std::string callbackId = GetCallbackId();
+                        finalCode = "external.EvaluateCallback('";
+                        finalCode += callbackId;
+                        finalCode += "',(function(){return ";
+                        finalCode += code;
+                        finalCode += "})());";
+                        js_callbacks_[callbackId] = callback;
+                    }
+			        frame->ExecuteJavaScript(finalCode, frame->GetURL(), 0);
             }
         }
     }
-    return false;
 }
 
 void WebviewHandler::GetViewRect(CefRefPtr<CefBrowser> browser, CefRect &rect) {

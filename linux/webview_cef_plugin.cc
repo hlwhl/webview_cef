@@ -206,41 +206,29 @@ static void webview_cef_plugin_handle_method_call(
     WebviewCefPlugin *self,
     FlMethodCall *method_call)
 {
-  g_autoptr(FlMethodResponse) response = nullptr;
   const gchar *method = fl_method_call_get_name(method_call);
-  FlValue *result = nullptr;
-  WValue *encodeArgs = encode_flvalue_to_wvalue(fl_method_call_get_args(method_call));
-  WValue *responseArgs = nullptr;
-  int ret = webview_cef::HandleMethodCall(method, encodeArgs, &responseArgs);
-  webview_value_unref(encodeArgs);
-  if (ret > 0)
-  {
-    if(strcmp(method, "init") == 0){
+  if(strcmp(method, "init") == 0){
       g_timeout_add(
           16, [](gpointer data) -> gboolean
           {
         webview_cef::doMessageLoopWork();
         return TRUE; },
           NULL);
+  }
+  WValue *encodeArgs = encode_flvalue_to_wvalue(fl_method_call_get_args(method_call));
+  g_object_ref(method_call);
+  webview_cef::HandleMethodCall(method, encodeArgs, [=](int ret, WValue *responseArgs){
+    if (ret > 0){
+      fl_method_call_respond_success(method_call, encode_wavlue_to_flvalue(responseArgs), nullptr);
     }
-    result = encode_wavlue_to_flvalue(responseArgs);
-    response = FL_METHOD_RESPONSE(fl_method_success_response_new(result));
-  }
-  else if (ret < 0)
-  {
-    result = encode_wavlue_to_flvalue(responseArgs);
-    response = FL_METHOD_RESPONSE(fl_method_error_response_new("error", "error", result));
-  }
-  else
-  {
-    response = FL_METHOD_RESPONSE(fl_method_not_implemented_response_new());
-  }
-  webview_value_unref(responseArgs);
-  fl_method_call_respond(method_call, response, nullptr);
-  if (result != nullptr)
-  {
-    fl_value_unref(result);
-  }
+    else if (ret < 0){
+      fl_method_call_respond_error(method_call, "error", "error", encode_wavlue_to_flvalue(responseArgs), nullptr);
+    }
+    else{
+      fl_method_call_respond_not_implemented(method_call, nullptr);
+    }
+    g_object_unref(method_call); });
+  webview_value_unref(encodeArgs);
 }
 
 static void webview_cef_plugin_dispose(GObject *object)
@@ -262,11 +250,8 @@ static void method_call_cb(FlMethodChannel *channel, FlMethodCall *method_call,
   webview_cef_plugin_handle_method_call(plugin, method_call);
 }
 
-static bool registered = false;
 void webview_cef_plugin_register_with_registrar(FlPluginRegistrar *registrar)
 {
-  if (registered)
-    return;
   WebviewCefPlugin *plugin = WEBVIEW_CEF_PLUGIN(
       g_object_new(webview_cef_plugin_get_type(), nullptr));
 
@@ -297,8 +282,6 @@ void webview_cef_plugin_register_with_registrar(FlPluginRegistrar *registrar)
   webview_cef::setCreateTextureFunc(createTexture);
 
   g_object_unref(plugin);
-
-  registered = true;
 }
 
 FLUTTER_PLUGIN_EXPORT void initCEFProcesses(int argc, char **argv, std::string userAgent)
@@ -334,14 +317,13 @@ FLUTTER_PLUGIN_EXPORT gboolean processKeyEventForCEF(GtkWidget *widget, GdkEvent
       key_event.unmodified_character = '\r';
     }
     else if((windows_key_code == KeyboardCode::VKEY_V) && (key_event.modifiers & EVENTFLAG_CONTROL_DOWN) && (event->type == GDK_KEY_PRESS)){
-      //try to fix copy request freeze process problem , not perfect for using xclip.
+      //try to fix copy request freeze process problem(flutter engine will send a copy request when ctrl+v pressed)
       int res = 0;
       if(system("xclip -o -sel clipboard | xclip -i -sel clipboard  &>/dev/null") == 0){
         res = system("xclip -o -sel clipboard | xclip -i &>/dev/null");
       }
     }
-    else
-    {
+    else {
       // FIXME: fix for non BMP chars
       key_event.unmodified_character =
           static_cast<int>(gdk_keyval_to_unicode(event->keyval));

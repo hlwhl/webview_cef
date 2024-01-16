@@ -305,34 +305,31 @@ private:
     webview_cef::doMessageLoopWork();
 }
 
-+ (NSObject*) handleMethodCallWrapper: (FlutterMethodCall*)call{
++ (void) handleMethodCallWrapper: (FlutterMethodCall*)call result:(FlutterResult)result{
     std::string name = std::string([call.method cStringUsingEncoding:NSUTF8StringEncoding]);
+    if(name.compare("init") == 0){
+        _timer = [NSTimer timerWithTimeInterval:0.016f target:self selector:@selector(doMessageLoopWork) userInfo:nil repeats:YES];
+        [[NSRunLoop mainRunLoop] addTimer: _timer forMode:NSRunLoopCommonModes];
+        
+        [NSEvent addLocalMonitorForEventsMatchingMask:NSEventMaskKeyDown handler:^NSEvent * _Nullable(NSEvent * _Nonnull event) {
+            [self processKeyboardEvent:event];
+            return event;
+        }];
+        
+        [NSEvent addLocalMonitorForEventsMatchingMask:NSEventMaskKeyUp handler:^NSEvent * _Nullable(NSEvent * _Nonnull event) {
+            [self processKeyboardEvent:event];
+            return event;
+        }];
+    }
     WValue *encodeArgs = [self encode_flvalue_to_wvalue:call.arguments];
-    WValue *responseArgs = nullptr;
-    int ret = webview_cef::HandleMethodCall(name, encodeArgs, &responseArgs);
-    webview_value_unref(encodeArgs);
-    if(ret != 0){
-        if(name.compare("init") == 0){
-            _timer = [NSTimer timerWithTimeInterval:0.016f target:self selector:@selector(doMessageLoopWork) userInfo:nil repeats:YES];
-            [[NSRunLoop mainRunLoop] addTimer: _timer forMode:NSRunLoopCommonModes];
-        
-            [NSEvent addLocalMonitorForEventsMatchingMask:NSEventMaskKeyDown handler:^NSEvent * _Nullable(NSEvent * _Nonnull event) {
-                [self processKeyboardEvent:event];
-                return event;
-            }];
-        
-            [NSEvent addLocalMonitorForEventsMatchingMask:NSEventMaskKeyUp handler:^NSEvent * _Nullable(NSEvent * _Nonnull event) {
-                [self processKeyboardEvent:event];
-                return event;
-            }];
+    webview_cef::HandleMethodCall(name, encodeArgs, [=](int ret, WValue* args){
+        if(ret != 0){
+            result([self encode_wvalue_to_flvalue:args]);
         }
-        NSObject *result = [self encode_wvalue_to_flvalue:responseArgs];
-        webview_value_unref(responseArgs);
-        return result;
-    }
-    else{
-        webview_value_unref(responseArgs);
-    }
-    return nil;
+        else{
+            result(nil);
+        }
+    });
+    webview_value_unref(encodeArgs);
 }
 @end

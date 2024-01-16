@@ -25,14 +25,6 @@ class WebviewManager extends ValueNotifier<bool> {
 
   get ready => _creatingCompleter.future;
 
-  Map<String, dynamic> allCookies = {};
-
-  void _handleVisitCookies(Map<String, dynamic> cookies) {
-    for (final key in cookies.keys) {
-      allCookies[key] = cookies[key];
-    }
-  }
-
   WebViewController createWebView({Widget? loading}) {
     int browserIndex = nextIndex++;
     final controller =
@@ -115,12 +107,6 @@ class WebviewManager extends ValueNotifier<bool> {
             call.arguments["source"] as String,
             call.arguments["line"] as int);
         return;
-      case "allCookiesVisited":
-        _handleVisitCookies(Map.from(call.arguments));
-        return;
-      case "urlCookiesVisited":
-        _handleVisitCookies(Map.from(call.arguments));
-        return;
       case 'javascriptChannelMessage':
         int browserId = call.arguments['browserId'] as int;
         _webViews[browserId]?.onJavascriptChannelMessage?.call(
@@ -164,12 +150,12 @@ class WebviewManager extends ValueNotifier<bool> {
     return pluginChannel.invokeMethod('deleteCookie', [domain, key]);
   }
 
-  Future<void> visitAllCookies() async {
+  Future<dynamic> visitAllCookies() async {
     assert(value);
     return pluginChannel.invokeMethod('visitAllCookies');
   }
 
-  Future<void> visitUrlCookies(String domain, bool isHttpOnly) async {
+  Future<dynamic> visitUrlCookies(String domain, bool isHttpOnly) async {
     assert(value);
     return pluginChannel.invokeMethod('visitUrlCookies', [domain, isHttpOnly]);
   }

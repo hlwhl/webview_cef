@@ -19,7 +19,7 @@ namespace webview_cef {
     void startCEF(std::string userAgent);
     void doMessageLoopWork();
     void sendKeyEvent(CefKeyEvent& ev);
-    int HandleMethodCall(std::string name, WValue* values, WValue** response);
+    void HandleMethodCall(std::string name, WValue* values, std::function<void(int ,WValue*)> result);
     void SwapBufferFromBgraToRgba(void* _dest, const void* _src, int width, int height);
     void setInvokeMethodFunc(std::function<void(std::string, WValue*)> func);
     void setCreateTextureFunc(std::function<std::shared_ptr<WebviewTexture>()> func);

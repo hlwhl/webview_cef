@@ -213,9 +213,8 @@ namespace webview_cef {
 			flutter::EncodableValue *methodValue = new flutter::EncodableValue(method);
 			flutter::EncodableValue *args = new flutter::EncodableValue(encode_wvalue_to_flvalue(arguments));
 			PostThreadMessage(threadId, WM_USER + 1, WPARAM(methodValue), LPARAM(args));
-
-		};
-		setInvokeMethodFunc(invoke);
+  		};
+  		setInvokeMethodFunc(invoke);
 
 		auto createTexture = [=]() {
 			std::shared_ptr<WebviewTextureRenderer> renderer = std::make_shared<WebviewTextureRenderer>(texture_registrar);
@@ -232,24 +231,20 @@ namespace webview_cef {
 
 	void WebviewCefPlugin::HandleMethodCall(
 		const flutter::MethodCall<flutter::EncodableValue>& method_call,
-		std::unique_ptr<flutter::MethodResult<flutter::EncodableValue>> result) {
+		std::shared_ptr<flutter::MethodResult<flutter::EncodableValue>> result) {
 		WValue *encodeArgs = encode_flvalue_to_wvalue(const_cast<flutter::EncodableValue *>(method_call.arguments()));
-		WValue *responseArgs = nullptr;
-		int ret = webview_cef::HandleMethodCall(method_call.method_name(), encodeArgs, &responseArgs);
-		if (ret > 0)
-		{
-			result->Success(encode_wvalue_to_flvalue(responseArgs));
-		}
-		else if (ret < 0)
-		{
-			result->Error("error", "error", encode_wvalue_to_flvalue(responseArgs));
-		}
-		else
-		{
-			result->NotImplemented();
-		}
+		webview_cef::HandleMethodCall(method_call.method_name(), encodeArgs, [=](int ret, WValue* args){
+			if (ret > 0){
+				result->Success(encode_wvalue_to_flvalue(args));
+			}
+			else if (ret < 0){
+				result->Error("error", "error", encode_wvalue_to_flvalue(args));
+			}
+			else{
+				result->NotImplemented();
+			}
+		});
 		webview_value_unref(encodeArgs);
-		webview_value_unref(responseArgs);
 	}
 
 	void WebviewCefPlugin::handleMessageProc(UINT message, WPARAM wparam, LPARAM lparam) {
@@ -265,4 +260,5 @@ namespace webview_cef {
 			webview_cef::HandleMethodCall("dispose", nullptr, nullptr);
 		}
 	}
+
 }  // namespace webview_cef

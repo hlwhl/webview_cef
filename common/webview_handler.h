@@ -9,6 +9,7 @@
 
 #include <functional>
 #include <list>
+#include <unordered_map>
 
 #include "webview_cookieVisitor.h"
 
@@ -36,22 +37,19 @@ public CefFocusHandler,
 public CefLoadHandler,
 public CefRenderHandler{
 public:
+    //Paint callback
     std::function<void(int borwserId, const void* buffer, int32_t width, int32_t height)> onPaintCallback;
-    std::function<void(int browserIndex, int browserId)> onBrowserCreated;
-
-    //display callback
-    std::function<void(int browserId, std::string url)> onUrlChangedCb;
-    std::function<void(int browserId, std::string title)> onTitleChangedCb;
-    std::function<void(int browserId, int type)>onCursorChanged;
-    std::function<void(int browserId, std::string text)> onTooltip;
-    std::function<void(int browserId, int level, std::string message, std::string source, int line)>onConsoleMessage;
-
-    std::function<void(std::string, std::string, std::string, int browserId, std::string)> onJavaScriptChannelMessage;
+    //cef message event
+    std::function<void(int browserId, std::string url)> onUrlChangedEvent;
+    std::function<void(int browserId, std::string title)> onTitleChangedEvent;
+    std::function<void(int browserId, int type)>onCursorChangedEvent;
+    std::function<void(int browserId, std::string text)> onTooltipEvent;
+    std::function<void(int browserId, int level, std::string message, std::string source, int line)>onConsoleMessageEvent;
     std::function<void(int browserId, bool editable)> onFocusedNodeChangeMessage;
     std::function<void(int browserId, int32_t x, int32_t y)> onImeCompositionRangeChangedMessage;
-    
-    std::function<void(std::map<std::string, std::map<std::string, std::string>> cookies)> onAllCookieVisitedCb;
-    std::function<void(std::map<std::string, std::map<std::string, std::string>> cookies)> onUrlCookieVisitedCb;
+    //webpage message
+    std::function<void(std::string, std::string, std::string, int browserId, std::string)> onJavaScriptChannelMessage;
+
 
     explicit WebviewHandler();
     ~WebviewHandler();
@@ -90,11 +88,11 @@ public:
                                 cef_cursor_type_t type,
                                 const CefCursorInfo& custom_cursor_info) override;
     virtual bool OnTooltip(CefRefPtr<CefBrowser> browser, CefString& text) override;
-    //virtual bool OnConsoleMessage(CefRefPtr<CefBrowser> browser,
-    //                              cef_log_severity_t level,
-    //                              const CefString& message,
-    //                              const CefString& source,
-    //                              int line) override;
+    virtual bool OnConsoleMessage(CefRefPtr<CefBrowser> browser,
+                                  cef_log_severity_t level,
+                                  const CefString& message,
+                                  const CefString& source,
+                                  int line) override;
     
     // CefLifeSpanHandler methods:
     virtual void OnAfterCreated(CefRefPtr<CefBrowser> browser) override;
@@ -169,23 +167,22 @@ public:
 
     void setCookie(const std::string& domain, const std::string& key, const std::string& value);
     void deleteCookie(const std::string& domain, const std::string& key);
-    bool visitAllCookies();
-    bool visitUrlCookies(const std::string& domain, const bool& isHttpOnly);
+    void visitAllCookies(std::function<void(std::map<std::string, std::map<std::string, std::string>>)> callback);
+    void visitUrlCookies(const std::string& domain, const bool& isHttpOnly, std::function<void(std::map<std::string, std::map<std::string, std::string>>)> callback);
 
-    bool setJavaScriptChannels(int browserId, const std::vector<std::string> channels);
-    bool sendJavaScriptChannelCallBack(const bool error, const std::string result, const std::string callbackId, const int browserId, const std::string frameId);
-    bool executeJavaScript(int browserId, const std::string code);
+    void setJavaScriptChannels(int browserId, const std::vector<std::string> channels);
+    void sendJavaScriptChannelCallBack(const bool error, const std::string result, const std::string callbackId, const int browserId, const std::string frameId);
+    void executeJavaScript(int browserId, const std::string code, std::function<void(std::string)> callback = nullptr);
     
 private:
-    bool getCookieVisitor();
-    
     // List of existing browser windows. Only accessed on the CEF UI thread.
     std::unordered_map<int, browser_info> browser_map_;
+
+    std::unordered_map<std::string, std::function<void(std::string)>> js_callbacks_;
     
     // Include the default reference counting implementation.
     IMPLEMENT_REFCOUNTING(WebviewHandler);
 
-    CefRefPtr<WebviewCookieVisitor> m_CookieVisitor;
 };
 
 #endif  // CEF_TESTS_CEFSIMPLE_SIMPLE_HANDLER_H_

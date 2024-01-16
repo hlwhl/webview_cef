@@ -20,7 +20,7 @@ class _MyAppState extends State<MyApp> {
   // late WebViewController _controller2;
   final _textController = TextEditingController();
   String title = "";
-  Map<String, dynamic> allCookies = {};
+  Map allCookies = {};
 
   @override
   void initState() {
@@ -72,10 +72,8 @@ class _MyAppState extends State<MyApp> {
     //normal JavaScriptChannels
     _controller.setJavaScriptChannels(jsChannels);
     //also you can build your own jssdk by execute JavaScript code to CEF
-    _controller.executeJavaScript("function abc(e){console.log(e)}");
-
-    // _controller2.initialize("www.baidu.com");
-
+    await _controller.executeJavaScript("function abc(e){return 'abc:'+ e}");
+    _controller.evaluateJavascript("abc('test')").then((value) => print(value));
     // If the widget was removed from the tree while the asynchronous platform
     // message was in flight, we want to discard the reply rather than calling
     // setState to update our non-existent appearance.
@@ -138,8 +136,8 @@ class _MyAppState extends State<MyApp> {
                   controller: _textController,
                   onSubmitted: (url) {
                     _controller.loadUrl(url);
-                    WebviewManager().visitAllCookies();
-                    Future.delayed(const Duration(milliseconds: 100), () {
+                    WebviewManager().visitAllCookies().then((value) {
+                      allCookies = Map.of(value);
                       if (url == "baidu.com") {
                         if (!allCookies.containsKey('.$url') ||
                             !Map.of(allCookies['.$url']).containsKey('test')) {
