@@ -41,7 +41,7 @@ public:
     void SetProcessMode(uint32_t uMode);
     void SetEnableGPU(bool bEnable);
     void OnContextInitialized() override;
-    CefRefPtr<CefClient> GetDefaultClient() override;
+    // CefRefPtr<CefClient> GetDefaultClient() override;
     void OnBeforeChildProcessLaunch(CefRefPtr<CefCommandLine> command_line) override;
     void SetUnSafelyTreatInsecureOriginAsSecure(const CefString& strFilterDomain);
 

@@ -13,9 +13,7 @@ class WebviewManager extends ValueNotifier<bool> {
 
   late Completer<void> _creatingCompleter;
 
-  late MethodChannel pluginChannel;
-
-  static const mainChannelName = 'webview_cef';
+  final MethodChannel pluginChannel = const MethodChannel("webview_cef");
 
   final Map<int, WebViewController> _webViews = <int, WebViewController>{};
 
@@ -29,20 +27,6 @@ class WebviewManager extends ValueNotifier<bool> {
     int browserIndex = nextIndex++;
     final controller =
         WebViewController(pluginChannel, browserIndex, loading: loading);
-    _tempWebViews[browserIndex] = controller;
-    return controller;
-  }
-
-  WebViewController createWindow(
-      {Widget? loading, String? name, int? height, int? width}) {
-    //loading is not used now
-    int browserIndex = nextIndex++;
-    final controller = WebViewController(pluginChannel, browserIndex,
-        loading: loading,
-        popup: true,
-        name: name,
-        height: height,
-        width: width);
     _tempWebViews[browserIndex] = controller;
     return controller;
   }

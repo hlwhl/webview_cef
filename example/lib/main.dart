@@ -24,8 +24,6 @@ class _MyAppState extends State<MyApp> {
 
   @override
   void initState() {
-    WebviewManager().pluginChannel = const MethodChannel(
-        WebviewManager.mainChannelName, StandardMethodCodec());
     _controller =
         WebviewManager().createWebView(loading: const Text("not initialized"));
     // _controller2 = WebviewManager().createWindow(

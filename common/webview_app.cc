@@ -179,10 +179,10 @@ void WebviewApp::OnContextInitialized()
     
 }
 
-CefRefPtr<CefClient> WebviewApp::GetDefaultClient() {
-    // Called when a new browser window is created via the Chrome runtime UI.
-    return WebviewHandler::GetInstance();
-}
+// CefRefPtr<CefClient> WebviewApp::GetDefaultClient() {
+//     // Called when a new browser window is created via the Chrome runtime UI.
+//     return WebviewHandler::GetInstance();
+// }
 
 void WebviewApp::SetUnSafelyTreatInsecureOriginAsSecure(const CefString &strFilterDomain)
 {

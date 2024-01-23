@@ -38,7 +38,7 @@ public CefLoadHandler,
 public CefRenderHandler{
 public:
     //Paint callback
-    std::function<void(int borwserId, const void* buffer, int32_t width, int32_t height)> onPaintCallback;
+    std::function<void(int browserId, const void* buffer, int32_t width, int32_t height)> onPaintCallback;
     //cef message event
     std::function<void(int browserId, std::string url)> onUrlChangedEvent;
     std::function<void(int browserId, std::string title)> onTitleChangedEvent;
@@ -49,13 +49,9 @@ public:
     std::function<void(int browserId, int32_t x, int32_t y)> onImeCompositionRangeChangedMessage;
     //webpage message
     std::function<void(std::string, std::string, std::string, int browserId, std::string)> onJavaScriptChannelMessage;
-
-
+    
     explicit WebviewHandler();
     ~WebviewHandler();
-    
-    // Provide access to the single global instance of this object.
-    static WebviewHandler* GetInstance();
     
     // CefClient methods:
     virtual CefRefPtr<CefDisplayHandler> GetDisplayHandler() override {
@@ -140,15 +136,7 @@ public:
     static bool IsChromeRuntimeEnabled();
 
     void closeBrowser(int browserId);
-    int createBrowser(
-        std::string url,
-        const CefWindowInfo &window_info,
-        const CefBrowserSettings &browser_settings);
-    int createBrowserPopup(
-        std::string url, 
-        std::string name, 
-        int height, 
-        int width);
+    void createBrowser(std::string url, std::function<void(int)> callback);
 
     void sendScrollEvent(int browserId, int x, int y, int deltaX, int deltaY);
     void changeSize(int browserId, float a_dpi, int width, int height);
