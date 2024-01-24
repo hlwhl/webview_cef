@@ -178,8 +178,18 @@ namespace webview_cef {
 			initCallback();
 			result(1, nullptr);
 		}
+		if (name.compare("quit") == 0) {
+			//only call this method when you want to quit the app
+			stopCEF();
+			result(1, nullptr);
+		}
 		if(name.compare("dispose") == 0){
 			// we don't need to dispose the texture, texture will be disposed by flutter engine
+			for(auto renderer : m_renderers){
+				if(renderer.second != nullptr){
+					m_handler->closeBrowser(renderer.first);
+				}
+			}
 			m_renderers.clear();
 			result(1, nullptr);
 		}
@@ -197,10 +207,10 @@ namespace webview_cef {
 		}
 		else if (name.compare("close") == 0) {
 			int browserId = int(webview_value_get_int(values));
+			m_handler->closeBrowser(browserId);
 			if(m_renderers.find(browserId) != m_renderers.end() && m_renderers[browserId] != nullptr) {
 				m_renderers[browserId].reset();
 			}
-			m_handler->closeBrowser(browserId);
 			result(1, nullptr);
 		}
 		else if (name.compare("loadUrl") == 0) {

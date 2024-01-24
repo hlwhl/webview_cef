@@ -12,7 +12,7 @@ namespace webview_cef {
 class WebviewCefPlugin : public flutter::Plugin {
  public:
   static void RegisterWithRegistrar(FlutterDesktopPluginRegistrarRef registrar);
-  static void handleMessageProc(UINT message, WPARAM wparam, LPARAM lparam);
+  static void handleMessageProc(HWND hwnd, UINT message, WPARAM wparam, LPARAM lparam);
 
   WebviewCefPlugin();
   virtual ~WebviewCefPlugin();
@@ -36,6 +36,7 @@ class WebviewCefPlugin : public flutter::Plugin {
 		m_channel = nullptr;
 
   DWORD m_mainThreadId;
+  HWND m_hwnd;
 };
 
 }  // namespace webview_cef

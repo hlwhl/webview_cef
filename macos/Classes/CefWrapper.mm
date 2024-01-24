@@ -6,6 +6,7 @@
 //
 
 #import "CefWrapper.h"
+#import "WebviewCefTexture.h"
 #import <Foundation/Foundation.h>
 #import "include/cef_base.h"
 #import "../../common/webview_app.h"
@@ -20,45 +21,34 @@
                         Infoflow/macOS SysVersion/13.4 AppID/0 AppVersion/2.3.28.5 JsVersion/62 Launch/web \
                         DistType/1 machi/2.3.28.5 JsVersion/62 OSVersion/13.4"
 
-NSObject<FlutterTextureRegistry>* tr;
-CGFloat scaleFactor = 0.0;
-
 static NSTimer* _timer;
+static BOOL CefInitialized = NO;
 
-FlutterMethodChannel* f_channel;
-
-typedef void(^RetainSelfBlock)(void);
-
-@implementation CefWrapper
-@synthesize textureId = _textureId;
+@implementation CefWrapper{
+    std::shared_ptr<webview_cef::WebviewPlugin> _plugin;
+}
 
 class WebviewTextureRenderer : public webview_cef::WebviewTexture {
 public:
-    WebviewTextureRenderer(){
-        wrapped = [[CefWrapper alloc] init];
-        textureId = [tr registerTexture:wrapped];
-        wrapped.textureId = textureId;
+    WebviewTextureRenderer(NSObject<FlutterTextureRegistry>* registry){
+        textureRegistry = registry;
+        texture = [[WebviewCefTexture alloc] init];
+        textureId = [textureRegistry registerTexture:texture];
     }
 
     virtual ~WebviewTextureRenderer() {
-        [tr unregisterTexture:textureId];
+        [textureRegistry unregisterTexture:textureId];
     }
 
     virtual void onFrame(const void* buffer, int width, int height) {
-        [wrapped onFrame:buffer width:width height:height];
+        [texture onFrame:buffer width:width height:height];
+        [textureRegistry textureFrameAvailable: textureId];
     }
 
 private:
-    CefWrapper *wrapped;
+    WebviewCefTexture* texture;
+    NSObject<FlutterTextureRegistry>* textureRegistry;
 };
-
-- (id) init {
-    self = [super init];
-    if (self) {
-        _lock = dispatch_semaphore_create(1);
-    }
-    return self;
-}
 
 + (NSObject *)encode_wvalue_to_flvalue: (WValue*)args {
     WValueType type = webview_value_get_type(args);
@@ -88,7 +78,7 @@ private:
             NSMutableArray* array = [NSMutableArray arrayWithCapacity:len];
             for(int64_t i = 0; i < len; i++) {
                 WValue* item = webview_value_get_list_value(args, i);
-                [array addObject:[self encode_wvalue_to_flvalue:item]];
+                [array addObject:[CefWrapper encode_wvalue_to_flvalue:item]];
             }
             return array;
         }
@@ -98,9 +88,9 @@ private:
             for(int i = 0; i < len; i++) {
                 WValue *value = webview_value_get_value(args, i);
                 WValue *key = webview_value_get_key(args, i);
-                NSString *nsKkey = [self encode_wvalue_to_flvalue:key];
+                NSString *nsKkey = [CefWrapper encode_wvalue_to_flvalue:key];
                 if (key != nil && value != nil) {
-                    [dic setObject:[self encode_wvalue_to_flvalue:value] forKey:nsKkey];
+                    [dic setObject:[CefWrapper encode_wvalue_to_flvalue:value] forKey:nsKkey];
                 }
             }
             return dic;
@@ -135,7 +125,7 @@ private:
         int len = (int)array.count;
         WValue* wvalue = webview_value_new_list();
         for(int i = 0; i < len; i++) {
-            WValue* item = [self encode_flvalue_to_wvalue:array[i]];
+            WValue* item = [CefWrapper encode_flvalue_to_wvalue:array[i]];
             webview_value_append(wvalue, item);
             webview_value_unref(item);
         }
@@ -145,8 +135,8 @@ private:
         int len = (int)dic.count;
         WValue* wvalue = webview_value_new_map();
         for(int i = 0; i < len; i++) {
-            WValue* key = [self encode_flvalue_to_wvalue:dic.allKeys[i]];
-            WValue* item = [self encode_flvalue_to_wvalue:dic.allValues[i]];
+            WValue* key = [CefWrapper encode_flvalue_to_wvalue:dic.allKeys[i]];
+            WValue* item = [CefWrapper encode_flvalue_to_wvalue:dic.allValues[i]];
             webview_value_set(wvalue, key, item);
             webview_value_unref(key);
             webview_value_unref(item);
@@ -157,11 +147,11 @@ private:
     }
 }
 
-+ (void)processKeyboardEvent: (NSEvent*) event {
+- (void)processKeyboardEvent: (NSEvent*) event {
     CefKeyEvent keyEvent;
     
     keyEvent.native_key_code = [event keyCode];
-    keyEvent.modifiers = [self getModifiersForEvent:event];
+    keyEvent.modifiers = [CefWrapper getModifiersForEvent:event];
     
     //handle backspace
     if(keyEvent.native_key_code == 51) {
@@ -186,7 +176,7 @@ private:
         }
     }
 
-    webview_cef::sendKeyEvent(keyEvent);
+    self->_plugin->sendKeyEvent(keyEvent);
 }
 
 + (int)getModifiersForEvent:(NSEvent*)event {
@@ -239,78 +229,36 @@ private:
     return modifiers;
 }
 
-- (void)onFrame:(const void *)buffer width:(int64_t)width height:(int64_t)height{
-    NSDictionary* dic = @{
-        (__bridge NSString*)kCVPixelBufferPixelFormatTypeKey: @(kCVPixelFormatType_32BGRA),
-        (__bridge NSString*)kCVPixelBufferIOSurfacePropertiesKey : @{},
-        (__bridge NSString*)kCVPixelBufferOpenGLCompatibilityKey : @YES,
-        (__bridge NSString*)kCVPixelBufferMetalCompatibilityKey : @YES,
-    };
-            
-    static CVPixelBufferRef buf = NULL;
-    CVPixelBufferCreate(kCFAllocatorDefault,  width,
-                                height, kCVPixelFormatType_32BGRA,
-                                (__bridge CFDictionaryRef)dic, &buf);
-            
-    //copy data
-    CVPixelBufferLockBaseAddress(buf, 0);
-    char *copyBaseAddress = (char *) CVPixelBufferGetBaseAddress(buf);
-            
-    //MUST align pixel to _pixelBuffer. Otherwise cause render issue. see https://www.codeprintr.com/thread/6563066.html about 16 bytes align
-    size_t bytesPerRow = CVPixelBufferGetBytesPerRowOfPlane(buf, 0);
-    char* src = (char*) buffer;
-    int actureRowSize = width * 4;
-    for(int line = 0; line < height; line++) {
-        memcpy(copyBaseAddress, src, actureRowSize);
-        src += actureRowSize;
-        copyBaseAddress += bytesPerRow;
-    }
-    CVPixelBufferUnlockBaseAddress(buf, 0);
-            
-    dispatch_semaphore_wait(_lock, DISPATCH_TIME_FOREVER);
-    if(_pixelBuffer) {
-        CVPixelBufferRelease(_pixelBuffer);
-    }
-    _pixelBuffer = buf;
-    dispatch_semaphore_signal(_lock);
-    [tr textureFrameAvailable:_textureId];
-}
-
-- (CVPixelBufferRef _Nullable)copyPixelBuffer {
-    dispatch_semaphore_wait(_lock, DISPATCH_TIME_FOREVER);
-    _pixelBufferTemp = _pixelBuffer;
-    CVPixelBufferRetain(_pixelBufferTemp);
-    dispatch_semaphore_signal(_lock);
-    return _pixelBufferTemp;
-}
-
-+ (void)setMethodChannel: (FlutterMethodChannel*)channel {
-    webview_cef::initCEFProcesses(CEF_USER_AGENT);
-    f_channel = channel;
-    auto invoke = [=](std::string method, WValue* arguments){
-        NSObject *arg = [self encode_wvalue_to_flvalue:arguments];
-        [f_channel invokeMethod:[NSString stringWithUTF8String:method.c_str()] arguments:arg];
-    };
-    webview_cef::setInvokeMethodFunc(invoke);
-
-	auto createTexture = [=]() {
-		std::shared_ptr<WebviewTextureRenderer> renderer = std::make_shared<WebviewTextureRenderer>();
-		return std::dynamic_pointer_cast<webview_cef::WebviewTexture>(renderer);
-	};
-	webview_cef::setCreateTextureFunc(createTexture);
-
-}
-
-+ (void)doMessageLoopWork {
+- (void)doMessageLoopWork {
     webview_cef::doMessageLoopWork();
 }
 
-+ (void) handleMethodCallWrapper: (FlutterMethodCall*)call result:(FlutterResult)result{
+- (id) init {
+    self = [super init];
+    if (self) {
+        _plugin = std::make_shared<webview_cef::WebviewPlugin>();
+        if(CefInitialized == NO){
+            webview_cef::initCEFProcesses(CEF_USER_AGENT);
+            _timer = [NSTimer timerWithTimeInterval:0.016f target:self selector:@selector(doMessageLoopWork) userInfo:nil repeats:YES];
+            [[NSRunLoop mainRunLoop] addTimer: _timer forMode:NSRunLoopCommonModes];
+            CefInitialized = YES;
+        }
+        _plugin->setInvokeMethodFunc([=](std::string method, WValue* arguments){
+            NSObject *arg = [CefWrapper encode_wvalue_to_flvalue:arguments];
+            [self.channel invokeMethod:[NSString stringWithUTF8String:method.c_str()] arguments:arg];
+        });
+
+        _plugin->setCreateTextureFunc([=]() {
+            std::shared_ptr<WebviewTextureRenderer> renderer = std::make_shared<WebviewTextureRenderer>(self.textureRegistry);
+            return std::dynamic_pointer_cast<webview_cef::WebviewTexture>(renderer);
+        });
+    }
+    return self;
+}
+
+- (void) handleMethodCallWrapper: (FlutterMethodCall*)call result:(FlutterResult)result{
     std::string name = std::string([call.method cStringUsingEncoding:NSUTF8StringEncoding]);
-    if(name.compare("init") == 0){
-        _timer = [NSTimer timerWithTimeInterval:0.016f target:self selector:@selector(doMessageLoopWork) userInfo:nil repeats:YES];
-        [[NSRunLoop mainRunLoop] addTimer: _timer forMode:NSRunLoopCommonModes];
-        
+    if(name.compare("init") == 0){       
         [NSEvent addLocalMonitorForEventsMatchingMask:NSEventMaskKeyDown handler:^NSEvent * _Nullable(NSEvent * _Nonnull event) {
             [self processKeyboardEvent:event];
             return event;
@@ -321,10 +269,10 @@ private:
             return event;
         }];
     }
-    WValue *encodeArgs = [self encode_flvalue_to_wvalue:call.arguments];
-    webview_cef::HandleMethodCall(name, encodeArgs, [=](int ret, WValue* args){
+    WValue *encodeArgs = [CefWrapper encode_flvalue_to_wvalue:call.arguments];
+    self->_plugin->HandleMethodCall(name, encodeArgs, [=](int ret, WValue* args){
         if(ret != 0){
-            result([self encode_wvalue_to_flvalue:args]);
+            result([CefWrapper encode_wvalue_to_flvalue:args]);
         }
         else{
             result(nil);

@@ -35,6 +35,13 @@ class _MyAppState extends State<MyApp> {
     initPlatformState();
   }
 
+  @override
+  void dispose() {
+    _controller.dispose();
+    WebviewManager().quit();
+    super.dispose();
+  }
+
   // Platform messages are asynchronous, so we initialize in an async method.
   Future<void> initPlatformState() async {
     await WebviewManager().initialize();

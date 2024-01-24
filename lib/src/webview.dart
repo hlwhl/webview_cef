@@ -12,25 +12,12 @@ import 'webview_textinput.dart';
 import 'webview_tooltip.dart';
 
 class WebViewController extends ValueNotifier<bool> {
-  WebViewController(this._pluginChannel, this._index,
-      {Widget? loading,
-      bool popup = false,
-      String? name,
-      int? height,
-      int? width})
+  WebViewController(this._pluginChannel, this._index, {Widget? loading})
       : super(false) {
     _loadingWidget = loading;
-    _isPopup = popup;
-    _name = name ?? "";
-    _height = height ?? 600;
-    _width = width ?? 800;
   }
   final MethodChannel _pluginChannel;
   Widget? _loadingWidget;
-  late bool _isPopup;
-  String? _name;
-  int? _height;
-  int? _width;
 
   late WebView _webviewWidget;
   Widget get webviewWidget => _webviewWidget;
@@ -73,26 +60,14 @@ class WebViewController extends ValueNotifier<bool> {
     _creatingCompleter = Completer<void>();
     try {
       await WebviewManager().ready;
-      List args;
-      if (_isPopup!) {
-        args = await _pluginChannel.invokeMethod('createPopup', [
-          url,
-          _name,
-          _height,
-          _width,
-        ]);
-      } else {
-        args = await _pluginChannel.invokeMethod('create', url);
-      }
+      List args = await _pluginChannel.invokeMethod('create', url);
       _browserId = args[0] as int;
-      _textureId = _isPopup ? 0 : args[1] as int;
+      _textureId = args[1] as int;
+      WebviewManager().onBrowserCreated(_index, _browserId);
+      await Future.delayed(const Duration(milliseconds: 50));
+      _webviewWidget = WebView(this);
       value = true;
       _creatingCompleter.complete();
-      WebviewManager().onBrowserCreated(_index, _browserId);
-      await Future.delayed(const Duration(milliseconds: 100));
-      if (!_isPopup) {
-        _webviewWidget = WebView(this);
-      }
     } on PlatformException catch (e) {
       _creatingCompleter.completeError(e);
     }

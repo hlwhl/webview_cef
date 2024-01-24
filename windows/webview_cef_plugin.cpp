@@ -183,6 +183,9 @@ namespace webview_cef {
 		return nullptr;
 	}
 
+	std::unordered_map<HWND, std::shared_ptr<WebviewPlugin>> webviewPlugins;
+	std::unordered_map<HWND, std::function<void(std::string method,flutter::EncodableValue * arguments)>> webviewChannels;
+
 	void WebviewCefPlugin::RegisterWithRegistrar(FlutterDesktopPluginRegistrarRef registrar) {
 
 		auto plugin = std::make_unique<WebviewCefPlugin>();
@@ -200,20 +203,21 @@ namespace webview_cef {
 				plugin_pointer->HandleMethodCall(call, std::move(result));
 			});
 
-		//DWORD threadId = GetCurrentThreadId();
-		auto invoke = [plugin_pointer = plugin.get()](std::string method, WValue* arguments) {
-			//flutter::EncodableValue *methodValue = new flutter::EncodableValue(method);
-			flutter::EncodableValue *args = new flutter::EncodableValue(encode_wvalue_to_flvalue(arguments));
-			// PostThreadMessage(threadId, WM_USER + 1, WPARAM(methodValue), LPARAM(args));
-			plugin_pointer->m_channel->InvokeMethod(method, std::make_unique<flutter::EncodableValue>(*args));
-  		};
-  		plugin->m_plugin->setInvokeMethodFunc(invoke);
+		plugin->m_hwnd = FlutterDesktopViewGetHWND(FlutterDesktopPluginRegistrarGetView(registrar));
+		webviewPlugins.emplace(plugin->m_hwnd, plugin->m_plugin);
+		webviewChannels.emplace(plugin->m_hwnd, [plugin_pointer = plugin.get()](std::string method, flutter::EncodableValue* arguments) {
+			plugin_pointer->m_channel->InvokeMethod(method, std::make_unique<flutter::EncodableValue>(*arguments));
+			});
+		plugin->m_plugin->setInvokeMethodFunc([plugin_pointer = plugin.get(), hwnd](std::string method, WValue* arguments) {
+			flutter::EncodableValue* methodValue = new flutter::EncodableValue(method);
+			flutter::EncodableValue* args = new flutter::EncodableValue(encode_wvalue_to_flvalue(arguments));
+			PostMessage(plugin_pointer->m_hwnds, WM_USER + 1, WPARAM(methodValue), LPARAM(args));
+			});
 
-		auto createTexture = [plugin_pointer = plugin.get()]() {
+		plugin->m_plugin->setCreateTextureFunc([plugin_pointer = plugin.get()]() {
 			std::shared_ptr<WebviewTextureRenderer> renderer = std::make_shared<WebviewTextureRenderer>(plugin_pointer->m_textureRegistrar);
 			return std::dynamic_pointer_cast<WebviewTexture>(renderer);
-		};
-		plugin->m_plugin->setCreateTextureFunc(createTexture);
+		});
 
 		window_registrar->AddPlugin(std::move(plugin));
 	}
@@ -222,7 +226,10 @@ namespace webview_cef {
 		m_plugin = std::make_shared<WebviewPlugin>();
 	}
 
-	WebviewCefPlugin::~WebviewCefPlugin() {}
+	WebviewCefPlugin::~WebviewCefPlugin() {
+		webviewPlugins.erase(m_hwnd);
+		webviewChannels.erase(m_hwnd);
+	}
 
 	void WebviewCefPlugin::HandleMethodCall(
 		const flutter::MethodCall<flutter::EncodableValue>& method_call,
@@ -242,17 +249,21 @@ namespace webview_cef {
 		webview_value_unref(encodeArgs);
 	}
 
-	void WebviewCefPlugin::handleMessageProc(UINT message, WPARAM wparam, LPARAM lparam) {
+	void WebviewCefPlugin::handleMessageProc(HWND hwnd, UINT message, WPARAM wparam, LPARAM lparam) {
 		switch (message) {
 		case WM_USER + 1:
 		{
-			//flutter::EncodableValue *method = (flutter::EncodableValue *)wparam;
-			//flutter::EncodableValue *args = (flutter::EncodableValue *)lparam;
-			// channel->InvokeMethod(*std::get_if<std::string>(method), std::make_unique<flutter::EncodableValue>(*args));
+			if (webviewPlugins.find(hwnd) != webviewPlugins.end()) {
+				flutter::EncodableValue *method = (flutter::EncodableValue *)wparam;
+				flutter::EncodableValue *args = (flutter::EncodableValue *)lparam;
+				webviewChannels[hwnd]((*std::get_if<std::string>(method)), args);
+			}
 			break;
 		}
-		case WM_QUIT:{
-			webview_cef::stopCEF();
+		case WM_CLOSE:{
+			if(webviewPlugins.begin()->first == hwnd){
+				webview_cef::stopCEF();
+			}
 		}
 		case WM_SYSCHAR:
 		case WM_SYSKEYDOWN:
@@ -260,8 +271,10 @@ namespace webview_cef {
 		case WM_KEYDOWN:
 		case WM_KEYUP:
 		case WM_CHAR:{
-			// CefKeyEvent keyEvent = getCefKeyEvent(message, wparam, lparam);
-			// m_plugin->sendKeyEvent(keyEvent);
+			if(webviewPlugins.find(hwnd)!=webviewPlugins.end()){
+				CefKeyEvent keyEvent = getCefKeyEvent(message, wparam, lparam);
+				webviewPlugins[hwnd]->sendKeyEvent(keyEvent);
+			}
 		}
 		}
 	}

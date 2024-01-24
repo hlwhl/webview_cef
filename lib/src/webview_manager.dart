@@ -143,4 +143,10 @@ class WebviewManager extends ValueNotifier<bool> {
     assert(value);
     return pluginChannel.invokeMethod('visitUrlCookies', [domain, isHttpOnly]);
   }
+
+  Future<void> quit() async {
+    //only call this method when you want to quit the app
+    assert(value);
+    return pluginChannel.invokeMethod('quit');
+  }
 }

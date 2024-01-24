@@ -1,7 +1,7 @@
 #ifndef FLUTTER_PLUGIN_WEBVIEW_CEF_PLUGIN_C_API_H_
 #define FLUTTER_PLUGIN_WEBVIEW_CEF_PLUGIN_C_API_H_
 
-#include <flutter_plugin_registrar.h>
+#include <flutter/plugin_registrar_windows.h>
 #include <string>
 
 #ifdef FLUTTER_PLUGIN_IMPL
@@ -19,7 +19,7 @@ FLUTTER_PLUGIN_EXPORT void WebviewCefPluginCApiRegisterWithRegistrar(
 
 FLUTTER_PLUGIN_EXPORT void initCEFProcesses(std::string userAgent = "");
 
-FLUTTER_PLUGIN_EXPORT void handleWndProcForCEF(unsigned int message, unsigned __int64 wParam, __int64 lParam);
+FLUTTER_PLUGIN_EXPORT void handleWndProcForCEF(HWND hwnd, unsigned int message, unsigned __int64 wParam, __int64 lParam);
 
 #if defined(__cplusplus)
 }  // extern "C"

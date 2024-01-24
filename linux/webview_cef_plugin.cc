@@ -17,25 +17,31 @@
 struct _WebviewCefPlugin
 {
   GObject parent_instance;
+  std::shared_ptr<webview_cef::WebviewPlugin> m_plugin;
+  FlTextureRegistrar *m_textureRegister;
+  int64_t m_window;
 };
 
 G_DEFINE_TYPE(WebviewCefPlugin, webview_cef_plugin, g_object_get_type())
 
-static FlTextureRegistrar *texture_register;
+static bool cefInitialized = false;
+std::unordered_map<int64_t, std::shared_ptr<webview_cef::WebviewPlugin>> webviewPlugins;
 
 class WebviewTextureRenderer : public webview_cef::WebviewTexture
 {
 public:
-  WebviewTextureRenderer()
+  WebviewTextureRenderer(FlTextureRegistrar *texture_register)
   {
+    register_ = texture_register;
     texture = webview_cef_texture_new();
-    fl_texture_registrar_register_texture(texture_register, FL_TEXTURE(texture));
+    fl_texture_registrar_register_texture(register_, FL_TEXTURE(texture));
     textureId = (int64_t)texture;
   }
 
   virtual ~WebviewTextureRenderer()
   {
-    fl_texture_registrar_unregister_texture(texture_register, FL_TEXTURE(texture));
+    fl_texture_registrar_unregister_texture(register_, FL_TEXTURE(texture));
+    register_ = nullptr;
   }
 
   virtual void onFrame(const void *buffer, int32_t width, int32_t height) override
@@ -46,8 +52,9 @@ public:
     delete texture->buffer;
     texture->buffer = new uint8_t[size];
     webview_cef::SwapBufferFromBgraToRgba((void *)texture->buffer, buffer, width, height);
-    fl_texture_registrar_mark_texture_frame_available(texture_register, FL_TEXTURE(texture));
+    fl_texture_registrar_mark_texture_frame_available(register_, FL_TEXTURE(texture));
   }
+  FlTextureRegistrar *register_;
   WebviewCefTexture *texture;
 };
 
@@ -207,17 +214,9 @@ static void webview_cef_plugin_handle_method_call(
     FlMethodCall *method_call)
 {
   const gchar *method = fl_method_call_get_name(method_call);
-  if(strcmp(method, "init") == 0){
-      g_timeout_add(
-          16, [](gpointer data) -> gboolean
-          {
-        webview_cef::doMessageLoopWork();
-        return TRUE; },
-          NULL);
-  }
   WValue *encodeArgs = encode_flvalue_to_wvalue(fl_method_call_get_args(method_call));
   g_object_ref(method_call);
-  webview_cef::HandleMethodCall(method, encodeArgs, [=](int ret, WValue *responseArgs){
+  self->m_plugin->HandleMethodCall(method, encodeArgs, [=](int ret, WValue *responseArgs){
     if (ret > 0){
       fl_method_call_respond_success(method_call, encode_wavlue_to_flvalue(responseArgs), nullptr);
     }
@@ -227,12 +226,14 @@ static void webview_cef_plugin_handle_method_call(
     else{
       fl_method_call_respond_not_implemented(method_call, nullptr);
     }
-    g_object_unref(method_call); });
+    g_object_unref(method_call); 
+  });
   webview_value_unref(encodeArgs);
 }
 
 static void webview_cef_plugin_dispose(GObject *object)
 {
+  webviewPlugins.erase(WEBVIEW_CEF_PLUGIN(object)->m_window);
   G_OBJECT_CLASS(webview_cef_plugin_parent_class)->dispose(object);
 }
 
@@ -241,7 +242,9 @@ static void webview_cef_plugin_class_init(WebviewCefPluginClass *klass)
   G_OBJECT_CLASS(klass)->dispose = webview_cef_plugin_dispose;
 }
 
-static void webview_cef_plugin_init(WebviewCefPlugin *self) {}
+static void webview_cef_plugin_init(WebviewCefPlugin *self) {
+  self->m_plugin = std::make_shared<webview_cef::WebviewPlugin>();
+}
 
 static void method_call_cb(FlMethodChannel *channel, FlMethodCall *method_call,
                            gpointer user_data)
@@ -252,10 +255,22 @@ static void method_call_cb(FlMethodChannel *channel, FlMethodCall *method_call,
 
 void webview_cef_plugin_register_with_registrar(FlPluginRegistrar *registrar)
 {
+  if(!cefInitialized){
+    //start cef message loop, 16ms support  60fps, only one message loop is needed
+    g_timeout_add(16, [](gpointer data) -> gboolean {
+      webview_cef::doMessageLoopWork();
+      return TRUE; 
+    }, NULL);
+    cefInitialized = true;
+  }
+
   WebviewCefPlugin *plugin = WEBVIEW_CEF_PLUGIN(
       g_object_new(webview_cef_plugin_get_type(), nullptr));
 
-  texture_register = fl_plugin_registrar_get_texture_registrar(registrar);
+  plugin->m_window = int64_t(fl_plugin_registrar_get_view(registrar));
+  webviewPlugins.emplace(plugin->m_window, plugin->m_plugin);
+
+  plugin->m_textureRegister = fl_plugin_registrar_get_texture_registrar(registrar);
 
   g_autoptr(FlStandardMethodCodec) codec = fl_standard_method_codec_new();
   g_autoptr(FlMethodChannel) channel =
@@ -266,20 +281,16 @@ void webview_cef_plugin_register_with_registrar(FlPluginRegistrar *registrar)
                                             g_object_ref(plugin),
                                             g_object_unref);
 
-  auto invoke = [=](std::string method, WValue *arguments)
-  {
+  plugin->m_plugin->setInvokeMethodFunc([=](std::string method, WValue *arguments) {
     FlValue *args = encode_wavlue_to_flvalue(arguments);
     fl_method_channel_invoke_method(channel, method.c_str(), args, NULL, NULL, NULL);
     fl_value_unref(args);
-  };
-  webview_cef::setInvokeMethodFunc(invoke);
+  });
 
-  auto createTexture = [=]()
-  {
-    std::shared_ptr<WebviewTextureRenderer> renderer = std::make_shared<WebviewTextureRenderer>();
+  plugin->m_plugin->setCreateTextureFunc([=](){
+    std::shared_ptr<WebviewTextureRenderer> renderer = std::make_shared<WebviewTextureRenderer>(plugin->m_textureRegister);
     return std::dynamic_pointer_cast<webview_cef::WebviewTexture>(renderer);
-  };
-  webview_cef::setCreateTextureFunc(createTexture);
+  });
 
   g_object_unref(plugin);
 }
@@ -292,7 +303,8 @@ FLUTTER_PLUGIN_EXPORT void initCEFProcesses(int argc, char **argv, std::string u
 
 FLUTTER_PLUGIN_EXPORT gboolean processKeyEventForCEF(GtkWidget *widget, GdkEventKey *event, gpointer data)
 {
-  if (webview_cef::getAnyBrowserFocused())
+  int64_t _id = int64_t(widget);
+  if (webviewPlugins.find(_id) != webviewPlugins.end() && webviewPlugins[_id]->getAnyBrowserFocused())
   {
     CefKeyEvent key_event;
     KeyboardCode windows_key_code = GdkEventToWindowsKeyCode(event);
@@ -342,14 +354,14 @@ FLUTTER_PLUGIN_EXPORT gboolean processKeyEventForCEF(GtkWidget *widget, GdkEvent
     if (event->type == GDK_KEY_PRESS)
     {
       key_event.type = KEYEVENT_RAWKEYDOWN;
-      webview_cef::sendKeyEvent(key_event);
+      webviewPlugins[_id]->sendKeyEvent(key_event);
       key_event.type = KEYEVENT_CHAR;
     }
     else
     {
       key_event.type = KEYEVENT_KEYUP;
     }
-    webview_cef::sendKeyEvent(key_event);
+    webviewPlugins[_id]->sendKeyEvent(key_event);
 
     return TRUE;
   }
