@@ -9,6 +9,8 @@
 #define CefWrapper_h
 #import <FlutterMacOS/FlutterMacOS.h>
 
+extern NSMapTable* webviewPlugins;
+
 @interface CefWrapper : NSObject
 
 @property(nonatomic) NSObject<FlutterTextureRegistry>* textureRegistry;

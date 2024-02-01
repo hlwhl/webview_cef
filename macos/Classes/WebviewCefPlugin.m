@@ -17,6 +17,7 @@
     instance->_cefWrapper = [[CefWrapper alloc] init];
     instance->_cefWrapper.channel = channel;
     instance->_cefWrapper.textureRegistry = registrar.textures;
+    [webviewPlugins setObject:instance->_cefWrapper forKey: registrar.view.superview];
 }
 
 - (void)handleMethodCall:(FlutterMethodCall*)call result:(FlutterResult)result {

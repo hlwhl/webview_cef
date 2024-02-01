@@ -23,6 +23,7 @@
 
 static NSTimer* _timer;
 static BOOL CefInitialized = NO;
+NSMapTable* webviewPlugins = [NSMapTable weakToWeakObjectsMapTable];
 
 @implementation CefWrapper{
     std::shared_ptr<webview_cef::WebviewPlugin> _plugin;
@@ -147,57 +148,75 @@ private:
     }
 }
 
-- (void)processKeyboardEvent: (NSEvent*) event {
++ (BOOL)processKeyboardEvent: (NSEvent*) event {
+    CefWrapper *currentPlugin = [webviewPlugins objectForKey:event.window.contentView];
+    if(currentPlugin == nil || !currentPlugin->_plugin->getAnyBrowserFocused()){
+        return false;
+    }
+    
     CefKeyEvent keyEvent;
     
-    keyEvent.native_key_code = [event keyCode];
-    keyEvent.modifiers = [CefWrapper getModifiersForEvent:event];
+    NSString* s = [event characters];
     
-    //handle backspace
-    if(keyEvent.native_key_code == 51) {
-        keyEvent.character = 0;
-        keyEvent.unmodified_character = 0;
-    } else {
-        NSString* s = [event characters];
-        if([s length] == 0) {
-            keyEvent.type = KEYEVENT_KEYDOWN;
-        } else {
-            keyEvent.type = KEYEVENT_CHAR;
-        }
-        if ([s length] > 0)
-            keyEvent.character = [s characterAtIndex:0];
-        
-        s = [event charactersIgnoringModifiers];
-        if ([s length] > 0)
-            keyEvent.unmodified_character = [s characterAtIndex:0];
-        
-        if([event type] == NSKeyUp) {
-            keyEvent.type = KEYEVENT_KEYUP;
-        }
+    if ([s length] != 0){
+        keyEvent.character = [s characterAtIndex:0];
     }
 
-    self->_plugin->sendKeyEvent(keyEvent);
+    s = [event charactersIgnoringModifiers];
+    if ([s length] > 0){
+        keyEvent.unmodified_character = [s characterAtIndex:0];
+    }
+    
+    if ([event type] == NSEventTypeFlagsChanged){
+        keyEvent.character = 0;
+        keyEvent.unmodified_character = 0;
+    }
+        
+    keyEvent.native_key_code = [event keyCode];
+    
+    keyEvent.modifiers = [CefWrapper getModifiersForEvent:event];
+
+//    if(keyEvent.native_key_code == 51){
+//        keyEvent.character = 0;
+//        keyEvent.unmodified_character = 0;
+//    }
+    if([event type] == NSEventTypeKeyDown){
+        keyEvent.type = KEYEVENT_RAWKEYDOWN;
+        currentPlugin->_plugin->sendKeyEvent(keyEvent);
+        keyEvent.type = KEYEVENT_CHAR;
+    }else{
+        keyEvent.type = KEYEVENT_KEYUP;
+    }
+
+    currentPlugin->_plugin->sendKeyEvent(keyEvent);
+    return true;
 }
 
 + (int)getModifiersForEvent:(NSEvent*)event {
     int modifiers = 0;
     
-    if ([event modifierFlags] & NSControlKeyMask)
+    //Warning:NSEventModifierFlags is support for MacOS 10.12 and after
+    if ([event modifierFlags] & NSEventModifierFlagControl){
         modifiers |= EVENTFLAG_CONTROL_DOWN;
-    if ([event modifierFlags] & NSShiftKeyMask)
+    }
+    if ([event modifierFlags] & NSEventModifierFlagShift){
         modifiers |= EVENTFLAG_SHIFT_DOWN;
-    if ([event modifierFlags] & NSAlternateKeyMask)
+    }
+    if ([event modifierFlags] & NSEventModifierFlagOption){
         modifiers |= EVENTFLAG_ALT_DOWN;
-    if ([event modifierFlags] & NSCommandKeyMask)
+    }
+    if ([event modifierFlags] & NSEventModifierFlagCommand){
         modifiers |= EVENTFLAG_COMMAND_DOWN;
-    if ([event modifierFlags] & NSAlphaShiftKeyMask)
+    }
+    if ([event modifierFlags] & NSEventModifierFlagCapsLock){
         modifiers |= EVENTFLAG_CAPS_LOCK_ON;
-    
-    if ([event type] == NSKeyUp || [event type] == NSKeyDown ||
-        [event type] == NSFlagsChanged) {
+    }
+    if ([event type] == NSEventTypeKeyUp || [event type] == NSEventTypeKeyDown ||
+        [event type] == NSEventTypeFlagsChanged) {
         // Only perform this check for key events
-        //    if ([self isKeyPadEvent:event])
-        //      modifiers |= EVENTFLAG_IS_KEY_PAD;
+        if ([CefWrapper isKeyPadEvent:event]){
+            modifiers |= EVENTFLAG_IS_KEY_PAD;
+        }
     }
     
     // OS X does not have a modifier for NumLock, so I'm not entirely sure how to
@@ -207,19 +226,19 @@ private:
     
     // Mouse buttons
     switch ([event type]) {
-        case NSLeftMouseDragged:
-        case NSLeftMouseDown:
-        case NSLeftMouseUp:
+        case NSEventTypeLeftMouseDragged:
+        case NSEventTypeLeftMouseDown:
+        case NSEventTypeLeftMouseUp:
             modifiers |= EVENTFLAG_LEFT_MOUSE_BUTTON;
             break;
-        case NSRightMouseDragged:
-        case NSRightMouseDown:
-        case NSRightMouseUp:
+        case NSEventTypeRightMouseDragged:
+        case NSEventTypeRightMouseDown:
+        case NSEventTypeRightMouseUp:
             modifiers |= EVENTFLAG_RIGHT_MOUSE_BUTTON;
             break;
-        case NSOtherMouseDragged:
-        case NSOtherMouseDown:
-        case NSOtherMouseUp:
+        case NSEventTypeOtherMouseDragged:
+        case NSEventTypeOtherMouseDown:
+        case NSEventTypeOtherMouseUp:
             modifiers |= EVENTFLAG_MIDDLE_MOUSE_BUTTON;
             break;
         default:
@@ -227,6 +246,36 @@ private:
     }
     
     return modifiers;
+}
+
++ (BOOL)isKeyPadEvent:(NSEvent*)event {
+    if ([event modifierFlags] & NSEventModifierFlagNumericPad) {
+        return true;
+    }
+    
+    switch ([event keyCode]) {
+        case 71:  // Clear
+        case 81:  // =
+        case 75:  // /
+        case 67:  // *
+        case 78:  // -
+        case 69:  // +
+        case 76:  // Enter
+        case 65:  // .
+        case 82:  // 0
+        case 83:  // 1
+        case 84:  // 2
+        case 85:  // 3
+        case 86:  // 4
+        case 87:  // 5
+        case 88:  // 6
+        case 89:  // 7
+        case 91:  // 8
+        case 92:  // 9
+            return true;
+    }
+    
+    return false;
 }
 
 - (void)doMessageLoopWork {
@@ -241,6 +290,19 @@ private:
             webview_cef::initCEFProcesses(CEF_USER_AGENT);
             _timer = [NSTimer timerWithTimeInterval:0.016f target:self selector:@selector(doMessageLoopWork) userInfo:nil repeats:YES];
             [[NSRunLoop mainRunLoop] addTimer: _timer forMode:NSRunLoopCommonModes];
+            [NSEvent addLocalMonitorForEventsMatchingMask:NSEventMaskKeyDown handler:^NSEvent * _Nullable(NSEvent * _Nonnull event) {
+                if([CefWrapper processKeyboardEvent:event]){
+                    return nil;
+                }
+                return event;
+            }];
+            
+            [NSEvent addLocalMonitorForEventsMatchingMask:NSEventMaskKeyUp handler:^NSEvent * _Nullable(NSEvent * _Nonnull event) {
+                if([CefWrapper processKeyboardEvent:event]){
+                    return nil;
+                }
+                return event;
+            }];
             CefInitialized = YES;
         }
         _plugin->setInvokeMethodFunc([=](std::string method, WValue* arguments){
@@ -258,17 +320,6 @@ private:
 
 - (void) handleMethodCallWrapper: (FlutterMethodCall*)call result:(FlutterResult)result{
     std::string name = std::string([call.method cStringUsingEncoding:NSUTF8StringEncoding]);
-    if(name.compare("init") == 0){       
-        [NSEvent addLocalMonitorForEventsMatchingMask:NSEventMaskKeyDown handler:^NSEvent * _Nullable(NSEvent * _Nonnull event) {
-            [self processKeyboardEvent:event];
-            return event;
-        }];
-        
-        [NSEvent addLocalMonitorForEventsMatchingMask:NSEventMaskKeyUp handler:^NSEvent * _Nullable(NSEvent * _Nonnull event) {
-            [self processKeyboardEvent:event];
-            return event;
-        }];
-    }
     WValue *encodeArgs = [CefWrapper encode_flvalue_to_wvalue:call.arguments];
     self->_plugin->HandleMethodCall(name, encodeArgs, [=](int ret, WValue* args){
         if(ret != 0){
