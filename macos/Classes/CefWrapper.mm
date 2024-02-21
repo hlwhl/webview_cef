@@ -17,12 +17,9 @@
 #import "../../common/webview_value.h"
 #include <thread>
 
-#define CEF_USER_AGENT  "Mozilla/5.0 (Macintosh; Intel Mac OS X 10_15_7) AppleWebKit/605.1.15 (KHTML, like Gecko) \
-                        Infoflow/macOS SysVersion/13.4 AppID/0 AppVersion/2.3.28.5 JsVersion/62 Launch/web \
-                        DistType/1 machi/2.3.28.5 JsVersion/62 OSVersion/13.4"
-
 static NSTimer* _timer;
-static BOOL CefInitialized = NO;
+static BOOL isCefProcessInit = NO;
+static BOOL isCefMessageLoop = NO;
 NSMapTable* webviewPlugins = [NSMapTable weakToWeakObjectsMapTable];
 
 @implementation CefWrapper{
@@ -286,24 +283,9 @@ private:
     self = [super init];
     if (self) {
         _plugin = std::make_shared<webview_cef::WebviewPlugin>();
-        if(CefInitialized == NO){
-            webview_cef::initCEFProcesses(CEF_USER_AGENT);
-            _timer = [NSTimer timerWithTimeInterval:0.016f target:self selector:@selector(doMessageLoopWork) userInfo:nil repeats:YES];
-            [[NSRunLoop mainRunLoop] addTimer: _timer forMode:NSRunLoopCommonModes];
-            [NSEvent addLocalMonitorForEventsMatchingMask:NSEventMaskKeyDown handler:^NSEvent * _Nullable(NSEvent * _Nonnull event) {
-                if([CefWrapper processKeyboardEvent:event]){
-                    return nil;
-                }
-                return event;
-            }];
-            
-            [NSEvent addLocalMonitorForEventsMatchingMask:NSEventMaskKeyUp handler:^NSEvent * _Nullable(NSEvent * _Nonnull event) {
-                if([CefWrapper processKeyboardEvent:event]){
-                    return nil;
-                }
-                return event;
-            }];
-            CefInitialized = YES;
+        if(isCefProcessInit == NO){
+            webview_cef::initCEFProcesses();
+            isCefProcessInit = YES;
         }
         _plugin->setInvokeMethodFunc([=](std::string method, WValue* arguments){
             NSObject *arg = [CefWrapper encode_wvalue_to_flvalue:arguments];
@@ -329,6 +311,24 @@ private:
             result(nil);
         }
     });
+    if(isCefMessageLoop == NO){
+        _timer = [NSTimer timerWithTimeInterval:0.016f target:self selector:@selector(doMessageLoopWork) userInfo:nil repeats:YES];
+        [[NSRunLoop mainRunLoop] addTimer: _timer forMode:NSRunLoopCommonModes];
+        [NSEvent addLocalMonitorForEventsMatchingMask:NSEventMaskKeyDown handler:^NSEvent * _Nullable(NSEvent * _Nonnull event) {
+            if([CefWrapper processKeyboardEvent:event]){
+                return nil;
+            }
+            return event;
+        }];
+            
+        [NSEvent addLocalMonitorForEventsMatchingMask:NSEventMaskKeyUp handler:^NSEvent * _Nullable(NSEvent * _Nonnull event) {
+            if([CefWrapper processKeyboardEvent:event]){
+                return nil;
+            }
+            return event;
+        }];
+        isCefMessageLoop = YES;
+   }
     webview_value_unref(encodeArgs);
 }
 @end

@@ -23,7 +23,7 @@ FLUTTER_PLUGIN_EXPORT void webview_cef_plugin_register_with_registrar(
 
 G_END_DECLS
 
-FLUTTER_PLUGIN_EXPORT void initCEFProcesses(int argc, char** argv, std::string userAgent = "");
+FLUTTER_PLUGIN_EXPORT void initCEFProcesses(int argc, char** argv);
 
 FLUTTER_PLUGIN_EXPORT gboolean processKeyEventForCEF(GtkWidget* widget, GdkEventKey* event, gpointer data);
 

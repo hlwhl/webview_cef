@@ -1,7 +1,6 @@
 import 'dart:async';
 
 import 'package:flutter/material.dart';
-import 'package:flutter/services.dart';
 import 'package:webview_cef/webview_cef.dart';
 
 void main() {
@@ -44,7 +43,7 @@ class _MyAppState extends State<MyApp> {
 
   // Platform messages are asynchronous, so we initialize in an async method.
   Future<void> initPlatformState() async {
-    await WebviewManager().initialize();
+    await WebviewManager().initialize(userAgent: "test/userAgent");
     String url = "www.baidu.com";
     _textController.text = url;
     //unified interface for all platforms set user agent

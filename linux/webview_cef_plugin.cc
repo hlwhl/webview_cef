@@ -24,7 +24,7 @@ struct _WebviewCefPlugin
 
 G_DEFINE_TYPE(WebviewCefPlugin, webview_cef_plugin, g_object_get_type())
 
-static bool cefInitialized = false;
+static bool isCefMessageLoop = false;
 std::unordered_map<int64_t, std::shared_ptr<webview_cef::WebviewPlugin>> webviewPlugins;
 
 class WebviewTextureRenderer : public webview_cef::WebviewTexture
@@ -228,6 +228,14 @@ static void webview_cef_plugin_handle_method_call(
     }
     g_object_unref(method_call); 
   });
+  if(!isCefMessageLoop){
+    //start cef message loop, 16ms support  60fps, only one message loop is needed
+    g_timeout_add(16, [](gpointer data) -> gboolean {
+      webview_cef::doMessageLoopWork();
+      return TRUE; 
+    }, NULL);
+    isCefMessageLoop = true;
+  }
   webview_value_unref(encodeArgs);
 }
 
@@ -255,15 +263,6 @@ static void method_call_cb(FlMethodChannel *channel, FlMethodCall *method_call,
 
 void webview_cef_plugin_register_with_registrar(FlPluginRegistrar *registrar)
 {
-  if(!cefInitialized){
-    //start cef message loop, 16ms support  60fps, only one message loop is needed
-    g_timeout_add(16, [](gpointer data) -> gboolean {
-      webview_cef::doMessageLoopWork();
-      return TRUE; 
-    }, NULL);
-    cefInitialized = true;
-  }
-
   WebviewCefPlugin *plugin = WEBVIEW_CEF_PLUGIN(
       g_object_new(webview_cef_plugin_get_type(), nullptr));
 
@@ -295,10 +294,10 @@ void webview_cef_plugin_register_with_registrar(FlPluginRegistrar *registrar)
   g_object_unref(plugin);
 }
 
-FLUTTER_PLUGIN_EXPORT void initCEFProcesses(int argc, char **argv, std::string userAgent)
+FLUTTER_PLUGIN_EXPORT void initCEFProcesses(int argc, char **argv)
 {
   CefMainArgs main_args(argc, argv);
-  webview_cef::initCEFProcesses(main_args, userAgent);
+  webview_cef::initCEFProcesses(main_args);
 }
 
 FLUTTER_PLUGIN_EXPORT gboolean processKeyEventForCEF(GtkWidget *widget, GdkEventKey *event, gpointer data)

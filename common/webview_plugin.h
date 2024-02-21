@@ -35,9 +35,9 @@ namespace webview_cef {
 	    bool m_init = false;
     };
 
-    void initCEFProcesses(CefMainArgs args, std::string userAgent = "");
-    void initCEFProcesses(std::string userAgent = "");
-    void startCEF(std::string userAgent);
+    void initCEFProcesses(CefMainArgs args);
+    void initCEFProcesses();
+    void startCEF();
     void doMessageLoopWork();
     void SwapBufferFromBgraToRgba(void* _dest, const void* _src, int width, int height);
     void stopCEF();

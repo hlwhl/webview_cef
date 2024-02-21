@@ -17,7 +17,7 @@ extern "C" {
 FLUTTER_PLUGIN_EXPORT void WebviewCefPluginCApiRegisterWithRegistrar(
     FlutterDesktopPluginRegistrarRef registrar);
 
-FLUTTER_PLUGIN_EXPORT void initCEFProcesses(std::string userAgent = "");
+FLUTTER_PLUGIN_EXPORT void initCEFProcesses();
 
 FLUTTER_PLUGIN_EXPORT void handleWndProcForCEF(HWND hwnd, unsigned int message, unsigned __int64 wParam, __int64 lParam);
 

@@ -13,6 +13,8 @@
 namespace webview_cef {
 	CefMainArgs mainArgs;
 	CefRefPtr<WebviewApp> app;
+	CefString userAgent;
+	bool isCefInitialized = false;
 
 	WebviewPlugin::WebviewPlugin() {
 		m_handler = new WebviewHandler();
@@ -175,15 +177,21 @@ namespace webview_cef {
 
     void WebviewPlugin::HandleMethodCall(std::string name, WValue* values, std::function<void(int ,WValue*)> result) {
 		if (name.compare("init") == 0){
+			if(!isCefInitialized){
+				if(values != nullptr){
+					userAgent = CefString(webview_value_get_string(values));
+				}
+				startCEF();
+			}
 			initCallback();
 			result(1, nullptr);
 		}
-		if (name.compare("quit") == 0) {
+		else if (name.compare("quit") == 0) {
 			//only call this method when you want to quit the app
 			stopCEF();
 			result(1, nullptr);
 		}
-		if(name.compare("dispose") == 0){
+		else if(name.compare("dispose") == 0){
 			// we don't need to dispose the texture, texture will be disposed by flutter engine
 			for(auto renderer : m_renderers){
 				if(renderer.second != nullptr){
@@ -433,12 +441,12 @@ namespace webview_cef {
 		return 1;
 	}
 
-	void initCEFProcesses(CefMainArgs args, std::string userAgent){
+	void initCEFProcesses(CefMainArgs args){
 		mainArgs = args;
-		initCEFProcesses(userAgent);
+		initCEFProcesses();
 	}
 
-	void initCEFProcesses(std::string userAgent){
+	void initCEFProcesses(){
 #ifdef OS_MAC
 		CefScopedLibraryLoader loader;
 		if(!loader.LoadInMain()) {
@@ -448,17 +456,17 @@ namespace webview_cef {
 		// handler = new WebviewHandler();
 		app = new WebviewApp();
 		CefExecuteProcess(mainArgs, app, nullptr);
-		startCEF(userAgent);
 	}
 
-	void startCEF(std::string userAgent)
+	void startCEF()
 	{
 		CefSettings cefs;
 		cefs.windowless_rendering_enabled = true;
 		cefs.no_sandbox = true;
 		if(!userAgent.empty()){
-			CefString(&cefs.user_agent) = CefString(userAgent);
+			CefString(&cefs.user_agent_product) = userAgent;
 		}
+		CefString(&cefs.locale) = "zh-CN";
 #ifdef OS_WIN
 		//cef message run in another thread on windows
 		cefs.multi_threaded_message_loop = true;

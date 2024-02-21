@@ -39,10 +39,14 @@ class WebviewManager extends ValueNotifier<bool> {
 
   WebviewManager._internal() : super(false);
 
-  Future<void> initialize() async {
+  Future<void> initialize({String? userAgent}) async {
     _creatingCompleter = Completer<void>();
     try {
-      await pluginChannel.invokeMethod('init');
+      if (userAgent != null && userAgent.isNotEmpty) {
+        await pluginChannel.invokeMethod('init', userAgent);
+      } else {
+        await pluginChannel.invokeMethod('init');
+      }
       pluginChannel.setMethodCallHandler(methodCallhandler);
       // Wait for the platform to complete initialization.
       await Future.delayed(const Duration(milliseconds: 300));
