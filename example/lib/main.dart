@@ -82,7 +82,6 @@ class _MyAppState extends State<MyApp> {
     // message was in flight, we want to discard the reply rather than calling
     // setState to update our non-existent appearance.
     if (!mounted) return;
-    setState(() {});
   }
 
   @override
@@ -159,12 +158,22 @@ class _MyAppState extends State<MyApp> {
           Expanded(
               child: Row(
             children: [
-              _controller.value
-                  ? Expanded(child: _controller.webviewWidget)
-                  : _controller.loadingWidget,
-              // _controller2.value
-              //     ? Expanded(child: _controller2.webviewWidget)
-              //     : _controller2.loadingWidget,
+              ValueListenableBuilder(
+                valueListenable: _controller,
+                builder: (context, value, child) {
+                  return _controller.value
+                      ? Expanded(child: _controller.webviewWidget)
+                      : _controller.loadingWidget;
+                },
+              ),
+              // ValueListenableBuilder(
+              //   valueListenable: _controller2,
+              //   builder: (context, value, child) {
+              //     return _controller2.value
+              //         ? Expanded(child: _controller2.webviewWidget)
+              //         : _controller2.loadingWidget;
+              //   },
+              // )
             ],
           ))
         ],

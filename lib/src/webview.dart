@@ -33,6 +33,7 @@ class WebViewController extends ValueNotifier<bool> {
   late int _textureId;
   final Map<String, JavascriptChannel> _javascriptChannels =
       <String, JavascriptChannel>{};
+  Map<String, JavascriptChannel> get javascriptChannels => _javascriptChannels;
   WebviewEventsListener? _listener;
   WebviewEventsListener? get listener => _listener;
 
