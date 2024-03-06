@@ -61,7 +61,6 @@ class WebviewManager extends ValueNotifier<bool> {
   @override
   Future<void> dispose() async {
     super.dispose();
-    await pluginChannel.invokeMethod('dispose');
     pluginChannel.setMethodCallHandler(null);
     _webViews.clear();
   }

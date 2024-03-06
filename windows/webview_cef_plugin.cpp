@@ -227,8 +227,12 @@ namespace webview_cef {
 	}
 
 	WebviewCefPlugin::~WebviewCefPlugin() {
+        m_plugin = nullptr;
 		webviewPlugins.erase(m_hwnd);
 		webviewChannels.erase(m_hwnd);
+        if(webviewPlugins.empty()){
+			webview_cef::stopCEF();
+		}
 	}
 
 	void WebviewCefPlugin::HandleMethodCall(
@@ -259,11 +263,6 @@ namespace webview_cef {
 				webviewChannels[hwnd]((*std::get_if<std::string>(method)), args);
 			}
 			break;
-		}
-		case WM_CLOSE:{
-			if(webviewPlugins.begin()->first == hwnd){
-				webview_cef::stopCEF();
-			}
 		}
 		case WM_SYSCHAR:
 		case WM_SYSKEYDOWN:

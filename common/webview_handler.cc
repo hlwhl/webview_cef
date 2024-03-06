@@ -611,10 +611,9 @@ bool WebviewHandler::GetScreenInfo(CefRefPtr<CefBrowser> browser, CefScreenInfo&
 
 void WebviewHandler::OnPaint(CefRefPtr<CefBrowser> browser, CefRenderHandler::PaintElementType type,
                             const CefRenderHandler::RectList &dirtyRects, const void *buffer, int w, int h) {
-    if (browser->IsPopup()) {
-        return;
+    if (!browser->IsPopup() && onPaintCallback != nullptr) {
+        onPaintCallback(browser->GetIdentifier(), buffer, w, h);
     }
-    onPaintCallback(browser->GetIdentifier(), buffer, w, h);
 }
 
 

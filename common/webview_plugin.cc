@@ -18,6 +18,15 @@ namespace webview_cef {
 
 	WebviewPlugin::WebviewPlugin() {
 		m_handler = new WebviewHandler();
+        }
+
+    WebviewPlugin::~WebviewPlugin() {
+		uninitCallback();
+		m_handler->CloseAllBrowsers(true);
+		m_handler = nullptr;
+		if(!m_renderers.empty()){
+			m_renderers.clear();
+		}
 	}
 
 	void WebviewPlugin::initCallback() {
@@ -175,6 +184,20 @@ namespace webview_cef {
 		}
 	}
 
+	void WebviewPlugin::uninitCallback(){
+		m_handler->onPaintCallback = nullptr;
+		m_handler->onTooltipEvent = nullptr;
+		m_handler->onCursorChangedEvent = nullptr;
+		m_handler->onConsoleMessageEvent = nullptr;
+		m_handler->onUrlChangedEvent = nullptr;
+		m_handler->onTitleChangedEvent = nullptr;
+		m_handler->onJavaScriptChannelMessage = nullptr;
+		m_handler->onFocusedNodeChangeMessage = nullptr;
+		m_handler->onImeCompositionRangeChangedMessage = nullptr;
+		m_init = false;
+	}
+
+
     void WebviewPlugin::HandleMethodCall(std::string name, WValue* values, std::function<void(int ,WValue*)> result) {
 		if (name.compare("init") == 0){
 			if(!isCefInitialized){
@@ -189,16 +212,6 @@ namespace webview_cef {
 		else if (name.compare("quit") == 0) {
 			//only call this method when you want to quit the app
 			stopCEF();
-			result(1, nullptr);
-		}
-		else if(name.compare("dispose") == 0){
-			// we don't need to dispose the texture, texture will be disposed by flutter engine
-			for(auto renderer : m_renderers){
-				if(renderer.second != nullptr){
-					m_handler->closeBrowser(renderer.first);
-				}
-			}
-			m_renderers.clear();
 			result(1, nullptr);
 		}
 		else if (name.compare("create") == 0) {
