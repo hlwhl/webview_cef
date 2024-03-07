@@ -238,7 +238,7 @@ void WebviewHandler::closeBrowser(int browserId)
 
 void WebviewHandler::createBrowser(std::string url, std::function<void(int)> callback)
 {
-#ifdef OS_WIN
+#ifndef OS_MAC
     if(!CefCurrentlyOn(TID_UI)) {
 		CefPostTask(TID_UI, base::BindOnce(&WebviewHandler::createBrowser, this, url, callback));
 		return;

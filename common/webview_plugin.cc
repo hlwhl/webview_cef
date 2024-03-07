@@ -480,13 +480,13 @@ namespace webview_cef {
 			CefString(&cefs.user_agent_product) = userAgent;
 		}
 		CefString(&cefs.locale) = "zh-CN";
-#ifdef OS_WIN
-		//cef message run in another thread on windows
-		cefs.multi_threaded_message_loop = true;
-#else
-		//cef message loop handle by MainApplication
+#ifdef OS_MAC
+		//cef message loop handle by MainApplication on mac
 		cefs.external_message_pump = true;
 		//CefString(&cefs.browser_subprocess_path) = "/Library/Chaches"; //the helper Program path
+#else
+		//cef message run in another thread on windows/linux
+		cefs.multi_threaded_message_loop = true;
 #endif
 		CefInitialize(mainArgs, cefs, app.get(), nullptr);
 	}
