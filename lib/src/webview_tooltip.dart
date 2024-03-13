@@ -4,7 +4,7 @@ import 'package:flutter/material.dart';
 
 class WebviewTooltip {
   WebviewTooltip(BuildContext context) {
-    _overlayState = Overlay.of(context);
+    _overlayState = Overlay.of(context)!;
     _box = context.findRenderObject() as RenderBox;
   }
   late OverlayState _overlayState;
