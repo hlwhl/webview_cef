@@ -26,7 +26,10 @@ public:
     void OnBeforeCommandLineProcessing(
                                        const CefString& process_type,
                                        CefRefPtr<CefCommandLine> command_line) override {
-                                           command_line->AppendSwitch("disable-gpu");
+                                           command_line->AppendSwitch("enable-gpu");
+                                        //    command_line->AppendSwitch("use-gl");
+                                           command_line->AppendSwitch("in-process-gpu");
+                                        //    command_line->AppendSwitch("disable-gpu");
                                            command_line->AppendSwitch("disable-gpu-compositing");
                                            command_line->AppendSwitch("disable-web-security");
                                            #ifdef __APPLE__
