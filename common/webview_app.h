@@ -28,6 +28,7 @@ public:
                                        CefRefPtr<CefCommandLine> command_line) override {
                                            command_line->AppendSwitch("disable-gpu");
                                            command_line->AppendSwitch("disable-gpu-compositing");
+                                           command_line->AppenSwitch("disable-web-security");
                                            #ifdef __APPLE__
                                                 command_line->AppendSwitch("use-mock-keychain");
                                                 command_line->AppendSwitch("single-process");
