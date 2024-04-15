@@ -69,7 +69,7 @@ Then follow the below steps inside the `macos/` folder <b>of the cloned reposito
 
 <br/><br/>
 
-`**[HELP WANTED!]**` Finding a more elegant way to distribute the prebuilt package.
+**`[HELP WANTED!]`** Finding a more elegant way to distribute the prebuilt package.
 
 > Note: Currently the project has not been enabled with multi process support due to debug convenience. If you want to enable multi process support, you may want to enable multi process mode by changing the implementation and build your own helper bundle. (Finding a more elegant way in the future.)
 
