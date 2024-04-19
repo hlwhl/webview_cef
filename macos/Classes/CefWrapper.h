@@ -9,13 +9,14 @@
 #define CefWrapper_h
 #import <FlutterMacOS/FlutterMacOS.h>
 
-extern NSObject<FlutterTextureRegistry>* tr;
-extern CGFloat scaleFactor;
+extern NSMapTable* webviewPlugins;
 
-@interface CefWrapper : NSObject<FlutterTexture>
+@interface CefWrapper : NSObject
 
-+ (void)setMethodChannel: (FlutterMethodChannel*)channel;
-+ (void) handleMethodCallWrapper: (FlutterMethodCall*)call result:(FlutterResult)result;
+@property(nonatomic) NSObject<FlutterTextureRegistry>* textureRegistry;
+@property(nonatomic) FlutterMethodChannel* channel;
+
+- (void)handleMethodCallWrapper: (FlutterMethodCall*)call result:(FlutterResult)result;
 
 @end
 
