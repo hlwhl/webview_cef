@@ -200,14 +200,6 @@ class WebViewController extends ValueNotifier<bool> {
         .invokeMethod('evaluateJavascript', [_browserId, code]);
   }
 
-  Future<dynamic> evaluateJavascript(String code) async {
-    if (_isDisposed) {
-      return;
-    }
-    assert(value);
-    return _pluginChannel.invokeMethod('evaluateJavascript', [code]);
-  }
-
   /// Moves the virtual cursor to [position].
   Future<void> _cursorMove(Offset position) async {
     if (_isDisposed) {

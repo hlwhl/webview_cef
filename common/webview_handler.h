@@ -166,10 +166,7 @@ private:
     // List of existing browser windows. Only accessed on the CEF UI thread.
     std::unordered_map<int, browser_info> browser_map_;
 
-    std::unordered_map<std::string, std::function<void(std::string)>> js_callbacks_;
-
-    std::unordered_map<std::string, std::function<void(std::string)>> js_callbacks_;
-    
+    std::unordered_map<std::string, std::function<void(std::string)>> js_callbacks_;    
     // Include the default reference counting implementation.
     IMPLEMENT_REFCOUNTING(WebviewHandler);
 
