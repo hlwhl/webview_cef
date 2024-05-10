@@ -95,7 +95,7 @@ void WebviewHandler::OnAddressChange(CefRefPtr<CefBrowser> browser,
                              CefRefPtr<CefFrame> frame,
                      const CefString& url) {
     if(onUrlChangedEvent) {
-        onTitleChangedEvent(browser->GetIdentifier(), url);
+        onUrlChangedEvent(browser->GetIdentifier(), url);
     }
 }
 
