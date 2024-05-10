@@ -8,6 +8,7 @@
 #include <string>
 #include <iostream>
 #include <chrono>
+#include <unordered_map>
 
 #include "include/base/cef_callback.h"
 #include "include/cef_app.h"
@@ -20,8 +21,8 @@
 #include "webview_js_handler.h"
 
 namespace {
-
-WebviewHandler* g_instance = nullptr;
+// The only browser that currently get focused
+CefRefPtr<CefBrowser> current_focused_browser_ = nullptr;
 
 // Returns a data: URI with the specified contents.
 std::string GetDataURI(const std::string& data, const std::string& mime_type) {
@@ -33,17 +34,12 @@ std::string GetDataURI(const std::string& data, const std::string& mime_type) {
 }  // namespace
 
 WebviewHandler::WebviewHandler() {
-    DCHECK(!g_instance);
-    g_instance = this;
+
 }
 
 WebviewHandler::~WebviewHandler() {
-    g_instance = nullptr;
-}
-
-// static
-WebviewHandler* WebviewHandler::GetInstance() {
-    return g_instance;
+    browser_map_.clear();
+    js_callbacks_.clear();
 }
 
 bool WebviewHandler::OnProcessMessageReceived(
@@ -51,8 +47,16 @@ bool WebviewHandler::OnProcessMessageReceived(
      CefProcessId source_process, CefRefPtr<CefProcessMessage> message)
 {
 	std::string message_name = message->GetName();
-
-    if(message_name == kJSCallCppFunctionMessage)
+    if (message_name == kFocusedNodeChangedMessage)
+    {
+        current_focused_browser_ = browser;
+        bool editable = message->GetArgumentList()->GetBool(0);
+        onFocusedNodeChangeMessage(browser->GetIdentifier(), editable);
+        if (editable) {
+            onImeCompositionRangeChangedMessage(browser->GetIdentifier(), message->GetArgumentList()->GetInt(1), message->GetArgumentList()->GetInt(2));
+        }
+    }
+    else if(message_name == kJSCallCppFunctionMessage)
     {
         CefString fun_name = message->GetArgumentList()->GetString(0);
 		CefString param = message->GetArgumentList()->GetString(1);
@@ -63,7 +67,7 @@ bool WebviewHandler::OnProcessMessageReceived(
 	    }
 
         onJavaScriptChannelMessage(
-            fun_name,param,std::to_string(js_callback_id),std::to_string(frame->GetIdentifier()));
+            fun_name,param,std::to_string(js_callback_id), browser->GetIdentifier(), std::to_string(frame->GetIdentifier()));
     }
     else if(message_name == kEvaluateCallbackMessage){
         CefString callbackId = message->GetArgumentList()->GetString(0);
@@ -83,7 +87,7 @@ void WebviewHandler::OnTitleChange(CefRefPtr<CefBrowser> browser,
                                   const CefString& title) {
     //todo: title change
     if(onTitleChangedEvent) {
-        onTitleChangedEvent(title);
+        onTitleChangedEvent(browser->GetIdentifier(), title);
     }
 }
 
@@ -91,7 +95,7 @@ void WebviewHandler::OnAddressChange(CefRefPtr<CefBrowser> browser,
                              CefRefPtr<CefFrame> frame,
                      const CefString& url) {
     if(onUrlChangedEvent) {
-        onUrlChangedEvent(url);
+        onUrlChangedEvent(browser->GetIdentifier(), url);
     }
 }
 
@@ -100,7 +104,7 @@ bool WebviewHandler::OnCursorChange(CefRefPtr<CefBrowser> browser,
                             cef_cursor_type_t type,
                             const CefCursorInfo& custom_cursor_info){
     if(onCursorChangedEvent) {
-        onCursorChangedEvent(type);
+        onCursorChangedEvent(browser->GetIdentifier(), type);
         return true;
     }
     return false;
@@ -108,7 +112,7 @@ bool WebviewHandler::OnCursorChange(CefRefPtr<CefBrowser> browser,
 
 bool WebviewHandler::OnTooltip(CefRefPtr<CefBrowser> browser, CefString& text) {
     if(onTooltipEvent) {
-        onTooltipEvent(text);
+        onTooltipEvent(browser->GetIdentifier(), text);
         return true;
     }
     return false;
@@ -120,16 +124,17 @@ bool WebviewHandler::OnConsoleMessage(CefRefPtr<CefBrowser> browser,
                                       const CefString& source,
                                       int line){
     if(onConsoleMessageEvent){
-        onConsoleMessageEvent(level, message, source, line);
+        onConsoleMessageEvent(browser->GetIdentifier(), level, message, source, line);
     }
     return false;
 }
 
 void WebviewHandler::OnAfterCreated(CefRefPtr<CefBrowser> browser) {
     CEF_REQUIRE_UI_THREAD();
-    
-    // Add to the list of existing browsers.
-    browser_list_.push_back(browser);
+    if (!browser->IsPopup()) {
+        browser_map_.emplace(browser->GetIdentifier(), browser_info());
+        browser_map_[browser->GetIdentifier()].browser = browser;
+    }
 }
 
 bool WebviewHandler::DoClose(CefRefPtr<CefBrowser> browser) {
@@ -141,20 +146,6 @@ bool WebviewHandler::DoClose(CefRefPtr<CefBrowser> browser) {
 
 void WebviewHandler::OnBeforeClose(CefRefPtr<CefBrowser> browser) {
     CEF_REQUIRE_UI_THREAD();
-    
-    // Remove from the list of existing browsers.
-    BrowserList::iterator bit = browser_list_.begin();
-    for (; bit != browser_list_.end(); ++bit) {
-        if ((*bit)->IsSame(browser)) {
-            browser_list_.erase(bit);
-            break;
-        }
-    }
-    
-    if (browser_list_.empty()) {
-        // All browser windows have closed. Quit the application message loop.
-        CefQuitMessageLoop();
-    }
 }
 
 bool WebviewHandler::OnBeforePopup(CefRefPtr<CefBrowser> browser,
@@ -169,8 +160,22 @@ bool WebviewHandler::OnBeforePopup(CefRefPtr<CefBrowser> browser,
                                   CefBrowserSettings& settings,
                                   CefRefPtr<CefDictionaryValue>& extra_info,
                                   bool* no_javascript_access) {
-    loadUrl(target_url);
+    loadUrl(browser->GetIdentifier(), target_url);
     return true;
+}
+
+void WebviewHandler::OnTakeFocus(CefRefPtr<CefBrowser> browser, bool next)
+{
+    executeJavaScript(browser->GetIdentifier(), "document.activeElement.blur()");
+}
+
+bool WebviewHandler::OnSetFocus(CefRefPtr<CefBrowser> browser, FocusSource source)
+{
+    return false;
+}
+
+void WebviewHandler::OnGotFocus(CefRefPtr<CefBrowser> browser)
+{
 }
 
 void WebviewHandler::OnLoadError(CefRefPtr<CefBrowser> browser,
@@ -199,19 +204,15 @@ void WebviewHandler::OnLoadError(CefRefPtr<CefBrowser> browser,
 }
 
 void WebviewHandler::CloseAllBrowsers(bool force_close) {
-    if (!CefCurrentlyOn(TID_UI)) {
-        // Execute on the UI thread.
-        //    CefPostTask(TID_UI, base::BindOnce(&SimpleHandler::CloseAllBrowsers, this,
-        //                                       force_close));
+    if (browser_map_.empty()){
         return;
     }
     
-    if (browser_list_.empty())
-        return;
-    
-    BrowserList::const_iterator it = browser_list_.begin();
-    for (; it != browser_list_.end(); ++it)
-        (*it)->GetHost()->CloseBrowser(force_close);
+    for (auto& it : browser_map_){
+        it.second.browser->GetHost()->CloseBrowser(force_close);
+        it.second.browser = nullptr;
+    }
+    browser_map_.clear();
 }
 
 // static
@@ -225,9 +226,35 @@ bool WebviewHandler::IsChromeRuntimeEnabled() {
     return value == 1;
 }
 
-void WebviewHandler::sendScrollEvent(int x, int y, int deltaX, int deltaY) {
-    BrowserList::const_iterator it = browser_list_.begin();
-    if (it != browser_list_.end()) {
+void WebviewHandler::closeBrowser(int browserId)
+{
+    auto it = browser_map_.find(browserId);
+    if(it != browser_map_.end()){
+        it->second.browser->GetHost()->CloseBrowser(true);
+        it->second.browser = nullptr;
+        browser_map_.erase(it);
+    }
+}
+
+void WebviewHandler::createBrowser(std::string url, std::function<void(int)> callback)
+{
+#ifndef OS_MAC
+    if(!CefCurrentlyOn(TID_UI)) {
+		CefPostTask(TID_UI, base::BindOnce(&WebviewHandler::createBrowser, this, url, callback));
+		return;
+	}
+#endif
+    CefBrowserSettings browser_settings ;
+    browser_settings.windowless_frame_rate = 30;
+    CefWindowInfo window_info;
+    window_info.SetAsWindowless(0);
+    callback(CefBrowserHost::CreateBrowserSync(window_info, this, url, browser_settings, nullptr, nullptr)->GetIdentifier());
+}
+
+void WebviewHandler::sendScrollEvent(int browserId, int x, int y, int deltaX, int deltaY) {
+
+    auto it = browser_map_.find(browserId);
+    if (it != browser_map_.end()) {
         CefMouseEvent ev;
         ev.x = x;
         ev.y = y;
@@ -236,58 +263,58 @@ void WebviewHandler::sendScrollEvent(int x, int y, int deltaX, int deltaY) {
         // The scrolling direction on Windows and Linux is different from MacOS
         deltaY = -deltaY;
         // Flutter scrolls too slowly, it looks more normal by 10x default speed.
-        (*it)->GetHost()->SendMouseWheelEvent(ev, deltaX * 10, deltaY * 10);
+        it->second.browser->GetHost()->SendMouseWheelEvent(ev, deltaX * 10, deltaY * 10);
 #else
-        (*it)->GetHost()->SendMouseWheelEvent(ev, deltaX, deltaY);
+        it->second.browser->GetHost()->SendMouseWheelEvent(ev, deltaX, deltaY);
 #endif
 
 
     }
 }
 
-void WebviewHandler::changeSize(float a_dpi, int w, int h)
+void WebviewHandler::changeSize(int browserId, float a_dpi, int w, int h)
 {
-    this->dpi = a_dpi;
-    this->width = w;
-    this->height = h;
-    BrowserList::const_iterator it = browser_list_.begin();
-    if (it != browser_list_.end()) {
-        (*it)->GetHost()->WasResized();
+    auto it = browser_map_.find(browserId);
+    if (it != browser_map_.end()) {
+        it->second.dpi = a_dpi;
+        it->second.width = w;
+        it->second.height = h;
+        it->second.browser->GetHost()->WasResized();
     }
 }
 
-void WebviewHandler::cursorClick(int x, int y, bool up)
+void WebviewHandler::cursorClick(int browserId, int x, int y, bool up)
 {
-    BrowserList::const_iterator it = browser_list_.begin();
-    if (it != browser_list_.end()) {
+    auto it = browser_map_.find(browserId);
+    if (it != browser_map_.end()) {
         CefMouseEvent ev;
         ev.x = x;
         ev.y = y;
         ev.modifiers = EVENTFLAG_LEFT_MOUSE_BUTTON;
-        if(up && is_dragging) {
-            (*it)->GetHost()->DragTargetDrop(ev);
-            (*it)->GetHost()->DragSourceSystemDragEnded();
-            is_dragging = false;
+        if(up && it->second.is_dragging) {
+            it->second.browser->GetHost()->DragTargetDrop(ev);
+            it->second.browser->GetHost()->DragSourceSystemDragEnded();
+            it->second.is_dragging = false;
         } else {
-            (*it)->GetHost()->SendMouseClickEvent(ev, CefBrowserHost::MouseButtonType::MBT_LEFT, up, 1);
+            it->second.browser->GetHost()->SendMouseClickEvent(ev, CefBrowserHost::MouseButtonType::MBT_LEFT, up, 1);
         }
     }
 }
 
-void WebviewHandler::cursorMove(int x , int y, bool dragging)
+void WebviewHandler::cursorMove(int browserId, int x , int y, bool dragging)
 {
-    BrowserList::const_iterator it = browser_list_.begin();
-    if (it != browser_list_.end()) {
+    auto it = browser_map_.find(browserId);
+    if (it != browser_map_.end()) {
         CefMouseEvent ev;
         ev.x = x;
         ev.y = y;
         if(dragging) {
             ev.modifiers = EVENTFLAG_LEFT_MOUSE_BUTTON;
         }
-        if(is_dragging && dragging) {
-            (*it)->GetHost()->DragTargetDragOver(ev, DRAG_OPERATION_EVERY);
+        if(it->second.is_dragging && dragging) {
+            it->second.browser->GetHost()->DragTargetDragOver(ev, DRAG_OPERATION_EVERY);
         } else {
-            (*it)->GetHost()->SendMouseMoveEvent(ev, false);
+            it->second.browser->GetHost()->SendMouseMoveEvent(ev, false);
         }
     }
 }
@@ -297,64 +324,144 @@ bool WebviewHandler::StartDragging(CefRefPtr<CefBrowser> browser,
                                   DragOperationsMask allowed_ops,
                                   int x,
                                   int y){
-    BrowserList::const_iterator it = browser_list_.begin();
-    if (it != browser_list_.end()) {
+    auto it = browser_map_.find(browser->GetIdentifier());
+    if (it != browser_map_.end() && it->second.browser->IsSame(browser)) {
         CefMouseEvent ev;
         ev.x = x;
         ev.y = y;
         ev.modifiers = EVENTFLAG_LEFT_MOUSE_BUTTON;
-        (*it)->GetHost()->DragTargetDragEnter(drag_data, ev, DRAG_OPERATION_EVERY);
-        is_dragging = true;
+        it->second.browser->GetHost()->DragTargetDragEnter(drag_data, ev, DRAG_OPERATION_EVERY);
+        it->second.is_dragging = true;
     }
     return true;
 }
 
+void WebviewHandler::OnImeCompositionRangeChanged(CefRefPtr<CefBrowser> browser, const CefRange &selection_range, const CefRenderHandler::RectList &character_bounds)
+{
+    CEF_REQUIRE_UI_THREAD();
+    auto it = browser_map_.find(browser->GetIdentifier());
+    if(it == browser_map_.end() || !it->second.browser.get() || browser->IsPopup()) {
+        return;
+    }
+    if (!character_bounds.empty()) {
+        if (it->second.is_ime_commit) {
+            auto lastCharacter = character_bounds.back();
+            it->second.prev_ime_position = lastCharacter;
+            onImeCompositionRangeChangedMessage(browser->GetIdentifier(), lastCharacter.x + lastCharacter.width, lastCharacter.y + lastCharacter.height);
+            it->second.is_ime_commit = false;
+        }
+        else
+        {
+            auto firstCharacter = character_bounds.front();
+            if (firstCharacter != it->second.prev_ime_position) {
+                it->second.prev_ime_position = firstCharacter;
+                onImeCompositionRangeChangedMessage(browser->GetIdentifier(), firstCharacter.x, firstCharacter.y + firstCharacter.height);
+            }
+        }
+    }
+}
+
 void WebviewHandler::sendKeyEvent(CefKeyEvent& ev)
 {
-    BrowserList::const_iterator it = browser_list_.begin();
-    if (it != browser_list_.end()) {
-        (*it)->GetHost()->SendKeyEvent(ev);
+    auto browser = current_focused_browser_;
+    if (!browser.get()) {
+        return;
     }
+    browser->GetHost()->SendKeyEvent(ev);
 }
 
-void WebviewHandler::loadUrl(std::string url)
+void WebviewHandler::loadUrl(int browserId, std::string url)
 {
-    BrowserList::const_iterator it = browser_list_.begin();
-    if (it != browser_list_.end()) {
-        (*it)->GetMainFrame()->LoadURL(url);
+    auto it = browser_map_.find(browserId);
+    if (it != browser_map_.end()) {
+        it->second.browser->GetMainFrame()->LoadURL(url);
     }
 }
 
-void WebviewHandler::goForward() {
-    BrowserList::const_iterator it = browser_list_.begin();
-    if (it != browser_list_.end()) {
-        (*it)->GetMainFrame()->GetBrowser()->GoForward();
+void WebviewHandler::goForward(int browserId) {
+    auto it = browser_map_.find(browserId);
+    if (it != browser_map_.end()) {
+        it->second.browser->GetMainFrame()->GetBrowser()->GoForward();
     }
 }
 
-void WebviewHandler::goBack() {
-    BrowserList::const_iterator it = browser_list_.begin();
-    if (it != browser_list_.end()) {
-        (*it)->GetMainFrame()->GetBrowser()->GoBack();
+void WebviewHandler::goBack(int browserId) {
+    auto it = browser_map_.find(browserId);
+    if (it != browser_map_.end()) {
+        it->second.browser->GetMainFrame()->GetBrowser()->GoBack();
     }
 }
 
-void WebviewHandler::reload() {
-    BrowserList::const_iterator it = browser_list_.begin();
-    if (it != browser_list_.end()) {
-        (*it)->GetMainFrame()->GetBrowser()->Reload();
+void WebviewHandler::reload(int browserId) {
+    auto it = browser_map_.find(browserId);
+    if (it != browser_map_.end()) {
+        it->second.browser->GetMainFrame()->GetBrowser()->Reload();
     }
 }
 
-void WebviewHandler::openDevTools() {
-    BrowserList::const_iterator it = browser_list_.begin();
-    if (it != browser_list_.end()) {
+void WebviewHandler::openDevTools(int browserId) {
+    auto it = browser_map_.find(browserId);
+    if (it != browser_map_.end()) {
         CefWindowInfo windowInfo;
-#ifdef _WIN32
+#ifdef OS_WIN
         windowInfo.SetAsPopup(nullptr, "DevTools");
 #endif
-        (*it)->GetHost()->ShowDevTools(windowInfo, this, CefBrowserSettings(), CefPoint());
+        it->second.browser->GetHost()->ShowDevTools(windowInfo, this, CefBrowserSettings(), CefPoint());
     }
+}
+
+void WebviewHandler::imeSetComposition(int browserId, std::string text)
+{
+    auto it = browser_map_.find(browserId);
+    if (it==browser_map_.end() || !it->second.browser.get()) {
+        return;
+    }
+
+    CefString cTextStr = CefString(text);
+
+    std::vector<CefCompositionUnderline> underlines;
+    cef_composition_underline_t underline = {};
+    underline.range.from = 0;
+    underline.range.to = static_cast<int>(0 + cTextStr.length());
+    underline.color = ColorUNDERLINE;
+    underline.background_color = ColorBKCOLOR;
+    underline.thick = 0;
+    underline.style = CEF_CUS_DOT;
+    underlines.push_back(underline);
+
+    // Keeps the caret at the end of the composition
+    auto selection_range_end = static_cast<int>(0 + cTextStr.length());
+    CefRange selection_range = CefRange(0, selection_range_end);
+    it->second.browser->GetHost()->ImeSetComposition(cTextStr, underlines, CefRange(UINT32_MAX, UINT32_MAX), selection_range);
+}
+
+void WebviewHandler::imeCommitText(int browserId, std::string text)
+{
+    auto it = browser_map_.find(browserId);
+    if (it==browser_map_.end() || !it->second.browser.get()) {
+        return;
+    }
+
+    CefString cTextStr = CefString(text);
+    it->second.is_ime_commit = true;
+
+    std::vector<CefCompositionUnderline> underlines;
+    auto selection_range_end = static_cast<int>(0 + cTextStr.length());
+    CefRange selection_range = CefRange(selection_range_end, selection_range_end);
+#ifndef _WIN32
+        it->second.browser->GetHost()->ImeSetComposition(cTextStr, underlines, CefRange(UINT32_MAX, UINT32_MAX), selection_range);
+#endif
+    it->second.browser->GetHost()->ImeCommitText(cTextStr, CefRange(UINT32_MAX, UINT32_MAX), 0);
+
+}
+
+void WebviewHandler::setClientFocus(int browserId, bool focus)
+{
+    auto it = browser_map_.find(browserId);
+    if (it==browser_map_.end() || !it->second.browser.get()) {
+        return;
+    }
+    it->second.browser->GetHost()->SetFocus(focus);
 }
 
 void WebviewHandler::setCookie(const std::string& domain, const std::string& key, const std::string& value){
@@ -413,7 +520,7 @@ void WebviewHandler::visitUrlCookies(const std::string& domain, const bool& isHt
     manager->VisitUrlCookies(httpDomain, isHttpOnly, cookieVisitor);
 }
 
-void WebviewHandler::setJavaScriptChannels(const std::vector<std::string> channels)
+void WebviewHandler::setJavaScriptChannels(int browserId, const std::vector<std::string> channels)
 {
     std::string extensionCode = "";
     for(auto& channel : channels)
@@ -423,19 +530,19 @@ void WebviewHandler::setJavaScriptChannels(const std::vector<std::string> channe
         extensionCode += channel;
         extensionCode += "',e,r)};";
     }
-    executeJavaScript(extensionCode);
+    executeJavaScript(browserId, extensionCode);
 }
 
-void WebviewHandler::sendJavaScriptChannelCallBack(const bool error, const std::string result, const std::string callbackId, const std::string frameId)
+void WebviewHandler::sendJavaScriptChannelCallBack(const bool error, const std::string result, const std::string callbackId, const int browserId, const std::string frameId)
 {
     CefRefPtr<CefProcessMessage> message = CefProcessMessage::Create(kExecuteJsCallbackMessage);
     CefRefPtr<CefListValue> args = message->GetArgumentList();
     args->SetInt(0, atoi(callbackId.c_str()));
     args->SetBool(1, error);
     args->SetString(2, result);
-    BrowserList::iterator bit = browser_list_.begin();
-    for (; bit != browser_list_.end(); ++bit) {
-        CefRefPtr<CefFrame> frame = (*bit)->GetMainFrame();
+    auto bit = browser_map_.find(browserId);
+    if(bit != browser_map_.end()){
+        CefRefPtr<CefFrame> frame = bit->second.browser->GetMainFrame();
         if (frame->GetIdentifier() == atoll(frameId.c_str()))
         {
             frame->SendProcessMessage(PID_RENDERER, message);
@@ -450,14 +557,14 @@ static std::string GetCallbackId()
     return std::to_string(timestamp);
 } 
 
-void WebviewHandler::executeJavaScript(const std::string code, std::function<void(std::string)> callback)
+void WebviewHandler::executeJavaScript(int browserId, const std::string code, std::function<void(std::string)> callback)
 {
     if(!code.empty())
     {
-        BrowserList::iterator bit = browser_list_.begin();
-        for (; bit != browser_list_.end(); ++bit) {
-            if ((*bit).get()) {
-                CefRefPtr<CefFrame> frame = (*bit)->GetMainFrame();
+        auto bit = browser_map_.find(browserId);
+        if(bit != browser_map_.end() && bit->second.browser.get()){
+                //TODO: this code is not true on muti tab
+                CefRefPtr<CefFrame> frame = bit->second.browser->GetMainFrame();
                 if (frame) {
                     std::string finalCode = code;
                     if(callback != nullptr){
@@ -470,7 +577,6 @@ void WebviewHandler::executeJavaScript(const std::string code, std::function<voi
                         js_callbacks_[callbackId] = callback;
                     }
 			        frame->ExecuteJavaScript(finalCode, frame->GetURL(), 0);
-		        }
             }
         }
     }
@@ -478,29 +584,36 @@ void WebviewHandler::executeJavaScript(const std::string code, std::function<voi
 
 void WebviewHandler::GetViewRect(CefRefPtr<CefBrowser> browser, CefRect &rect) {
     CEF_REQUIRE_UI_THREAD();
-    
+    auto it = browser_map_.find(browser->GetIdentifier());
+    if(it == browser_map_.end() || !it->second.browser.get() || browser->IsPopup()) {
+        return;
+    }
     rect.x = rect.y = 0;
     
-    if (width < 1) {
+    if (it->second.width < 1) {
         rect.width = 1;
     } else {
-        rect.width = width;
+        rect.width = it->second.width;
     }
     
-    if (height < 1) {
+    if (it->second.height < 1) {
         rect.height = 1;
     } else {
-        rect.height = height;
+        rect.height = it->second.height;
     }
 }
 
 bool WebviewHandler::GetScreenInfo(CefRefPtr<CefBrowser> browser, CefScreenInfo& screen_info) {
     //todo: hi dpi support
-    screen_info.device_scale_factor  = this->dpi;
+    screen_info.device_scale_factor  = browser_map_[browser->GetIdentifier()].dpi;
     return false;
 }
 
 void WebviewHandler::OnPaint(CefRefPtr<CefBrowser> browser, CefRenderHandler::PaintElementType type,
                             const CefRenderHandler::RectList &dirtyRects, const void *buffer, int w, int h) {
-    onPaintCallback(buffer, w, h);
+    if (!browser->IsPopup() && onPaintCallback != nullptr) {
+        onPaintCallback(browser->GetIdentifier(), buffer, w, h);
+    }
 }
+
+

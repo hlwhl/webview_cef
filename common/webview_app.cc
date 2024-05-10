@@ -80,24 +80,113 @@ WebviewApp::WebviewApp(CefRefPtr<WebviewHandler> handler) {
     m_handler = handler;
 }
 
-void WebviewApp::OnContextInitialized() {
-    CEF_REQUIRE_UI_THREAD();
+WebviewApp::ProcessType WebviewApp::GetProcessType(CefRefPtr<CefCommandLine> command_line)
+{
+    // The command-line flag won't be specified for the browser process.
+	if (!command_line->HasSwitch("type"))
+    {
+        return BrowserProcess;
+    }
 
-    // Specify CEF browser settings here.
-    CefBrowserSettings browser_settings;
-    browser_settings.windowless_frame_rate = 60;
-        
-    CefWindowInfo window_info;
-    window_info.SetAsWindowless(0);
-    
-    // Create the first browser window.
-    CefBrowserHost::CreateBrowser(window_info, m_handler, "", browser_settings,
-                                  nullptr, nullptr);
+	const std::string& process_type = command_line->GetSwitchValue("type");
+	if (process_type == "renderer")
+		return RendererProcess;
+#if defined(OS_LINUX)
+	else if (process_type == "zygote")
+		return ZygoteProcess;
+#endif
+	return OtherProcess;
 }
 
-CefRefPtr<CefClient> WebviewApp::GetDefaultClient() {
-    // Called when a new browser window is created via the Chrome runtime UI.
-    return WebviewHandler::GetInstance();
+void WebviewApp::OnBeforeCommandLineProcessing(const CefString &process_type, CefRefPtr<CefCommandLine> command_line)
+{
+    // Pass additional command-line flags to the browser process.
+	if (process_type.empty())
+	{
+		if (!m_bEnableGPU)
+		{
+			command_line->AppendSwitch("disable-gpu");
+			command_line->AppendSwitch("disable-gpu-compositing");
+		}
+
+		command_line->AppendSwitch("disable-web-security");                                     //disable web security
+		command_line->AppendSwitch("allow-running-insecure-content");                           //allow running insecure content in secure pages
+		// Don't create a "GPUCache" directory when cache-path is unspecified.
+		command_line->AppendSwitch("disable-gpu-shader-disk-cache");                            //disable gpu shader disk cache
+        command_line->AppendSwitch("no-sanbox");                       
+
+		//http://www.chromium.org/developers/design-documents/process-models
+		if (m_uMode == 1)
+		{
+			command_line->AppendSwitch("process-per-site");                                     //each site in its own process
+			command_line->AppendSwitchWithValue("renderer-process-limit ", "8");              //limit renderer process count to decrease memory usage
+		}
+		else if (m_uMode == 2)
+		{
+			command_line->AppendSwitch("process-per-tab");                                      //each tab in its own process
+		}
+		else if (m_uMode == 3)
+		{
+			command_line->AppendSwitch("single-process");                                     //all in one process
+		}
+		command_line->AppendSwitchWithValue("autoplay-policy", "no-user-gesture-required");     //autoplay policy for media
+
+        //Support cross domain requests
+        std::string values = command_line->GetSwitchValue("disable-features");
+        if (values == "")
+        {
+            values = "SameSiteByDefaultCookies,CookiesWithoutSameSiteMustBeSecure";
+        }
+        else
+        {
+            values += ",SameSiteByDefaultCookies,CookiesWithoutSameSiteMustBeSecure";
+        }
+        if (values.find("CalculateNativeWinOcclusion") == size_t(-1))
+        {
+            values += ",CalculateNativeWinOcclusion";
+        }
+
+        command_line->AppendSwitchWithValue("disable-features", values);
+        // for unsafe domain, add domain to whitelist
+		if (!m_strFilterDomain.empty())
+		{
+			command_line->AppendSwitch("ignore-certificate-errors");                            //ignore certificate errors
+			command_line->AppendSwitchWithValue("unsafely-treat-insecure-origin-as-secure",
+                m_strFilterDomain);
+		}
+    }
+
+#ifdef __APPLE__
+    command_line->AppendSwitch("use-mock-keychain");
+    command_line->AppendSwitch("single-process");
+#endif
+#ifdef __linux__
+                                           
+#endif
+}
+
+void WebviewApp::OnContextInitialized()
+{
+    CEF_REQUIRE_UI_THREAD();
+//    CefBrowserSettings browser_settings;
+//    browser_settings.windowless_frame_rate = 60;
+//                
+//    CefWindowInfo window_info;
+//    window_info.SetAsWindowless(0);
+//
+//    // create browser
+//    CefBrowserHost::CreateBrowser(window_info, m_handler, "", browser_settings, nullptr, nullptr);
+    
+}
+
+// CefRefPtr<CefClient> WebviewApp::GetDefaultClient() {
+//     // Called when a new browser window is created via the Chrome runtime UI.
+//     return WebviewHandler::GetInstance();
+// }
+
+void WebviewApp::SetUnSafelyTreatInsecureOriginAsSecure(const CefString &strFilterDomain)
+{
+    m_strFilterDomain = strFilterDomain;
 }
 
 void WebviewApp::OnWebKitInitialized()
@@ -177,8 +266,23 @@ void WebviewApp::OnWebKitInitialized()
 
 void WebviewApp::OnBrowserCreated(CefRefPtr<CefBrowser> browser, CefRefPtr<CefDictionaryValue> extra_info)
 {
-    if (!m_render_js_bridge.get())
+    if (!m_render_js_bridge.get()) {
         m_render_js_bridge.reset(new CefJSBridge);
+    }
+}
+
+void WebviewApp::SetProcessMode(uint32_t uMode)
+{
+    m_uMode = uMode;
+}
+
+void WebviewApp::SetEnableGPU(bool bEnable)
+{
+    m_bEnableGPU = bEnable;
+}
+
+void WebviewApp::OnBeforeChildProcessLaunch(CefRefPtr<CefCommandLine> command_line)
+{
 }
 
 void WebviewApp::OnBrowserDestroyed(CefRefPtr<CefBrowser> browser)
@@ -202,17 +306,18 @@ void WebviewApp::OnUncaughtException(CefRefPtr<CefBrowser> browser, CefRefPtr<Ce
 }
 
 void WebviewApp::OnFocusedNodeChanged(CefRefPtr<CefBrowser> browser, CefRefPtr<CefFrame> frame, CefRefPtr<CefDOMNode> node)
-{
+ {    
+    //Get node attribute
     bool is_editable = (node.get() && node->IsEditable());
-    if (is_editable != m_last_node_is_editable)
+    CefRefPtr<CefProcessMessage> message = CefProcessMessage::Create(kFocusedNodeChangedMessage);
+    message->GetArgumentList()->SetBool(0, is_editable);
+    if (is_editable)
     {
-        // Notify the browser of the change in focused element type.
-        m_last_node_is_editable = is_editable;
-        CefRefPtr<CefProcessMessage> message = CefProcessMessage::Create(kFocusedNodeChangedMessage);
-
-        message->GetArgumentList()->SetBool(0, is_editable);
-        frame->SendProcessMessage(PID_BROWSER, message);
+        CefRect rect = node->GetElementBounds();
+        message->GetArgumentList()->SetInt(1, rect.x);
+        message->GetArgumentList()->SetInt(2, rect.y + rect.height);
     }
+    frame->SendProcessMessage(PID_BROWSER, message);
 }
 
 bool WebviewApp::OnProcessMessageReceived(CefRefPtr<CefBrowser> browser, CefRefPtr<CefFrame> frame, CefProcessId source_process, CefRefPtr<CefProcessMessage> message)

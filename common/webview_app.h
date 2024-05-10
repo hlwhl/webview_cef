@@ -13,6 +13,17 @@
 class WebviewApp : public CefApp, public CefBrowserProcessHandler, public CefRenderProcessHandler{
 public:
     WebviewApp(CefRefPtr<WebviewHandler> handler);
+
+    WebviewApp(){};
+
+    enum ProcessType{
+        BrowserProcess,
+        RendererProcess,
+        ZygoteProcess,
+        OtherProcess,
+    };
+
+    static ProcessType GetProcessType(CefRefPtr<CefCommandLine> command_line);
     
     // CefApp methods:
     CefRefPtr<CefBrowserProcessHandler> GetBrowserProcessHandler() override {
@@ -23,23 +34,16 @@ public:
         return this; 
     }
 
-    void OnBeforeCommandLineProcessing(
-                                       const CefString& process_type,
-                                       CefRefPtr<CefCommandLine> command_line) override {
-                                           command_line->AppendSwitch("disable-gpu");
-                                           command_line->AppendSwitch("disable-gpu-compositing");
-                                           #ifdef __APPLE__
-                                                command_line->AppendSwitch("use-mock-keychain");
-                                                command_line->AppendSwitch("single-process");
-                                           #endif
-                                           #ifdef __linux__
-                                           
-                                           #endif
-                                       }
-    
     // CefBrowserProcessHandler methods:
+    void OnBeforeCommandLineProcessing(
+        const CefString& process_type,
+        CefRefPtr<CefCommandLine> command_line) override;
+    void SetProcessMode(uint32_t uMode);
+    void SetEnableGPU(bool bEnable);
     void OnContextInitialized() override;
-    CefRefPtr<CefClient> GetDefaultClient() override;
+    // CefRefPtr<CefClient> GetDefaultClient() override;
+    void OnBeforeChildProcessLaunch(CefRefPtr<CefCommandLine> command_line) override;
+    void SetUnSafelyTreatInsecureOriginAsSecure(const CefString& strFilterDomain);
 
     // CefRenderProcessHandler methods.
     void OnWebKitInitialized() override;
@@ -72,11 +76,12 @@ public:
         CefRefPtr<CefProcessMessage> message) override;
     
 private:
-    CefRefPtr<WebviewHandler> m_handler;
+    uint32_t                        m_uMode = 1;                        //process mode
+    bool                            m_bEnableGPU = false;               //enable gpu
+    CefString                       m_strFilterDomain;                  //insecure domain whitelist       
 
-    std::shared_ptr<CefJSBridge>	m_render_js_bridge;
-    bool							m_last_node_is_editable = false;
-
+    CefRefPtr<WebviewHandler>       m_handler;                          //webview handler for main process
+    std::shared_ptr<CefJSBridge>	m_render_js_bridge;                 //js bridge for render process
     // Include the default reference counting implementation.
     IMPLEMENT_REFCOUNTING(WebviewApp);
 };

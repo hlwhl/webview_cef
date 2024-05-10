@@ -2,7 +2,7 @@
 #define FLUTTER_PLUGIN_WEBVIEW_CEF_PLUGIN_H_
 
 #include <flutter_linux/flutter_linux.h>
-
+#include <string>
 G_BEGIN_DECLS
 
 #ifdef FLUTTER_PLUGIN_IMPL
