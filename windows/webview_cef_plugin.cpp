@@ -208,10 +208,10 @@ namespace webview_cef {
 		webviewChannels.emplace(plugin->m_hwnd, [plugin_pointer = plugin.get()](std::string method, flutter::EncodableValue* arguments) {
 			plugin_pointer->m_channel->InvokeMethod(method, std::make_unique<flutter::EncodableValue>(*arguments));
 			});
-		plugin->m_plugin->setInvokeMethodFunc([plugin_pointer = plugin.get(), hwnd](std::string method, WValue* arguments) {
+		plugin->m_plugin->setInvokeMethodFunc([plugin_pointer = plugin.get()](std::string method, WValue* arguments) {
 			flutter::EncodableValue* methodValue = new flutter::EncodableValue(method);
 			flutter::EncodableValue* args = new flutter::EncodableValue(encode_wvalue_to_flvalue(arguments));
-			PostMessage(plugin_pointer->m_hwnds, WM_USER + 1, WPARAM(methodValue), LPARAM(args));
+			PostMessage(plugin_pointer->m_hwnd, WM_USER + 1, WPARAM(methodValue), LPARAM(args));
 			});
 
 		plugin->m_plugin->setCreateTextureFunc([plugin_pointer = plugin.get()]() {
