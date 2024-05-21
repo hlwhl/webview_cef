@@ -21,21 +21,33 @@ This project is under heavy development, and the APIs are not stable yet.
 
 - [x] Windows 7+ <img align="center" src="https://upload.wikimedia.org/wikipedia/commons/thumb/8/87/Windows_logo_-_2021.svg/1200px-Windows_logo_-_2021.svg.png" width="12">
 - [x] macOS 10.12+ <img align="center" src="https://seeklogo.com/images/A/apple-logo-52C416BDDD-seeklogo.com.png" width="12">
-- [x] Linux (x64 and arm64,early beta version) <img align="center" src="https://1000logos.net/wp-content/uploads/2017/03/LINUX-LOGO.png" width="14">
+- [x] Linux (x64 and arm64) <img align="center" src="https://1000logos.net/wp-content/uploads/2017/03/LINUX-LOGO.png" width="14">
 
 ## Setting Up
 
 ### Windows <img src="https://upload.wikimedia.org/wikipedia/commons/thumb/8/87/Windows_logo_-_2021.svg/1200px-Windows_logo_-_2021.svg.png" width="16">
 
-Inside your application folder, you need to add two lines in your `windows\runner\main.cpp`.（Because of Chromium multi process architecture.)
+Inside your application folder, you need to add some lines in your `windows\runner\main.cpp`.（Because of Chromium multi process architecture, and IME support, and also flutter rquires invoke method channel on flutter engine thread)
 
 ```cpp
+//Introduce the source code of this plugin into your own project
 #include "webview_cef/webview_cef_plugin_c_api.h"
 
 int APIENTRY wWinMain(_In_ HINSTANCE instance, _In_opt_ HINSTANCE prev,
                       _In_ wchar_t *command_line, _In_ int show_command) {
   //start cef deamon processes. MUST CALL FIRST
   initCEFProcesses();
+```
+
+```cpp
+  ::MSG msg;
+  while (::GetMessage(&msg, nullptr, 0, 0)) {
+    ::TranslateMessage(&msg);
+    ::DispatchMessage(&msg);
+    
+    //add this line to enable cef keybord input, and enable to post messages to flutter engine thread from cef message loop thread.
+    handleWndProcForCEF(msg.hwnd, msg.message, msg.wParam, msg.lParam);
+  }
 ```
 
 When building the project for the first time, a prebuilt cef bin package (200MB, link in release) will be downloaded automatically, so you may wait for a longer time if you are building the project for the first time.
@@ -84,8 +96,8 @@ This part of the content needs to be summarized. You can refer to the methods in
 - [x] Windows support
 - [x] macOS support
 - [x] Linux support
-- [ ] Multi instance support
-- [ ] IME support
+- [x] Multi instance support
+- [x] IME support(Only support Third party IME on Linux and Windows, Microsoft IME on Windows, and only tested Chinese input methods)
 - [x] Mouse events support
 - [x] JS bridge support
 - [x] Cookie manipulation support
