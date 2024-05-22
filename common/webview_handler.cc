@@ -522,7 +522,7 @@ void WebviewHandler::visitUrlCookies(const std::string& domain, const bool& isHt
 
 void WebviewHandler::setJavaScriptChannels(int browserId, const std::vector<std::string> channels)
 {
-    std::string extensionCode = "";
+    std::string extensionCode = "try{";
     for(auto& channel : channels)
     {
         extensionCode += channel;
@@ -530,6 +530,7 @@ void WebviewHandler::setJavaScriptChannels(int browserId, const std::vector<std:
         extensionCode += channel;
         extensionCode += "',e,r)};";
     }
+    extensionCode += "}catch(e){console.log(e);}";
     executeJavaScript(browserId, extensionCode);
 }
 
@@ -563,20 +564,20 @@ void WebviewHandler::executeJavaScript(int browserId, const std::string code, st
     {
         auto bit = browser_map_.find(browserId);
         if(bit != browser_map_.end() && bit->second.browser.get()){
-                //TODO: this code is not true on muti tab
-                CefRefPtr<CefFrame> frame = bit->second.browser->GetMainFrame();
-                if (frame) {
-                    std::string finalCode = code;
-                    if(callback != nullptr){
-                        std::string callbackId = GetCallbackId();
-                        finalCode = "external.EvaluateCallback('";
-                        finalCode += callbackId;
-                        finalCode += "',(function(){return ";
-                        finalCode += code;
-                        finalCode += "})());";
-                        js_callbacks_[callbackId] = callback;
-                    }
-			        frame->ExecuteJavaScript(finalCode, frame->GetURL(), 0);
+            CefRefPtr<CefFrame> frame = bit->second.browser->GetMainFrame();
+            if (frame)
+            {
+                std::string finalCode = code;
+                if(callback != nullptr){
+                    std::string callbackId = GetCallbackId();
+                    finalCode = "external.EvaluateCallback('";
+                    finalCode += callbackId;
+                    finalCode += "',(function(){return ";
+                    finalCode += code;
+                    finalCode += "})());";
+                    js_callbacks_[callbackId] = callback;
+                }
+			    frame->ExecuteJavaScript(finalCode, frame->GetURL(), 0);
             }
         }
     }

@@ -25,11 +25,8 @@ class _MyAppState extends State<MyApp> {
   void initState() {
     _controller =
         WebviewManager().createWebView(loading: const Text("not initialized"));
-    // _controller2 = WebviewManager().createWindow(
-    //   loading: const Text("not initialized"),
-    //   name: "test",
-    //   height: 600,
-    //   width: 800);
+    // _controller2 =
+    //     WebviewManager().createWebView(loading: const Text("not initialized"));
     super.initState();
     initPlatformState();
   }
@@ -55,29 +52,51 @@ class _MyAppState extends State<MyApp> {
       },
       onUrlChanged: (url) {
         _textController.text = url;
+        final Set<JavascriptChannel> jsChannels = {
+          JavascriptChannel(
+              name: 'Print',
+              onMessageReceived: (JavascriptMessage message) {
+                print(message.message);
+                _controller.sendJavaScriptChannelCallBack(
+                    false,
+                    "{'code':'200','message':'print succeed!'}",
+                    message.callbackId,
+                    message.frameId);
+              }),
+        };
+        //normal JavaScriptChannels
+        _controller.setJavaScriptChannels(jsChannels);
+        //also you can build your own jssdk by execute JavaScript code to CEF
+        _controller.executeJavaScript("function abc(e){return 'abc:'+ e}");
+        _controller
+            .evaluateJavascript("abc('test')")
+            .then((value) => print(value));
       },
     ));
 
     await _controller.initialize(_textController.text);
-    // await _controller2.initialize("www.baidu.com");
-    // ignore: prefer_collection_literals
-    final Set<JavascriptChannel> jsChannels = [
-      JavascriptChannel(
-          name: 'Print',
-          onMessageReceived: (JavascriptMessage message) {
-            print(message.message);
-            _controller.sendJavaScriptChannelCallBack(
-                false,
-                "{'code':'200','message':'print succeed!'}",
-                message.callbackId,
-                message.frameId);
-          }),
-    ].toSet();
-    //normal JavaScriptChannels
-    _controller.setJavaScriptChannels(jsChannels);
-    //also you can build your own jssdk by execute JavaScript code to CEF
-    await _controller.executeJavaScript("function abc(e){return 'abc:'+ e}");
-    _controller.evaluateJavascript("abc('test')").then((value) => print(value));
+
+    // _controller2.setWebviewListener(WebviewEventsListener(
+    //   onTitleChanged: (t) {},
+    //   onUrlChanged: (url) {
+    //     final Set<JavascriptChannel> jsChannels = {
+    //       JavascriptChannel(
+    //           name: 'Print',
+    //           onMessageReceived: (JavascriptMessage message) {
+    //             print(message.message);
+    //             _controller.sendJavaScriptChannelCallBack(
+    //                 false,
+    //                 "{'code':'200','message':'print succeed!'}",
+    //                 message.callbackId,
+    //                 message.frameId);
+    //           }),
+    //     };
+    //     //normal JavaScriptChannels
+    //     _controller2.setJavaScriptChannels(jsChannels);
+    //   },
+    // ));
+    // await _controller2.initialize("baidu.com");
+
     // If the widget was removed from the tree while the asynchronous platform
     // message was in flight, we want to discard the reply rather than calling
     // setState to update our non-existent appearance.
