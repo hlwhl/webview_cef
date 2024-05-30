@@ -479,7 +479,8 @@ namespace webview_cef {
 		if(!userAgent.empty()){
 			CefString(&cefs.user_agent_product) = userAgent;
 		}
-		CefString(&cefs.locale) = "zh-CN";
+		//locale language setting
+		//CefString(&cefs.locale) = "zh-CN";
 #ifdef OS_MAC
 		//cef message loop handle by MainApplication on mac
 		cefs.external_message_pump = true;
