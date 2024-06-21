@@ -1,5 +1,5 @@
 ﻿#include "webview_cef_plugin.h"
-
+#include "webview_cef_keyevent.h"
 // This must be included before many other Windows headers.
 #include <windows.h>
 
@@ -7,6 +7,7 @@
 #include <VersionHelpers.h>
 
 #include <flutter/method_channel.h>
+#include <flutter_windows.h>
 #include <flutter/plugin_registrar_windows.h>
 #include <flutter/standard_method_codec.h>
 
@@ -16,27 +17,62 @@
 #include <mutex>
 
 namespace webview_cef {
-	int64_t texture_id;
-
-	FlutterDesktopTextureRegistrarRef texture_registrar;
-	std::shared_ptr<FlutterDesktopPixelBuffer> pixel_buffer;
-	std::unique_ptr<uint8_t> backing_pixel_buffer;
-	std::mutex buffer_mutex_;
-	std::unique_ptr<flutter::TextureVariant> m_texture = std::make_unique<flutter::TextureVariant>(flutter::PixelBufferTexture([](size_t width, size_t height) -> const FlutterDesktopPixelBuffer* {
-		buffer_mutex_.lock();
-		auto buffer = pixel_buffer.get();
-		// Only lock the mutex if the buffer is not null
-		// (to ensure the release callback gets called)
-		if (!buffer) {
-			buffer_mutex_.unlock();
+	class WebviewTextureRenderer : public WebviewTexture{
+	public:
+		WebviewTextureRenderer(FlutterDesktopTextureRegistrarRef texture_registrar) {
+			registrar_ = texture_registrar;
+			texture = std::make_unique<flutter::TextureVariant>(
+				flutter::PixelBufferTexture([this](size_t width, size_t height) -> const FlutterDesktopPixelBuffer* {
+					return this->CopyPixelBuffer(width, height);
+				}));
+			FlutterDesktopTextureInfo info = {};
+			info.type = kFlutterDesktopPixelBufferTexture;
+			info.pixel_buffer_config.user_data = std::get_if<flutter::PixelBufferTexture>(texture.get());
+			info.pixel_buffer_config.callback = [](size_t width, size_t height, void* user_data) -> const FlutterDesktopPixelBuffer* {
+				auto texture = static_cast<flutter::PixelBufferTexture*>(user_data);
+				return texture->CopyPixelBuffer(width, height);
+			};
+			textureId = FlutterDesktopTextureRegistrarRegisterExternalTexture(registrar_, &info);
 		}
-		return buffer;
-		}));
 
-	std::unique_ptr<
-		flutter::MethodChannel<flutter::EncodableValue>,
-		std::default_delete<flutter::MethodChannel<flutter::EncodableValue>>>
-		channel = nullptr;
+		virtual ~WebviewTextureRenderer() {
+			std::lock_guard<std::mutex> autolock(mutex_);
+			if(registrar_){
+				// FlutterDesktopTextureRegistrarUnregisterExternalTexture(registrar_, textureId, nullptr, nullptr);
+			}
+		}
+
+		const FlutterDesktopPixelBuffer *CopyPixelBuffer(size_t width, size_t height) const{
+			std::lock_guard<std::mutex> autolock(mutex_);
+    		return pixel_buffer.get();
+		}
+
+		virtual void onFrame(const void* buffer, int width, int height) override{
+			const std::lock_guard<std::mutex> autolock(mutex_);
+			if (!pixel_buffer.get() || pixel_buffer.get()->width != width || pixel_buffer.get()->height != height) {
+				if (!pixel_buffer.get()) {
+					pixel_buffer = std::make_unique<FlutterDesktopPixelBuffer>();
+					pixel_buffer->release_context = nullptr;
+				}
+				pixel_buffer->width = width;
+				pixel_buffer->height = height;
+				const auto size = width * height * 4;
+				backing_pixel_buffer.reset(new uint8_t[size]);
+				pixel_buffer->buffer = backing_pixel_buffer.get();
+			}
+
+			SwapBufferFromBgraToRgba((void*)pixel_buffer->buffer, buffer, width, height);
+			if(registrar_){
+				FlutterDesktopTextureRegistrarMarkExternalTextureFrameAvailable(registrar_, textureId);
+			}
+		}
+
+		FlutterDesktopTextureRegistrarRef registrar_;
+		std::unique_ptr<flutter::TextureVariant> texture;
+		mutable std::shared_ptr<FlutterDesktopPixelBuffer> pixel_buffer;
+		std::unique_ptr<uint8_t> backing_pixel_buffer;
+		mutable std::mutex mutex_;
+	};
 
 	static flutter::EncodableValue encode_wvalue_to_flvalue(WValue* args) {
 		WValueType type = webview_value_get_type(args);
@@ -147,105 +183,98 @@ namespace webview_cef {
 		return nullptr;
 	}
 
-	// static
+	std::unordered_map<HWND, std::shared_ptr<WebviewPlugin>> webviewPlugins;
+	std::unordered_map<HWND, std::function<void(std::string method,flutter::EncodableValue * arguments)>> webviewChannels;
+
 	void WebviewCefPlugin::RegisterWithRegistrar(FlutterDesktopPluginRegistrarRef registrar) {
-		texture_registrar = FlutterDesktopRegistrarGetTextureRegistrar(registrar);
-		flutter::PluginRegistrarWindows* window_registrar = flutter::PluginRegistrarManager::GetInstance()
-			->GetRegistrar<flutter::PluginRegistrarWindows>(registrar);
-		channel =
+
+		auto plugin = std::make_unique<WebviewCefPlugin>();
+		plugin->m_textureRegistrar = FlutterDesktopRegistrarGetTextureRegistrar(registrar);
+		flutter::PluginRegistrarWindows *window_registrar = flutter::PluginRegistrarManager::GetInstance()
+																->GetRegistrar<flutter::PluginRegistrarWindows>(registrar);
+		plugin->m_channel =
 			std::make_unique<flutter::MethodChannel<flutter::EncodableValue>>(
 				window_registrar->messenger(), "webview_cef",
 				&flutter::StandardMethodCodec::GetInstance());
 
-		auto plugin = std::make_unique<WebviewCefPlugin>();
-
-		channel->SetMethodCallHandler(
-			[plugin_pointer = plugin.get()](const auto& call, auto result) {
+		plugin->m_channel->SetMethodCallHandler(
+			[plugin_pointer = plugin.get()](const auto &call, auto result)
+			{
 				plugin_pointer->HandleMethodCall(call, std::move(result));
 			});
 
-		DWORD threadId = GetCurrentThreadId();
-		auto invoke = [=](std::string method, WValue* arguments) {
-			flutter::EncodableValue *methodValue = new flutter::EncodableValue(method);
-			flutter::EncodableValue *args = new flutter::EncodableValue(encode_wvalue_to_flvalue(arguments));
-			PostThreadMessage(threadId, WM_USER + 1, WPARAM(methodValue), LPARAM(args));
-  		};
-  		webview_cef::setInvokeMethodFunc(invoke);
+		plugin->m_hwnd = FlutterDesktopViewGetHWND(FlutterDesktopPluginRegistrarGetView(registrar));
+		webviewPlugins.emplace(plugin->m_hwnd, plugin->m_plugin);
+		webviewChannels.emplace(plugin->m_hwnd, [plugin_pointer = plugin.get()](std::string method, flutter::EncodableValue* arguments) {
+			plugin_pointer->m_channel->InvokeMethod(method, std::make_unique<flutter::EncodableValue>(*arguments));
+			});
+		plugin->m_plugin->setInvokeMethodFunc([plugin_pointer = plugin.get()](std::string method, WValue* arguments) {
+			flutter::EncodableValue* methodValue = new flutter::EncodableValue(method);
+			flutter::EncodableValue* args = new flutter::EncodableValue(encode_wvalue_to_flvalue(arguments));
+			PostMessage(plugin_pointer->m_hwnd, WM_USER + 1, WPARAM(methodValue), LPARAM(args));
+			});
+
+		plugin->m_plugin->setCreateTextureFunc([plugin_pointer = plugin.get()]() {
+			std::shared_ptr<WebviewTextureRenderer> renderer = std::make_shared<WebviewTextureRenderer>(plugin_pointer->m_textureRegistrar);
+			return std::dynamic_pointer_cast<WebviewTexture>(renderer);
+		});
 
 		window_registrar->AddPlugin(std::move(plugin));
 	}
+		
+	WebviewCefPlugin::WebviewCefPlugin() {
+		m_plugin = std::make_shared<WebviewPlugin>();
+	}
 
-	WebviewCefPlugin::WebviewCefPlugin() {}
-
-	WebviewCefPlugin::~WebviewCefPlugin() {}
+	WebviewCefPlugin::~WebviewCefPlugin() {
+        m_plugin = nullptr;
+		webviewPlugins.erase(m_hwnd);
+		webviewChannels.erase(m_hwnd);
+        if(webviewPlugins.empty()){
+			webview_cef::stopCEF();
+		}
+	}
 
 	void WebviewCefPlugin::HandleMethodCall(
 		const flutter::MethodCall<flutter::EncodableValue>& method_call,
 		std::shared_ptr<flutter::MethodResult<flutter::EncodableValue>> result) {
-		if (method_call.method_name().compare("init") == 0) {
-			FlutterDesktopTextureInfo info = {};
-			info.type = kFlutterDesktopPixelBufferTexture;
-			info.pixel_buffer_config.user_data = std::get_if<flutter::PixelBufferTexture>(m_texture.get());
-			info.pixel_buffer_config.callback = [](size_t width, size_t height, void* user_data) -> const FlutterDesktopPixelBuffer* {
-				auto texture = static_cast<flutter::PixelBufferTexture*>(user_data);
-				return texture->CopyPixelBuffer(width, height);
-			};
-			texture_id = FlutterDesktopTextureRegistrarRegisterExternalTexture(texture_registrar, &info);
-			auto callback = [=](const void* buffer, int32_t width, int32_t height) {
-				const std::lock_guard<std::mutex> lock(buffer_mutex_);
-				if (!pixel_buffer.get() || pixel_buffer.get()->width != width || pixel_buffer.get()->height != height) {
-					if (!pixel_buffer.get()) {
-						pixel_buffer = std::make_unique<FlutterDesktopPixelBuffer>();
-						pixel_buffer->release_context = &buffer_mutex_;
-							// Gets invoked after the FlutterDesktopPixelBuffer's
-							// backing buffer has been uploaded.
-						pixel_buffer->release_callback = [](void* opaque) {
-							auto mutex = reinterpret_cast<std::mutex*>(opaque);
-								// Gets locked just before |CopyPixelBuffer| returns.
-							mutex->unlock();
-						};
-					}
-					pixel_buffer->width = width;
-					pixel_buffer->height = height;
-					const auto size = width * height * 4;
-					backing_pixel_buffer.reset(new uint8_t[size]);
-					pixel_buffer->buffer = backing_pixel_buffer.get();
-				}
-
-				webview_cef::SwapBufferFromBgraToRgba((void*)pixel_buffer->buffer, buffer, width, height);
-				FlutterDesktopTextureRegistrarMarkExternalTextureFrameAvailable(texture_registrar, texture_id);
-			};
-			webview_cef::setPaintCallBack(callback);
-			result->Success(flutter::EncodableValue(texture_id));
-		}
-		else{
-			WValue *encodeArgs = encode_flvalue_to_wvalue(const_cast<flutter::EncodableValue *>(method_call.arguments()));
-			webview_cef::HandleMethodCall(method_call.method_name(), encodeArgs, [=](int ret, WValue* args){
-				if (ret > 0){
-					result->Success(encode_wvalue_to_flvalue(args));
-				}
-				else if (ret < 0){
-					result->Error("error", "error", encode_wvalue_to_flvalue(args));
-				}
-				else{
-					result->NotImplemented();
-				}
-			});
-			webview_value_unref(encodeArgs);
-		}
+		WValue *encodeArgs = encode_flvalue_to_wvalue(const_cast<flutter::EncodableValue *>(method_call.arguments()));
+		m_plugin->HandleMethodCall(method_call.method_name(), encodeArgs, [=](int ret, WValue* args){
+			if (ret > 0){
+				result->Success(encode_wvalue_to_flvalue(args));
+			}
+			else if (ret < 0){
+				result->Error("error", "error", encode_wvalue_to_flvalue(args));
+			}
+			else{
+				result->NotImplemented();
+			}
+		});
+		webview_value_unref(encodeArgs);
 	}
 
-	void WebviewCefPlugin::handleMessageProc(UINT message, WPARAM wparam, LPARAM lparam) {
+	void WebviewCefPlugin::handleMessageProc(HWND hwnd, UINT message, WPARAM wparam, LPARAM lparam) {
 		switch (message) {
 		case WM_USER + 1:
 		{
-			flutter::EncodableValue *method = (flutter::EncodableValue *)wparam;
-			flutter::EncodableValue *args = (flutter::EncodableValue *)lparam;
-			channel->InvokeMethod(*std::get_if<std::string>(method), std::make_unique<flutter::EncodableValue>(*args));
+			if (webviewPlugins.find(hwnd) != webviewPlugins.end()) {
+				flutter::EncodableValue *method = (flutter::EncodableValue *)wparam;
+				flutter::EncodableValue *args = (flutter::EncodableValue *)lparam;
+				webviewChannels[hwnd]((*std::get_if<std::string>(method)), args);
+			}
 			break;
 		}
-		case WM_QUIT:
-			webview_cef::HandleMethodCall("dispose", nullptr, nullptr);
+		case WM_SYSCHAR:
+		case WM_SYSKEYDOWN:
+		case WM_SYSKEYUP:
+		case WM_KEYDOWN:
+		case WM_KEYUP:
+		case WM_CHAR:{
+			if(webviewPlugins.find(hwnd)!=webviewPlugins.end()){
+				CefKeyEvent keyEvent = getCefKeyEvent(message, wparam, lparam);
+				webviewPlugins[hwnd]->sendKeyEvent(keyEvent);
+			}
+		}
 		}
 	}
 

@@ -6,6 +6,7 @@
 //
 
 #import "CefWrapper.h"
+#import "WebviewCefTexture.h"
 #import <Foundation/Foundation.h>
 #import "include/cef_base.h"
 #import "../../common/webview_app.h"
@@ -16,20 +17,36 @@
 #import "../../common/webview_value.h"
 #include <thread>
 
-NSObject<FlutterTextureRegistry>* tr;
-CGFloat scaleFactor = 0.0;
-CefMainArgs mainArgs;
-
 static NSTimer* _timer;
-static CVPixelBufferRef buf_cache;
-static CVPixelBufferRef buf_temp;
-dispatch_semaphore_t lock = dispatch_semaphore_create(1);
+static BOOL isCefProcessInit = NO;
+static BOOL isCefMessageLoop = NO;
+NSMapTable* webviewPlugins = [NSMapTable weakToWeakObjectsMapTable];
 
-int64_t textureId;
+@implementation CefWrapper{
+    std::shared_ptr<webview_cef::WebviewPlugin> _plugin;
+}
 
-FlutterMethodChannel* f_channel;
+class WebviewTextureRenderer : public webview_cef::WebviewTexture {
+public:
+    WebviewTextureRenderer(NSObject<FlutterTextureRegistry>* registry){
+        textureRegistry = registry;
+        texture = [[WebviewCefTexture alloc] init];
+        textureId = [textureRegistry registerTexture:texture];
+    }
 
-@implementation CefWrapper
+    virtual ~WebviewTextureRenderer() {
+        [textureRegistry unregisterTexture:textureId];
+    }
+
+    virtual void onFrame(const void* buffer, int width, int height) {
+        [texture onFrame:buffer width:width height:height];
+        [textureRegistry textureFrameAvailable: textureId];
+    }
+
+private:
+    WebviewCefTexture* texture;
+    NSObject<FlutterTextureRegistry>* textureRegistry;
+};
 
 + (NSObject *)encode_wvalue_to_flvalue: (WValue*)args {
     WValueType type = webview_value_get_type(args);
@@ -37,7 +54,7 @@ FlutterMethodChannel* f_channel;
         case Webview_Value_Type_Bool:
             return [NSNumber numberWithBool:webview_value_get_bool(args)];
         case Webview_Value_Type_Int:
-            return [NSNumber numberWithInt:webview_value_get_int(args)];
+            return [NSNumber numberWithLongLong:webview_value_get_int(args)];
         case Webview_Value_Type_Float:
             return [NSNumber numberWithFloat:webview_value_get_float(args)];
         case Webview_Value_Type_Double:
@@ -55,22 +72,23 @@ FlutterMethodChannel* f_channel;
         case Webview_Value_Type_Double_List:
             return [NSData dataWithBytes:webview_value_get_double_list(args) length:webview_value_get_len(args)];
         case Webview_Value_Type_List: {
-            int len = webview_value_get_len(args);
+            int64_t len = webview_value_get_len(args);
             NSMutableArray* array = [NSMutableArray arrayWithCapacity:len];
-            for(int i = 0; i < len; i++) {
+            for(int64_t i = 0; i < len; i++) {
                 WValue* item = webview_value_get_list_value(args, i);
-                [array addObject:[self encode_wvalue_to_flvalue:item]];
+                [array addObject:[CefWrapper encode_wvalue_to_flvalue:item]];
             }
             return array;
         }
         case Webview_Value_Type_Map: {
-            int len = webview_value_get_len(args);
+            int64_t len = webview_value_get_len(args);
             NSMutableDictionary* dic = [NSMutableDictionary dictionaryWithCapacity:len];
             for(int i = 0; i < len; i++) {
-                NSString *key = [self encode_wvalue_to_flvalue:webview_value_get_key(args, i)];
                 WValue *value = webview_value_get_value(args, i);
+                WValue *key = webview_value_get_key(args, i);
+                NSString *nsKkey = [CefWrapper encode_wvalue_to_flvalue:key];
                 if (key != nil && value != nil) {
-                    [dic setObject:[self encode_wvalue_to_flvalue:value] forKey:key];
+                    [dic setObject:[CefWrapper encode_wvalue_to_flvalue:value] forKey:nsKkey];
                 }
             }
             return dic;
@@ -105,7 +123,7 @@ FlutterMethodChannel* f_channel;
         int len = (int)array.count;
         WValue* wvalue = webview_value_new_list();
         for(int i = 0; i < len; i++) {
-            WValue* item = [self encode_flvalue_to_wvalue:array[i]];
+            WValue* item = [CefWrapper encode_flvalue_to_wvalue:array[i]];
             webview_value_append(wvalue, item);
             webview_value_unref(item);
         }
@@ -115,8 +133,8 @@ FlutterMethodChannel* f_channel;
         int len = (int)dic.count;
         WValue* wvalue = webview_value_new_map();
         for(int i = 0; i < len; i++) {
-            WValue* key = [self encode_flvalue_to_wvalue:dic.allKeys[i]];
-            WValue* item = [self encode_flvalue_to_wvalue:dic.allValues[i]];
+            WValue* key = [CefWrapper encode_flvalue_to_wvalue:dic.allKeys[i]];
+            WValue* item = [CefWrapper encode_flvalue_to_wvalue:dic.allValues[i]];
             webview_value_set(wvalue, key, item);
             webview_value_unref(key);
             webview_value_unref(item);
@@ -127,57 +145,75 @@ FlutterMethodChannel* f_channel;
     }
 }
 
-+ (void)processKeyboardEvent: (NSEvent*) event {
++ (BOOL)processKeyboardEvent: (NSEvent*) event {
+    CefWrapper *currentPlugin = [webviewPlugins objectForKey:event.window.contentView];
+    if(currentPlugin == nil || !currentPlugin->_plugin->getAnyBrowserFocused()){
+        return false;
+    }
+    
     CefKeyEvent keyEvent;
     
-    keyEvent.native_key_code = [event keyCode];
-    keyEvent.modifiers = [self getModifiersForEvent:event];
+    NSString* s = [event characters];
     
-    //handle backspace
-    if(keyEvent.native_key_code == 51) {
-        keyEvent.character = 0;
-        keyEvent.unmodified_character = 0;
-    } else {
-        NSString* s = [event characters];
-        if([s length] == 0) {
-            keyEvent.type = KEYEVENT_KEYDOWN;
-        } else {
-            keyEvent.type = KEYEVENT_CHAR;
-        }
-        if ([s length] > 0)
-            keyEvent.character = [s characterAtIndex:0];
-        
-        s = [event charactersIgnoringModifiers];
-        if ([s length] > 0)
-            keyEvent.unmodified_character = [s characterAtIndex:0];
-        
-        if([event type] == NSKeyUp) {
-            keyEvent.type = KEYEVENT_KEYUP;
-        }
+    if ([s length] != 0){
+        keyEvent.character = [s characterAtIndex:0];
     }
 
-    webview_cef::sendKeyEvent(keyEvent);
+    s = [event charactersIgnoringModifiers];
+    if ([s length] > 0){
+        keyEvent.unmodified_character = [s characterAtIndex:0];
+    }
+    
+    if ([event type] == NSEventTypeFlagsChanged){
+        keyEvent.character = 0;
+        keyEvent.unmodified_character = 0;
+    }
+        
+    keyEvent.native_key_code = [event keyCode];
+    
+    keyEvent.modifiers = [CefWrapper getModifiersForEvent:event];
+
+//    if(keyEvent.native_key_code == 51){
+//        keyEvent.character = 0;
+//        keyEvent.unmodified_character = 0;
+//    }
+    if([event type] == NSEventTypeKeyDown){
+        keyEvent.type = KEYEVENT_RAWKEYDOWN;
+        currentPlugin->_plugin->sendKeyEvent(keyEvent);
+        keyEvent.type = KEYEVENT_CHAR;
+    }else{
+        keyEvent.type = KEYEVENT_KEYUP;
+    }
+
+    currentPlugin->_plugin->sendKeyEvent(keyEvent);
+    return true;
 }
 
 + (int)getModifiersForEvent:(NSEvent*)event {
     int modifiers = 0;
     
-    if ([event modifierFlags] & NSControlKeyMask)
+    //Warning:NSEventModifierFlags is support for MacOS 10.12 and after
+    if ([event modifierFlags] & NSEventModifierFlagControl){
         modifiers |= EVENTFLAG_CONTROL_DOWN;
-    if ([event modifierFlags] & NSShiftKeyMask)
+    }
+    if ([event modifierFlags] & NSEventModifierFlagShift){
         modifiers |= EVENTFLAG_SHIFT_DOWN;
-    if ([event modifierFlags] & NSAlternateKeyMask)
+    }
+    if ([event modifierFlags] & NSEventModifierFlagOption){
         modifiers |= EVENTFLAG_ALT_DOWN;
-    if ([event modifierFlags] & NSCommandKeyMask)
+    }
+    if ([event modifierFlags] & NSEventModifierFlagCommand){
         modifiers |= EVENTFLAG_COMMAND_DOWN;
-    if ([event modifierFlags] & NSAlphaShiftKeyMask)
+    }
+    if ([event modifierFlags] & NSEventModifierFlagCapsLock){
         modifiers |= EVENTFLAG_CAPS_LOCK_ON;
-    
-    if ([event type] == NSKeyUp || [event type] == NSKeyDown ||
-        [event type] == NSFlagsChanged) {
+    }
+    if ([event type] == NSEventTypeKeyUp || [event type] == NSEventTypeKeyDown ||
+        [event type] == NSEventTypeFlagsChanged) {
         // Only perform this check for key events
-        //    if ([self isKeyPadEvent:event])
-        //      modifiers |= EVENTFLAG_IS_KEY_PAD;
+        if ([CefWrapper isKeyPadEvent:event]){
+            modifiers |= EVENTFLAG_IS_KEY_PAD;
+        }
     }
     
     // OS X does not have a modifier for NumLock, so I'm not entirely sure how to
@@ -187,19 +223,19 @@ FlutterMethodChannel* f_channel;
     
     // Mouse buttons
     switch ([event type]) {
-        case NSLeftMouseDragged:
-        case NSLeftMouseDown:
-        case NSLeftMouseUp:
+        case NSEventTypeLeftMouseDragged:
+        case NSEventTypeLeftMouseDown:
+        case NSEventTypeLeftMouseUp:
             modifiers |= EVENTFLAG_LEFT_MOUSE_BUTTON;
             break;
-        case NSRightMouseDragged:
-        case NSRightMouseDown:
-        case NSRightMouseUp:
+        case NSEventTypeRightMouseDragged:
+        case NSEventTypeRightMouseDown:
+        case NSEventTypeRightMouseUp:
             modifiers |= EVENTFLAG_RIGHT_MOUSE_BUTTON;
             break;
-        case NSOtherMouseDragged:
-        case NSOtherMouseDown:
-        case NSOtherMouseUp:
+        case NSEventTypeOtherMouseDragged:
+        case NSEventTypeOtherMouseDown:
+        case NSEventTypeOtherMouseUp:
             modifiers |= EVENTFLAG_MIDDLE_MOUSE_BUTTON;
             break;
         default:
@@ -209,94 +245,90 @@ FlutterMethodChannel* f_channel;
     return modifiers;
 }
 
-- (CVPixelBufferRef _Nullable)copyPixelBuffer {
-    dispatch_semaphore_wait(lock, DISPATCH_TIME_FOREVER);
-    buf_temp = buf_cache;
-    CVPixelBufferRetain(buf_temp);
-    dispatch_semaphore_signal(lock);
-    return buf_temp;
++ (BOOL)isKeyPadEvent:(NSEvent*)event {
+    if ([event modifierFlags] & NSEventModifierFlagNumericPad) {
+        return true;
+    }
+    
+    switch ([event keyCode]) {
+        case 71:  // Clear
+        case 81:  // =
+        case 75:  // /
+        case 67:  // *
+        case 78:  // -
+        case 69:  // +
+        case 76:  // Enter
+        case 65:  // .
+        case 82:  // 0
+        case 83:  // 1
+        case 84:  // 2
+        case 85:  // 3
+        case 86:  // 4
+        case 87:  // 5
+        case 88:  // 6
+        case 89:  // 7
+        case 91:  // 8
+        case 92:  // 9
+            return true;
+    }
+    
+    return false;
 }
 
-+ (void)setMethodChannel: (FlutterMethodChannel*)channel {
-    f_channel = channel;
-    auto invoke = [=](std::string method, WValue* arguments){
-        NSObject *arg = [self encode_wvalue_to_flvalue:arguments];
-        [f_channel invokeMethod:[NSString stringWithUTF8String:method.c_str()] arguments:arg];
-    };
-    webview_cef::setInvokeMethodFunc(invoke);
-}
-
-+ (void)doMessageLoopWork {
+- (void)doMessageLoopWork {
     webview_cef::doMessageLoopWork();
 }
 
-+ (void) handleMethodCallWrapper: (FlutterMethodCall*)call result:(FlutterResult)result{
-    std::string name = std::string([call.method cStringUsingEncoding:NSUTF8StringEncoding]);
-    if(name.compare("init") == 0){
-        textureId = [tr registerTexture:[CefWrapper alloc]];
-        auto callback = [](const void* buffer, int32_t width, int32_t height) {
-            NSDictionary* dic = @{
-                (__bridge NSString*)kCVPixelBufferPixelFormatTypeKey: @(kCVPixelFormatType_32BGRA),
-                (__bridge NSString*)kCVPixelBufferIOSurfacePropertiesKey : @{},
-                (__bridge NSString*)kCVPixelBufferOpenGLCompatibilityKey : @YES,
-                (__bridge NSString*)kCVPixelBufferMetalCompatibilityKey : @YES,
-            };
-            
-            static CVPixelBufferRef buf = NULL;
-            CVPixelBufferCreate(kCFAllocatorDefault,  width,
-                                height, kCVPixelFormatType_32BGRA,
-                                (__bridge CFDictionaryRef)dic, &buf);
-            
-            //copy data
-            CVPixelBufferLockBaseAddress(buf, 0);
-            char *copyBaseAddress = (char *) CVPixelBufferGetBaseAddress(buf);
-            
-            //MUST align pixel to pixelBuffer. Otherwise cause render issue. see https://www.codeprintr.com/thread/6563066.html about 16 bytes align
-            size_t bytesPerRow = CVPixelBufferGetBytesPerRowOfPlane(buf, 0);
-            char* src = (char*) buffer;
-            int actureRowSize = width * 4;
-            for(int line = 0; line < height; line++) {
-                memcpy(copyBaseAddress, src, actureRowSize);
-                src += actureRowSize;
-                copyBaseAddress += bytesPerRow;
-            }
-            CVPixelBufferUnlockBaseAddress(buf, 0);
-            
-            dispatch_semaphore_wait(lock, DISPATCH_TIME_FOREVER);
-            if(buf_cache) {
-                CVPixelBufferRelease(buf_cache);
-            }
-            buf_cache = buf;
-            dispatch_semaphore_signal(lock);
-            [tr textureFrameAvailable:textureId];
-        };
-        webview_cef::initCEFProcesses();
-        webview_cef::setPaintCallBack(callback);
+- (id) init {
+    self = [super init];
+    if (self) {
+        _plugin = std::make_shared<webview_cef::WebviewPlugin>();
+        if(isCefProcessInit == NO){
+            webview_cef::initCEFProcesses();
+            isCefProcessInit = YES;
+        }
+        _plugin->setInvokeMethodFunc([=](std::string method, WValue* arguments){
+            NSObject *arg = [CefWrapper encode_wvalue_to_flvalue:arguments];
+            [self.channel invokeMethod:[NSString stringWithUTF8String:method.c_str()] arguments:arg];
+        });
 
+        _plugin->setCreateTextureFunc([=]() {
+            std::shared_ptr<WebviewTextureRenderer> renderer = std::make_shared<WebviewTextureRenderer>(self.textureRegistry);
+            return std::dynamic_pointer_cast<webview_cef::WebviewTexture>(renderer);
+        });
+    }
+    return self;
+}
+
+- (void) handleMethodCallWrapper: (FlutterMethodCall*)call result:(FlutterResult)result{
+    std::string name = std::string([call.method cStringUsingEncoding:NSUTF8StringEncoding]);
+    WValue *encodeArgs = [CefWrapper encode_flvalue_to_wvalue:call.arguments];
+    self->_plugin->HandleMethodCall(name, encodeArgs, [=](int ret, WValue* args){
+        if(ret != 0){
+            result([CefWrapper encode_wvalue_to_flvalue:args]);
+        }
+        else{
+            result(nil);
+        }
+    });
+    if(isCefMessageLoop == NO){
         _timer = [NSTimer timerWithTimeInterval:0.016f target:self selector:@selector(doMessageLoopWork) userInfo:nil repeats:YES];
         [[NSRunLoop mainRunLoop] addTimer: _timer forMode:NSRunLoopCommonModes];
-        
         [NSEvent addLocalMonitorForEventsMatchingMask:NSEventMaskKeyDown handler:^NSEvent * _Nullable(NSEvent * _Nonnull event) {
-            [self processKeyboardEvent:event];
+            if([CefWrapper processKeyboardEvent:event]){
+                return nil;
+            }
             return event;
         }];
-        
+            
         [NSEvent addLocalMonitorForEventsMatchingMask:NSEventMaskKeyUp handler:^NSEvent * _Nullable(NSEvent * _Nonnull event) {
-            [self processKeyboardEvent:event];
+            if([CefWrapper processKeyboardEvent:event]){
+                return nil;
+            }
             return event;
         }];
-        result([NSNumber numberWithLong:textureId]);
-    }else{
-        WValue *encodeArgs = [self encode_flvalue_to_wvalue:call.arguments];
-        webview_cef::HandleMethodCall(name, encodeArgs, [=](int ret, WValue* args){
-            if(ret != 0){
-                result([self encode_wvalue_to_flvalue:args]);
-            }
-            else{
-                result(nil);
-            }
-        });
-        webview_value_unref(encodeArgs);
-    }
+        isCefMessageLoop = YES;
+   }
+    webview_value_unref(encodeArgs);
 }
 @end

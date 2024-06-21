@@ -1,79 +1,78 @@
 import 'dart:async';
+import 'dart:io';
 
 import 'package:flutter/gestures.dart';
 import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
-import 'package:flutter/widgets.dart';
 
+import 'webview_manager.dart';
 import 'webview_events_listener.dart';
 import 'webview_javascript.dart';
+import 'webview_textinput.dart';
 import 'webview_tooltip.dart';
 
-const MethodChannel _pluginChannel = MethodChannel("webview_cef");
-
 class WebViewController extends ValueNotifier<bool> {
+  WebViewController(this._pluginChannel, this._index, {Widget? loading})
+      : super(false) {
+    _loadingWidget = loading;
+  }
+  final MethodChannel _pluginChannel;
+  Widget? _loadingWidget;
+
+  late WebView _webviewWidget;
+  Widget get webviewWidget => _webviewWidget;
+  Widget get loadingWidget => _loadingWidget ?? const Text("loading...");
+
   late Completer<void> _creatingCompleter;
-  int _textureId = 0;
+  Future<void> get ready => _creatingCompleter.future;
   bool _isDisposed = false;
-  WebviewEventsListener? _listener;
   bool _focusEditable = false;
 
+  final int _index;
+  late int _browserId;
+  late int _textureId;
   final Map<String, JavascriptChannel> _javascriptChannels =
       <String, JavascriptChannel>{};
+  Map<String, JavascriptChannel> get javascriptChannels => _javascriptChannels;
+  WebviewEventsListener? _listener;
+  WebviewEventsListener? get listener => _listener;
 
-  Future<void> get ready => _creatingCompleter.future;
+  get onJavascriptChannelMessage => (final String channelName,
+          final String message, final String callbackId, final String frameId) {
+        if (_javascriptChannels.containsKey(channelName)) {
+          _javascriptChannels[channelName]!.onMessageReceived(
+              JavascriptMessage(message, callbackId, frameId));
+        } else {
+          print('Channel "$channelName" is not exstis');
+        }
+      };
 
-  WebViewController() : super(false);
+  get onToolTip => _onToolTip;
+  get onCursorChanged => _onCursorChanged;
+  get onFocusedNodeChangeMessage => _onFocusedNodeChangeMessage;
+  get onImeCompositionRangeChangedMessage =>
+      _onImeCompositionRangeChangedMessage;
 
   /// Initializes the underlying platform view.
-  Future<void> initialize() async {
+  Future<void> initialize(String url) async {
     if (_isDisposed) {
       return Future<void>.value();
     }
     _creatingCompleter = Completer<void>();
     try {
-      _textureId = await _pluginChannel.invokeMethod<int>('init') ?? 0;
-      _pluginChannel.setMethodCallHandler(_methodCallhandler);
+      await WebviewManager().ready;
+      List args = await _pluginChannel.invokeMethod('create', url);
+      _browserId = args[0] as int;
+      _textureId = args[1] as int;
+      WebviewManager().onBrowserCreated(_index, _browserId);
+      await Future.delayed(const Duration(milliseconds: 50));
+      _webviewWidget = WebView(this);
       value = true;
       _creatingCompleter.complete();
     } on PlatformException catch (e) {
       _creatingCompleter.completeError(e);
     }
-
     return _creatingCompleter.future;
-  }
-
-  Future<void> _methodCallhandler(MethodCall call) async {
-    if (_listener == null) return;
-    switch (call.method) {
-      case "onUrlChangedEvent":
-        _listener?.onUrlChanged?.call(call.arguments);
-        return;
-      case "onTitleChangedEvent":
-        _listener?.onTitleChanged?.call(call.arguments);
-        return;
-      case 'javascriptChannelMessage':
-        _handleJavascriptChannelMessage(
-            call.arguments['channel'],
-            call.arguments['message'],
-            call.arguments['callbackId'],
-            call.arguments['frameId']);
-        break;
-      case 'onTooltipEvent':
-        onToolTip?.call(call.arguments['text']);
-        break;
-      case 'onCursorChangedEvent':
-        onCursorChanged?.call(call.arguments['type']);
-        break;
-      case 'onConsoleMessageEvent':
-        _listener?.onConsoleMessage?.call(
-            call.arguments['level'],
-            call.arguments['message'],
-            call.arguments['source'],
-            call.arguments['line']);
-        break;
-      default:
-    }
   }
 
   setWebviewListener(WebviewEventsListener listener) {
@@ -85,8 +84,8 @@ class WebViewController extends ValueNotifier<bool> {
     await _creatingCompleter.future;
     if (!_isDisposed) {
       _isDisposed = true;
-      _javascriptChannels.clear();
-      await _pluginChannel.invokeMethod('dispose', _textureId);
+      WebviewManager().removeWebView(_browserId);
+      await _pluginChannel.invokeMethod('close', _browserId);
     }
     super.dispose();
   }
@@ -97,7 +96,7 @@ class WebViewController extends ValueNotifier<bool> {
       return;
     }
     assert(value);
-    return _pluginChannel.invokeMethod('loadUrl', url);
+    return _pluginChannel.invokeMethod('loadUrl', [_browserId, url]);
   }
 
   /// Reloads the current document.
@@ -106,7 +105,7 @@ class WebViewController extends ValueNotifier<bool> {
       return;
     }
     assert(value);
-    return _pluginChannel.invokeMethod('reload');
+    return _pluginChannel.invokeMethod('reload', _browserId);
   }
 
   Future<void> goForward() async {
@@ -114,7 +113,7 @@ class WebViewController extends ValueNotifier<bool> {
       return;
     }
     assert(value);
-    return _pluginChannel.invokeMethod('goForward');
+    return _pluginChannel.invokeMethod('goForward', _browserId);
   }
 
   Future<void> goBack() async {
@@ -122,7 +121,7 @@ class WebViewController extends ValueNotifier<bool> {
       return;
     }
     assert(value);
-    return _pluginChannel.invokeMethod('goBack');
+    return _pluginChannel.invokeMethod('goBack', _browserId);
   }
 
   Future<void> openDevTools() async {
@@ -130,43 +129,33 @@ class WebViewController extends ValueNotifier<bool> {
       return;
     }
     assert(value);
-    return _pluginChannel.invokeMethod('openDevTools');
+    return _pluginChannel.invokeMethod('openDevTools', _browserId);
   }
 
-  Future<void> setClientFocus(bool focus) {
-    return _pluginChannel.invokeMethod('setClientFocus', [focus]);
-  }
-
-  Future<void> setCookie(String domain, String key, String val) async {
+  Future<void> imeSetComposition(String composingText) async {
     if (_isDisposed) {
       return;
     }
     assert(value);
-    return _pluginChannel.invokeMethod('setCookie', [domain, key, val]);
+    return _pluginChannel
+        .invokeMethod('imeSetComposition', [_browserId, composingText]);
   }
 
-  Future<void> deleteCookie(String domain, String key) async {
+  Future<void> imeCommitText(String composingText) async {
     if (_isDisposed) {
       return;
     }
     assert(value);
-    return _pluginChannel.invokeMethod('deleteCookie', [domain, key]);
+    return _pluginChannel
+        .invokeMethod('imeCommitText', [_browserId, composingText]);
   }
 
-  Future<dynamic> visitAllCookies() async {
+  Future<void> setClientFocus(bool focus) async {
     if (_isDisposed) {
       return;
     }
     assert(value);
-    return _pluginChannel.invokeMethod('visitAllCookies');
-  }
-
-  Future<dynamic> visitUrlCookies(String domain, bool isHttpOnly) async {
-    if (_isDisposed) {
-      return;
-    }
-    assert(value);
-    return _pluginChannel.invokeMethod('visitUrlCookies', [domain, isHttpOnly]);
+    return _pluginChannel.invokeMethod('setClientFocus', [_browserId, focus]);
   }
 
   Future<void> setJavaScriptChannels(Set<JavascriptChannel> channels) async {
@@ -176,12 +165,12 @@ class WebViewController extends ValueNotifier<bool> {
     assert(value);
     _assertJavascriptChannelNamesAreUnique(channels);
 
-    channels.forEach((channel) {
+    for (var channel in channels) {
       _javascriptChannels[channel.name] = channel;
-    });
+    }
 
     return _pluginChannel.invokeMethod('setJavaScriptChannels',
-        _extractJavascriptChannelNames(channels).toList());
+        [_browserId, _extractJavascriptChannelNames(channels).toList()]);
   }
 
   Future<void> sendJavaScriptChannelCallBack(
@@ -190,8 +179,8 @@ class WebViewController extends ValueNotifier<bool> {
       return;
     }
     assert(value);
-    return _pluginChannel.invokeMethod(
-        'sendJavaScriptChannelCallBack', [error, result, callbackId, frameId]);
+    return _pluginChannel.invokeMethod('sendJavaScriptChannelCallBack',
+        [error, result, callbackId, _browserId, frameId]);
   }
 
   Future<void> executeJavaScript(String code) async {
@@ -199,7 +188,7 @@ class WebViewController extends ValueNotifier<bool> {
       return;
     }
     assert(value);
-    return _pluginChannel.invokeMethod('executeJavaScript', [code]);
+    return _pluginChannel.invokeMethod('executeJavaScript', [_browserId, code]);
   }
 
   Future<dynamic> evaluateJavascript(String code) async {
@@ -207,7 +196,8 @@ class WebViewController extends ValueNotifier<bool> {
       return;
     }
     assert(value);
-    return _pluginChannel.invokeMethod('evaluateJavascript', [code]);
+    return _pluginChannel
+        .invokeMethod('evaluateJavascript', [_browserId, code]);
   }
 
   /// Moves the virtual cursor to [position].
@@ -216,8 +206,8 @@ class WebViewController extends ValueNotifier<bool> {
       return;
     }
     assert(value);
-    return _pluginChannel
-        .invokeMethod('cursorMove', [position.dx.round(), position.dy.round()]);
+    return _pluginChannel.invokeMethod(
+        'cursorMove', [_browserId, position.dx.round(), position.dy.round()]);
   }
 
   Future<void> _cursorDragging(Offset position) async {
@@ -225,8 +215,8 @@ class WebViewController extends ValueNotifier<bool> {
       return;
     }
     assert(value);
-    return _pluginChannel.invokeMethod(
-        'cursorDragging', [position.dx.round(), position.dy.round()]);
+    return _pluginChannel.invokeMethod('cursorDragging',
+        [_browserId, position.dx.round(), position.dy.round()]);
   }
 
   Future<void> _cursorClickDown(Offset position) async {
@@ -234,8 +224,8 @@ class WebViewController extends ValueNotifier<bool> {
       return;
     }
     assert(value);
-    return _pluginChannel.invokeMethod(
-        'cursorClickDown', [position.dx.round(), position.dy.round()]);
+    return _pluginChannel.invokeMethod('cursorClickDown',
+        [_browserId, position.dx.round(), position.dy.round()]);
   }
 
   Future<void> _cursorClickUp(Offset position) async {
@@ -243,8 +233,8 @@ class WebViewController extends ValueNotifier<bool> {
       return;
     }
     assert(value);
-    return _pluginChannel.invokeMethod(
-        'cursorClickUp', [position.dx.round(), position.dy.round()]);
+    return _pluginChannel.invokeMethod('cursorClickUp',
+        [_browserId, position.dx.round(), position.dy.round()]);
   }
 
   /// Sets the horizontal and vertical scroll delta.
@@ -253,8 +243,8 @@ class WebViewController extends ValueNotifier<bool> {
       return;
     }
     assert(value);
-    return _pluginChannel.invokeMethod(
-        'setScrollDelta', [position.dx.round(), position.dy.round(), dx, dy]);
+    return _pluginChannel.invokeMethod('setScrollDelta',
+        [_browserId, position.dx.round(), position.dy.round(), dx, dy]);
   }
 
   /// Sets the surface size to the provided [size].
@@ -264,23 +254,13 @@ class WebViewController extends ValueNotifier<bool> {
     }
     assert(value);
     return _pluginChannel
-        .invokeMethod('setSize', [dpi, size.width, size.height]);
+        .invokeMethod('setSize', [_browserId, dpi, size.width, size.height]);
   }
 
   Set<String> _extractJavascriptChannelNames(Set<JavascriptChannel> channels) {
     final Set<String> channelNames =
         channels.map((JavascriptChannel channel) => channel.name).toSet();
     return channelNames;
-  }
-
-  void _handleJavascriptChannelMessage(final String channelName,
-      final String message, final String callbackId, final String frameId) {
-    if (_javascriptChannels.containsKey(channelName)) {
-      _javascriptChannels[channelName]!
-          .onMessageReceived(JavascriptMessage(message, callbackId, frameId));
-    } else {
-      print('Channel "$channelName" is not exstis');
-    }
   }
 
   void _assertJavascriptChannelNamesAreUnique(
@@ -291,8 +271,10 @@ class WebViewController extends ValueNotifier<bool> {
     assert(_extractJavascriptChannelNames(channels).length == channels.length);
   }
 
-  Function(String)? onToolTip;
-  Function(int)? onCursorChanged;
+  Function(String)? _onToolTip;
+  Function(int)? _onCursorChanged;
+  Function(bool editable)? _onFocusedNodeChangeMessage;
+  Function(int, int)? _onImeCompositionRangeChangedMessage;
 }
 
 class WebView extends StatefulWidget {
@@ -304,24 +286,70 @@ class WebView extends StatefulWidget {
   WebViewState createState() => WebViewState();
 }
 
-class WebViewState extends State<WebView> {
+class WebViewState extends State<WebView> with WebeViewTextInput {
   final GlobalKey _key = GlobalKey();
+  String _composingText = '';
   late final _focusNode = FocusNode();
+  bool isPrimaryFocus = false;
   WebviewTooltip? _tooltip;
   MouseCursor _mouseType = SystemMouseCursors.basic;
 
   WebViewController get _controller => widget.controller;
 
   @override
+  updateEditingValueWithDeltas(List<TextEditingDelta> textEditingDeltas) {
+    /// Handles IME composition only
+    for (var d in textEditingDeltas) {
+      if (d is TextEditingDeltaInsertion) {
+        // composing text
+        if (d.composing.isValid) {
+          _composingText += d.textInserted;
+          _controller.imeSetComposition(_composingText);
+        } else if (!Platform.isWindows) {
+          _controller.imeCommitText(d.textInserted);
+        }
+      } else if (d is TextEditingDeltaDeletion) {
+        if (d.composing.isValid) {
+          if (_composingText == d.textDeleted) {
+            _composingText = "";
+          }
+          _controller.imeSetComposition(_composingText);
+        }
+      } else if (d is TextEditingDeltaReplacement) {
+        if (d.composing.isValid) {
+          _composingText = d.replacementText;
+          _controller.imeSetComposition(_composingText);
+        }
+      } else if (d is TextEditingDeltaNonTextUpdate) {
+        if (_composingText.isNotEmpty) {
+          _controller.imeCommitText(_composingText);
+          _composingText = '';
+        }
+      }
+    }
+  }
+
+  @override
   void initState() {
     super.initState();
+    _controller._onFocusedNodeChangeMessage = (editable) {
+      _composingText = '';
+      editable ? attachTextInputClient() : detachTextInputClient();
+      _controller._focusEditable = editable;
+    };
 
-    _controller.onToolTip = (final String text) {
+    _controller._onImeCompositionRangeChangedMessage = (x, y) {
+      final box = _key.currentContext!.findRenderObject() as RenderBox;
+      updateIMEComposionPosition(
+          x.toDouble(), y.toDouble(), box.localToGlobal(Offset.zero));
+    };
+
+    _controller._onToolTip = (final String text) {
       _tooltip ??= WebviewTooltip(_key.currentContext!);
       _tooltip?.showToolTip(text);
     };
 
-    _controller.onCursorChanged = (int type) {
+    _controller._onCursorChanged = (int type) {
       switch (type) {
         case 0:
           _mouseType = SystemMouseCursors.basic;
@@ -358,7 +386,18 @@ class WebViewState extends State<WebView> {
       canRequestFocus: true,
       debugLabel: "webview_cef",
       onFocusChange: (focused) {
-        _controller.setClientFocus(focused);
+        _composingText = '';
+        if (focused) {
+          _controller.setClientFocus(true);
+          if (_controller._focusEditable) {
+            attachTextInputClient();
+          }
+        } else {
+          _controller.setClientFocus(false);
+          if (_controller._focusEditable) {
+            detachTextInputClient();
+          }
+        }
       },
       child: SizedBox.expand(key: _key, child: _buildInner()),
     );
@@ -378,6 +417,7 @@ class WebViewState extends State<WebView> {
           },
           onPointerDown: (ev) {
             if (!_focusNode.hasFocus) {
+              _controller._onImeCompositionRangeChangedMessage?.call(0, 0);
               _focusNode.requestFocus();
               Future.delayed(const Duration(milliseconds: 50), () {
                 if (!_focusNode.hasFocus) {

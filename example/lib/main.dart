@@ -15,23 +15,35 @@ class MyApp extends StatefulWidget {
 }
 
 class _MyAppState extends State<MyApp> {
-  final _controller = WebViewController();
+  late WebViewController _controller;
+  // late WebViewController _controller2;
   final _textController = TextEditingController();
   String title = "";
   Map allCookies = {};
 
   @override
   void initState() {
+    _controller =
+        WebviewManager().createWebView(loading: const Text("not initialized"));
+    // _controller2 =
+    //     WebviewManager().createWebView(loading: const Text("not initialized"));
     super.initState();
     initPlatformState();
   }
 
+  @override
+  void dispose() {
+    _controller.dispose();
+    WebviewManager().quit();
+    super.dispose();
+  }
+
   // Platform messages are asynchronous, so we initialize in an async method.
   Future<void> initPlatformState() async {
-    String url = "https://flutter.dev/";
+    await WebviewManager().initialize(userAgent: "test/userAgent");
+    String url = "www.baidu.com";
     _textController.text = url;
-    await _controller.initialize();
-    await _controller.loadUrl(url);
+    //unified interface for all platforms set user agent
     _controller.setWebviewListener(WebviewEventsListener(
       onTitleChanged: (t) {
         setState(() {
@@ -40,32 +52,55 @@ class _MyAppState extends State<MyApp> {
       },
       onUrlChanged: (url) {
         _textController.text = url;
+        final Set<JavascriptChannel> jsChannels = {
+          JavascriptChannel(
+              name: 'Print',
+              onMessageReceived: (JavascriptMessage message) {
+                print(message.message);
+                _controller.sendJavaScriptChannelCallBack(
+                    false,
+                    "{'code':'200','message':'print succeed!'}",
+                    message.callbackId,
+                    message.frameId);
+              }),
+        };
+        //normal JavaScriptChannels
+        _controller.setJavaScriptChannels(jsChannels);
+        //also you can build your own jssdk by execute JavaScript code to CEF
+        _controller.executeJavaScript("function abc(e){return 'abc:'+ e}");
+        _controller
+            .evaluateJavascript("abc('test')")
+            .then((value) => print(value));
       },
     ));
 
-    // ignore: prefer_collection_literals
-    final Set<JavascriptChannel> jsChannels = [
-      JavascriptChannel(
-          name: 'Print',
-          onMessageReceived: (JavascriptMessage message) {
-            print(message.message);
-            _controller.sendJavaScriptChannelCallBack(
-                false,
-                "{'code':'200','message':'print succeed!'}",
-                message.callbackId,
-                message.frameId);
-          }),
-    ].toSet();
-    //normal JavaScriptChannels
-    await _controller.setJavaScriptChannels(jsChannels);
-    //also you can build your own jssdk by execute JavaScript code to CEF
-    await _controller.executeJavaScript("function abc(e){return 'abc:'+ e}");
-    _controller.evaluateJavascript("abc('test')").then((value) => print(value));
+    await _controller.initialize(_textController.text);
+
+    // _controller2.setWebviewListener(WebviewEventsListener(
+    //   onTitleChanged: (t) {},
+    //   onUrlChanged: (url) {
+    //     final Set<JavascriptChannel> jsChannels = {
+    //       JavascriptChannel(
+    //           name: 'Print',
+    //           onMessageReceived: (JavascriptMessage message) {
+    //             print(message.message);
+    //             _controller.sendJavaScriptChannelCallBack(
+    //                 false,
+    //                 "{'code':'200','message':'print succeed!'}",
+    //                 message.callbackId,
+    //                 message.frameId);
+    //           }),
+    //     };
+    //     //normal JavaScriptChannels
+    //     _controller2.setJavaScriptChannels(jsChannels);
+    //   },
+    // ));
+    // await _controller2.initialize("baidu.com");
+
     // If the widget was removed from the tree while the asynchronous platform
     // message was in flight, we want to discard the reply rather than calling
     // setState to update our non-existent appearance.
     if (!mounted) return;
-    setState(() {});
   }
 
   @override
@@ -123,14 +158,14 @@ class _MyAppState extends State<MyApp> {
                   controller: _textController,
                   onSubmitted: (url) {
                     _controller.loadUrl(url);
-                    _controller.visitAllCookies().then((value) {
+                    WebviewManager().visitAllCookies().then((value) {
                       allCookies = Map.of(value);
                       if (url == "baidu.com") {
                         if (!allCookies.containsKey('.$url') ||
                             !Map.of(allCookies['.$url']).containsKey('test')) {
-                          _controller.setCookie(url, 'test', 'test123');
+                          WebviewManager().setCookie(url, 'test', 'test123');
                         } else {
-                          _controller.deleteCookie(url, 'test');
+                          WebviewManager().deleteCookie(url, 'test');
                         }
                       }
                     });
@@ -139,9 +174,27 @@ class _MyAppState extends State<MyApp> {
               ),
             ],
           ),
-          _controller.value
-              ? Expanded(child: WebView(_controller))
-              : const Text("not init"),
+          Expanded(
+              child: Row(
+            children: [
+              ValueListenableBuilder(
+                valueListenable: _controller,
+                builder: (context, value, child) {
+                  return _controller.value
+                      ? Expanded(child: _controller.webviewWidget)
+                      : _controller.loadingWidget;
+                },
+              ),
+              // ValueListenableBuilder(
+              //   valueListenable: _controller2,
+              //   builder: (context, value, child) {
+              //     return _controller2.value
+              //         ? Expanded(child: _controller2.webviewWidget)
+              //         : _controller2.loadingWidget;
+              //   },
+              // )
+            ],
+          ))
         ],
       )),
     );
