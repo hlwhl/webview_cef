@@ -33,7 +33,6 @@ public:
     CefRefPtr<CefRenderProcessHandler> GetRenderProcessHandler() override { 
         return this; 
     }
-
     // CefBrowserProcessHandler methods:
     void OnBeforeCommandLineProcessing(
         const CefString& process_type,
