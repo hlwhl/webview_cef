@@ -1,3 +1,8 @@
+## 0.2.0
+- Linux support!
+- Multiple instances support.
+- js eval support.
+
 ## 0.1.0
 - JS bridge support (Thanks to @SinyimZhi)
 - Cookie manipulation support (Thanks to @SinyimZhi)
