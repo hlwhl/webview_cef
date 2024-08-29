@@ -1,5 +1,5 @@
 import 'dart:async';
-
+import 'navigation_decision.dart';
 import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
 import 'package:flutter/widgets.dart';
@@ -72,6 +72,20 @@ class WebviewManager extends ValueNotifier<bool> {
 
   Future<void> methodCallhandler(MethodCall call) async {
     switch (call.method) {
+    case "navigationRequest":
+      int browserId = call.arguments["browserId"] as int;
+      String url = call.arguments["url"] as String;
+
+      final decision = _webViews[browserId]
+          ?.onNavigationRequest
+          ?.call(url);
+
+      // Convert the NavigationDecision to a boolean that the native side expects.
+      bool shouldBlock = (decision == NavigationDecision.prevent);
+
+      // Return the result as an awaited value.
+      return Future.value(shouldBlock);
+
       case "urlChanged":
         int browserId = call.arguments["browserId"] as int;
         _webViews[browserId]

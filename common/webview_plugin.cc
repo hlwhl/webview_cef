@@ -105,6 +105,34 @@ namespace webview_cef {
 				}
 			};
 
+            m_handler->onUrlChangedEvent = [=](int browserId, std::string url) -> bool {
+                if (m_invokeFuncWithReturn) {
+                    WValue* bId = webview_value_new_int(browserId);
+                    WValue* wUrl = webview_value_new_string(const_cast<char*>(url.c_str()));
+
+
+
+                    WValue* retMap = webview_value_new_map();
+                    webview_value_set_string(retMap, "browserId", bId);
+                    webview_value_set_string(retMap, "url", wUrl);
+
+                    // Invoke the Dart-side function and wait for the response.
+                    WValue* result = m_invokeFuncWithReturn("urlChanged", retMap);
+
+                    // Handle the result from Dart, assuming it returns a boolean.
+                    bool shouldBlock = webview_value_get_bool(result);
+
+                    // Unref the values...
+                    webview_value_unref(bId);
+                    webview_value_unref(wUrl);
+                    webview_value_unref(result);
+                    webview_value_unref(retMap);
+
+                    return shouldBlock;
+                }
+                return false;
+            };
+
 			m_handler->onTitleChangedEvent = [=](int browserId, std::string title)
 			{
 				if (m_invokeFunc)
@@ -190,6 +218,7 @@ namespace webview_cef {
 		m_handler->onCursorChangedEvent = nullptr;
 		m_handler->onConsoleMessageEvent = nullptr;
 		m_handler->onUrlChangedEvent = nullptr;
+		m_handler->onNavigationRequest = nullptr;
 		m_handler->onTitleChangedEvent = nullptr;
 		m_handler->onJavaScriptChannelMessage = nullptr;
 		m_handler->onFocusedNodeChangeMessage = nullptr;
@@ -413,6 +442,11 @@ namespace webview_cef {
 
 	void WebviewPlugin::setInvokeMethodFunc(std::function<void(std::string, WValue*)> func){
 		m_invokeFunc = func;
+	}
+
+	void WebviewPlugin::setInvokeMethodFuncWithReturn(std::function<WValue*(std::string, WValue*)> func)
+	{
+		m_invokeFuncWithReturn = func;
 	}
 
 	void WebviewPlugin::setCreateTextureFunc(std::function<std::shared_ptr<WebviewTexture>()> func)

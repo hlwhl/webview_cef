@@ -74,6 +74,15 @@ class _MyAppState extends State<MyApp> {
       },
     ));
 
+    await _controller.setUrlNavigation((url) {
+      print("URL_NAVIGATION ===> $url");
+      if(url.contains("www.youtube.com")){
+        return NavigationDecision.prevent;
+      }
+      return NavigationDecision.navigate;
+      
+    });
+
     await _controller.initialize(_textController.text);
 
     // _controller2.setWebviewListener(WebviewEventsListener(

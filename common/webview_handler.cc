@@ -148,11 +148,33 @@ void WebviewHandler::OnBeforeClose(CefRefPtr<CefBrowser> browser) {
     CEF_REQUIRE_UI_THREAD();
 }
 
+bool WebviewHandler::OnBeforeBrowse(CefRefPtr<CefBrowser> browser,
+                                    CefRefPtr<CefFrame> frame,
+                                    CefRefPtr<CefRequest> request,
+                                    bool user_gesture,
+                                    bool is_redirect) {
+    if (onNavigationRequest) {
+        std::string url = request->GetURL();
+
+        // Call the Dart-side callback and wait for the response.
+        bool shouldBlock = onNavigationRequest(browser->GetIdentifier(), url);
+
+        // If the decision is to prevent navigation, return true.
+        if (shouldBlock) {
+            return true;
+        }
+    }
+
+    // Otherwise, allow navigation.
+    return false;
+}
+
+
 bool WebviewHandler::OnBeforePopup(CefRefPtr<CefBrowser> browser,
                                   CefRefPtr<CefFrame> frame,
                                   const CefString& target_url,
                                   const CefString& target_frame_name,
-                                  WindowOpenDisposition target_disposition,
+                                  CefLifeSpanHandler::WindowOpenDisposition target_disposition,
                                   bool user_gesture,
                                   const CefPopupFeatures& popupFeatures,
                                   CefWindowInfo& windowInfo,

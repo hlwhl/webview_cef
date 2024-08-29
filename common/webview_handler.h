@@ -6,6 +6,8 @@
 #define CEF_TESTS_CEFSIMPLE_SIMPLE_HANDLER_H_
 
 #include "include/cef_client.h"
+#include "include/cef_resource_request_handler.h"
+// #include "include/cef_types.h"
 
 #include <functional>
 #include <list>
@@ -35,12 +37,15 @@ public CefDisplayHandler,
 public CefLifeSpanHandler,
 public CefFocusHandler,
 public CefLoadHandler,
+public CefResourceRequestHandler,
+public CefRequestHandler,
 public CefRenderHandler{
 public:
     //Paint callback
     std::function<void(int browserId, const void* buffer, int32_t width, int32_t height)> onPaintCallback;
     //cef message event
     std::function<void(int browserId, std::string url)> onUrlChangedEvent;
+    std::function<bool(int browserId, std::string url)> onNavigationRequest;
     std::function<void(int browserId, std::string title)> onTitleChangedEvent;
     std::function<void(int browserId, int type)>onCursorChangedEvent;
     std::function<void(int browserId, std::string text)> onTooltipEvent;
@@ -63,14 +68,37 @@ public:
     virtual CefRefPtr<CefFocusHandler> GetFocusHandler() override {
         return this;
     }
+    virtual CefRefPtr<CefRequestHandler> GetRequestHandler() override {
+        return this;
+    }
     virtual CefRefPtr<CefLoadHandler> GetLoadHandler() override { return this; }
     virtual CefRefPtr<CefRenderHandler> GetRenderHandler() override { return this; }
+
+    // virtual CefRefPtr<CefResourceHandler> GetResourceHandler(
+    //         CefRefPtr<CefBrowser> browser,
+    //         CefRefPtr<CefFrame> frame,
+    //         CefRefPtr<CefRequest> request) override {
+    //     // Return a custom handler or nullptr to use the default handler
+    //     return this;
+    // }
 
 	bool OnProcessMessageReceived(
         CefRefPtr<CefBrowser> browser,
 		CefRefPtr<CefFrame> frame,
 		CefProcessId source_process,
 		CefRefPtr<CefProcessMessage> message) override;
+
+    // CefRequestHandler methods:
+    virtual bool OnBeforeBrowse(CefRefPtr<CefBrowser> browser,
+                                CefRefPtr<CefFrame> frame,
+                                CefRefPtr<CefRequest> request,
+                                bool user_gesture,
+                                bool is_redirect) override;
+
+    // virtual CefResourceRequestHandler::ReturnValue OnBeforeResourceLoad(CefRefPtr<CefBrowser> browser,
+    //                                          CefRefPtr<CefFrame> frame,
+    //                                          CefRefPtr<CefRequest> request,
+    //                                          CefRefPtr<CefCallback> callback) override;
 
     
     // CefDisplayHandler methods:
@@ -98,7 +126,7 @@ public:
                                CefRefPtr<CefFrame> frame,
                                const CefString& target_url,
                                const CefString& target_frame_name,
-                               WindowOpenDisposition target_disposition,
+                               CefLifeSpanHandler::WindowOpenDisposition target_disposition,
                                bool user_gesture,
                                const CefPopupFeatures& popupFeatures,
                                CefWindowInfo& windowInfo,

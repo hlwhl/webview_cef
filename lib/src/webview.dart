@@ -5,6 +5,7 @@ import 'package:flutter/gestures.dart';
 import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
 
+import 'navigation_decision.dart';
 import 'webview_manager.dart';
 import 'webview_events_listener.dart';
 import 'webview_javascript.dart';
@@ -49,6 +50,7 @@ class WebViewController extends ValueNotifier<bool> {
 
   get onToolTip => _onToolTip;
   get onCursorChanged => _onCursorChanged;
+  get onNavigationRequest => _onNavigationRequest;
   get onFocusedNodeChangeMessage => _onFocusedNodeChangeMessage;
   get onImeCompositionRangeChangedMessage =>
       _onImeCompositionRangeChangedMessage;
@@ -68,6 +70,7 @@ class WebViewController extends ValueNotifier<bool> {
       await Future.delayed(const Duration(milliseconds: 50));
       _webviewWidget = WebView(this);
       value = true;
+      _onNavigationRequest = onNavigationRequest;
       _creatingCompleter.complete();
     } on PlatformException catch (e) {
       _creatingCompleter.completeError(e);
@@ -77,6 +80,10 @@ class WebViewController extends ValueNotifier<bool> {
 
   setWebviewListener(WebviewEventsListener listener) {
     _listener = listener;
+  }
+
+  setUrlNavigation(NavigationDecision Function(String url)? callback) {
+    _onNavigationRequest = callback;
   }
 
   @override
@@ -96,6 +103,15 @@ class WebViewController extends ValueNotifier<bool> {
       return;
     }
     assert(value);
+
+    // Invoke the onNavigationRequest callback before loading the URL
+    if (onNavigationRequest != null) {
+      final decision = onNavigationRequest!(_browserId, url);
+      if (decision == NavigationDecision.prevent) {
+        return; // Do not proceed with the navigation
+      }
+    }
+
     return _pluginChannel.invokeMethod('loadUrl', [_browserId, url]);
   }
 
@@ -273,6 +289,7 @@ class WebViewController extends ValueNotifier<bool> {
 
   Function(String)? _onToolTip;
   Function(int)? _onCursorChanged;
+  NavigationDecision Function(String)? _onNavigationRequest;
   Function(bool editable)? _onFocusedNodeChangeMessage;
   Function(int, int)? _onImeCompositionRangeChangedMessage;
 }
@@ -348,6 +365,8 @@ class WebViewState extends State<WebView> with WebeViewTextInput {
       _tooltip ??= WebviewTooltip(_key.currentContext!);
       _tooltip?.showToolTip(text);
     };
+
+    _controller._onNavigationRequest = _controller.onNavigationRequest;
 
     _controller._onCursorChanged = (int type) {
       switch (type) {
