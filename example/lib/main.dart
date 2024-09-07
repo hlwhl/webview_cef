@@ -67,10 +67,17 @@ class _MyAppState extends State<MyApp> {
         //normal JavaScriptChannels
         _controller.setJavaScriptChannels(jsChannels);
         //also you can build your own jssdk by execute JavaScript code to CEF
-        _controller.executeJavaScript("function abc(e){return 'abc:'+ e}");
+        _controller.executeJavaScript("function abc(e){retu\rn 'abc:'+ e}");
         _controller
             .evaluateJavascript("abc('test')")
             .then((value) => print(value));
+      },
+    ));
+
+    _controller.setNavigationDelegate(NavigationDelegate(
+      onNavigationRequest: (url) {
+        print("onNavigationRequest: $url");
+        return true;
       },
     ));
 

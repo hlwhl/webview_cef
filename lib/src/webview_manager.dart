@@ -4,6 +4,7 @@ import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
 import 'package:flutter/widgets.dart';
 
+import 'navigation_delegate.dart';
 import 'webview.dart';
 
 class WebviewManager extends ValueNotifier<bool> {
@@ -125,6 +126,18 @@ class WebviewManager extends ValueNotifier<bool> {
         return;
       default:
     }
+  }
+
+   Future<void> setNavigationDelegate(NavigationDelegate delegate) async {
+    assert(value);
+    return pluginChannel.invokeMethod('setNavigationDelegate', {
+      'onNavigationRequest': (String url) {
+        if (delegate.onNavigationRequest != null) {
+          return delegate.onNavigationRequest!(url);
+        }
+        return true; // Allow navigation by default
+      },
+    });
   }
 
   Future<void> setCookie(String domain, String key, String val) async {
