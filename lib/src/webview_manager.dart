@@ -133,7 +133,10 @@ class WebviewManager extends ValueNotifier<bool> {
     return pluginChannel.invokeMethod('setNavigationDelegate', {
       'onNavigationRequest': (String url) {
         if (delegate.onNavigationRequest != null) {
-          return delegate.onNavigationRequest!(url);
+          final decision = delegate.onNavigationRequest!(url);
+
+          // return delegate.onNavigationRequest!(url);
+          return decision == NavigationDecision.navigate;
         }
         return true; // Allow navigation by default
       },

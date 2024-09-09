@@ -1,7 +1,12 @@
-typedef NavigationDecision = bool Function(String url);
+typedef OnNavigationDecisionCb = NavigationDecision Function(String url);
 
 class NavigationDelegate {
-  final NavigationDecision? onNavigationRequest;
+  final OnNavigationDecisionCb? onNavigationRequest;
 
   NavigationDelegate({this.onNavigationRequest});
+}
+
+enum NavigationDecision {
+  prevent,
+  navigate,
 }

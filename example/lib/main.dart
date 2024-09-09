@@ -77,7 +77,10 @@ class _MyAppState extends State<MyApp> {
     _controller.setNavigationDelegate(NavigationDelegate(
       onNavigationRequest: (url) {
         print("onNavigationRequest: $url");
-        return true;
+        if(url.contains("www.youtube.com")){
+          return NavigationDecision.prevent;
+        }
+        return NavigationDecision.navigate;
       },
     ));
 

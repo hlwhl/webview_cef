@@ -80,7 +80,7 @@ class WebViewController extends ValueNotifier<bool> {
     _listener = listener;
   }
 
-    Future<void> setNavigationDelegate(NavigationDelegate delegate) async {
+  Future<void> setNavigationDelegate(NavigationDelegate delegate) async {
     if (_isDisposed) {
       return;
     }
