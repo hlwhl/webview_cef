@@ -5,6 +5,7 @@ import 'package:flutter/gestures.dart';
 import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
 
+import 'navigation_delegate.dart';
 import 'webview_manager.dart';
 import 'webview_events_listener.dart';
 import 'webview_javascript.dart';
@@ -77,6 +78,14 @@ class WebViewController extends ValueNotifier<bool> {
 
   setWebviewListener(WebviewEventsListener listener) {
     _listener = listener;
+  }
+
+  Future<void> setNavigationDelegate(NavigationDelegate delegate) async {
+    if (_isDisposed) {
+      return;
+    }
+    assert(value);
+    return WebviewManager().setNavigationDelegate(delegate);
   }
 
   @override

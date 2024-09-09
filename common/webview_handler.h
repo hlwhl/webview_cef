@@ -34,6 +34,7 @@ class WebviewHandler : public CefClient,
 public CefDisplayHandler,
 public CefLifeSpanHandler,
 public CefFocusHandler,
+public CefRequestHandler,
 public CefLoadHandler,
 public CefRenderHandler{
 public:
@@ -41,6 +42,7 @@ public:
     std::function<void(int browserId, const void* buffer, int32_t width, int32_t height)> onPaintCallback;
     //cef message event
     std::function<void(int browserId, std::string url)> onUrlChangedEvent;
+    std::function<bool(int, std::string)> onNavigationRequestEvent;
     std::function<void(int browserId, std::string title)> onTitleChangedEvent;
     std::function<void(int browserId, int type)>onCursorChangedEvent;
     std::function<void(int browserId, std::string text)> onTooltipEvent;
@@ -63,8 +65,17 @@ public:
     virtual CefRefPtr<CefFocusHandler> GetFocusHandler() override {
         return this;
     }
+    virtual CefRefPtr<CefRequestHandler> GetRequestHandler() override {
+        return this;
+    }
     virtual CefRefPtr<CefLoadHandler> GetLoadHandler() override { return this; }
     virtual CefRefPtr<CefRenderHandler> GetRenderHandler() override { return this; }
+
+    virtual bool OnBeforeBrowse(CefRefPtr<CefBrowser> browser,
+                              CefRefPtr<CefFrame> frame,
+                              CefRefPtr<CefRequest> request,
+                              bool user_gesture,
+                              bool is_redirect) override;
 
 	bool OnProcessMessageReceived(
         CefRefPtr<CefBrowser> browser,
@@ -98,7 +109,7 @@ public:
                                CefRefPtr<CefFrame> frame,
                                const CefString& target_url,
                                const CefString& target_frame_name,
-                               WindowOpenDisposition target_disposition,
+                               CefLifeSpanHandler::WindowOpenDisposition target_disposition,
                                bool user_gesture,
                                const CefPopupFeatures& popupFeatures,
                                CefWindowInfo& windowInfo,
