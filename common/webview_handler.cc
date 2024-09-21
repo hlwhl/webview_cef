@@ -9,6 +9,7 @@
 #include <iostream>
 #include <chrono>
 #include <unordered_map>
+#include <cstdint>
 
 #include "include/base/cef_callback.h"
 #include "include/cef_app.h"
@@ -17,6 +18,21 @@
 #include "include/views/cef_window.h"
 #include "include/wrapper/cef_closure_task.h"
 #include "include/wrapper/cef_helpers.h"
+
+#include <sstream>
+
+// std::to_string fails for ints on Ubuntu 24.04:
+// webview_handler.cc:86:86: error: no matching function for call to 'to_string'
+// webview_handler.cc:567:24: error: no matching function for call to 'to_string'
+namespace stringpatch
+{
+    template < typename T > std::string to_string( const T& n )
+    {
+        std::ostringstream stm ;
+        stm << n ;
+        return stm.str() ;
+    }
+}
 
 #include "webview_js_handler.h"
 
@@ -67,7 +83,7 @@ bool WebviewHandler::OnProcessMessageReceived(
 	    }
 
         onJavaScriptChannelMessage(
-            fun_name,param,std::to_string(js_callback_id), browser->GetIdentifier(), std::to_string(frame->GetIdentifier()));
+            fun_name,param,stringpatch::to_string(js_callback_id), browser->GetIdentifier(), stringpatch::to_string(frame->GetIdentifier()));
     }
     else if(message_name == kEvaluateCallbackMessage){
         CefString callbackId = message->GetArgumentList()->GetString(0);
@@ -543,8 +559,12 @@ void WebviewHandler::sendJavaScriptChannelCallBack(const bool error, const std::
     args->SetString(2, result);
     auto bit = browser_map_.find(browserId);
     if(bit != browser_map_.end()){
+        int64_t frameIdInt = atoll(frameId.c_str());
+
         CefRefPtr<CefFrame> frame = bit->second.browser->GetMainFrame();
-        if (frame->GetIdentifier() == atoll(frameId.c_str()))
+
+        // GetIdentifier().ToString() does not work on MacOS
+        if (std::stoll(stringpatch::to_string(frame->GetIdentifier())) == frameIdInt)
         {
             frame->SendProcessMessage(PID_RENDERER, message);
         }
