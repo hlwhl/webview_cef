@@ -2,6 +2,7 @@
 #include <memory>
 #include <string.h>
 #include <inttypes.h>
+#include <cstdlib>
 
 #if defined(_MSC_VER)
 #pragma warning(disable: 4996)
@@ -11,6 +12,9 @@ typedef SSIZE_T ssize_t;
 
 #define return_val_if_fail(p, ret) if(!(p)) return (ret)
 #define return_if_fail(p) if(!(p)) return
+
+using std::malloc;
+using std::free;
 
 struct webview_value{
   WValueType type;

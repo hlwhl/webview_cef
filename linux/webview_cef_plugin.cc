@@ -328,6 +328,8 @@ FLUTTER_PLUGIN_EXPORT gboolean processKeyEventForCEF(GtkWidget *widget, GdkEvent
       if(system("xclip -o -sel clipboard | xclip -i -sel clipboard  &>/dev/null") == 0){
         res = system("xclip -o -sel clipboard | xclip -i &>/dev/null");
       }
+      // Suppress unused variable warning
+      (void)res;
     }
     else {
       // FIXME: fix for non BMP chars

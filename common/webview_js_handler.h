@@ -6,6 +6,8 @@
 
 #include <functional>
 #include <memory>
+#include <cstdint>
+
 
 static const char kJSCallCppFunctionMessage[] = "JSCallCppFunction";		 //js call c++ message
 static const char kExecuteJsCallbackMessage[] = "ExecuteJsCallback";		 //c++ call js message
@@ -29,7 +31,7 @@ public:
 	void RemoveCallbackFuncWithFrame(CefRefPtr<CefFrame> frame);
 	bool ExecuteJSCallbackFunc(int js_callback_id, bool has_error, const CefString& json_result);
 private:
-	uint32						js_callback_id_ = 0;
+	uint32_t						js_callback_id_ = 0;
 	RenderCallbackMap			render_callback_;
 	StartRequestCallbackMap     startRequest_callback_;
 };
