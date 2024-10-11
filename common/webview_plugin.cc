@@ -180,6 +180,40 @@ namespace webview_cef {
 					webview_value_unref(retMap);
 				}
 			};
+
+
+            m_handler->onLoadStart = [=](int nBrowserId, std::string urlId)
+            {
+                if (m_invokeFunc)
+                {
+                    WValue* bId = webview_value_new_int(nBrowserId);
+                    WValue* uId = webview_value_new_string(const_cast<char*>(urlId.c_str()));
+                    WValue* retMap = webview_value_new_map();
+                    webview_value_set_string(retMap, "browserId", bId);
+                    webview_value_set_string(retMap, "urlId", uId);
+                    m_invokeFunc("onLoadStart", retMap);
+                    webview_value_unref(bId);
+                    webview_value_unref(uId);
+                    webview_value_unref(retMap);
+                }
+            };
+
+            m_handler->onLoadEnd = [=](int nBrowserId, std::string urlId)
+            {
+                if (m_invokeFunc)
+                {
+                    WValue* bId = webview_value_new_int(nBrowserId);
+                    WValue* uId = webview_value_new_string(const_cast<char*>(urlId.c_str()));
+                    WValue* retMap = webview_value_new_map();
+                    webview_value_set_string(retMap, "browserId", bId);
+                    webview_value_set_string(retMap, "urlId", uId);
+                    m_invokeFunc("onLoadEnd", retMap);
+                    webview_value_unref(bId);
+                    webview_value_unref(uId);
+                    webview_value_unref(retMap);
+                }
+            };
+
 			m_init = true;
 		}
 	}

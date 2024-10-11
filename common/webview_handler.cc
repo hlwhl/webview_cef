@@ -203,6 +203,22 @@ void WebviewHandler::OnLoadError(CefRefPtr<CefBrowser> browser,
     frame->LoadURL(GetDataURI(ss.str(), "text/html"));
 }
 
+void WebviewHandler::OnLoadStart(CefRefPtr<CefBrowser> browser, CefRefPtr<CefFrame> frame,
+                                 CefLoadHandler::TransitionType transition_type) {
+    if(onLoadStart){
+        onLoadStart(browser->GetIdentifier(), frame->GetURL());
+    }
+    return;
+}
+
+void WebviewHandler::OnLoadEnd(CefRefPtr<CefBrowser> browser, CefRefPtr<CefFrame> frame,
+                               int httpStatusCode) {
+    if(onLoadEnd){
+        onLoadEnd(browser->GetIdentifier(), frame->GetURL());
+    }
+    return;
+}
+
 void WebviewHandler::CloseAllBrowsers(bool force_close) {
     if (browser_map_.empty()){
         return;
