@@ -72,6 +72,12 @@ class _MyAppState extends State<MyApp> {
             .evaluateJavascript("abc('test')")
             .then((value) => print(value));
       },
+      onLoadStart: (controller, url) {
+        print("onLoadStart => $url");
+      },
+      onLoadEnd: (controller, url) {
+        print("onLoadEnd => $url");
+      },
     ));
 
     await _controller.initialize(_textController.text);

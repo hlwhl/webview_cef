@@ -49,6 +49,8 @@ public:
     std::function<void(int browserId, int32_t x, int32_t y)> onImeCompositionRangeChangedMessage;
     //webpage message
     std::function<void(std::string, std::string, std::string, int browserId, std::string)> onJavaScriptChannelMessage;
+    std::function<void(int browserId, std::string url)> onLoadStart;
+    std::function<void(int browserId, std::string url)> onLoadEnd;
     
     explicit WebviewHandler();
     ~WebviewHandler();
@@ -117,6 +119,12 @@ public:
                              ErrorCode errorCode,
                              const CefString& errorText,
                              const CefString& failedUrl) override;
+    virtual void OnLoadEnd(CefRefPtr<CefBrowser> browser,
+                           CefRefPtr<CefFrame> frame,
+                           int httpStatusCode) override;
+    virtual void OnLoadStart(CefRefPtr<CefBrowser> browser,
+                             CefRefPtr<CefFrame> frame,
+                             CefLoadHandler::TransitionType transition_type) override;
     
     // CefRenderHandler methods:
     virtual void GetViewRect(CefRefPtr<CefBrowser> browser, CefRect& rect) override;

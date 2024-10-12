@@ -123,6 +123,22 @@ class WebviewManager extends ValueNotifier<bool> {
             ?.onImeCompositionRangeChangedMessage
             ?.call(call.arguments['x'] as int, call.arguments['y'] as int);
         return;
+      case 'onLoadStart':
+        int browserId = call.arguments["browserId"] as int;
+        String urlId = call.arguments["urlId"] as String;
+
+        WebViewController controller =
+        _webViews[browserId] as WebViewController;
+        _webViews[browserId]?.listener?.onLoadStart?.call(controller, urlId);
+        return;
+      case 'onLoadEnd':
+        int browserId = call.arguments["browserId"] as int;
+        String urlId = call.arguments["urlId"] as String;
+
+        WebViewController controller =
+        _webViews[browserId] as WebViewController;
+        _webViews[browserId]?.listener?.onLoadEnd?.call(controller, urlId);
+        return;
       default:
     }
   }
