@@ -73,7 +73,7 @@ bool WebviewHandler::OnProcessMessageReceived(
         CefString callbackId = message->GetArgumentList()->GetString(0);
         CefRefPtr<CefValue> param = message->GetArgumentList()->GetValue(1);
 
-        if(!callbackId.empty() && param->IsValid()){
+        if(!callbackId.empty()){
             auto it = js_callbacks_.find(callbackId.ToString());
             if(it != js_callbacks_.end()){
                 it->second(param);

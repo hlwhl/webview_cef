@@ -425,6 +425,12 @@ namespace webview_cef {
 			m_handler->executeJavaScript(browserId, code, [=](CefRefPtr<CefValue> values){
                 WValue* retValue;
 
+                if (values == nullptr) {
+                    result(1, nullptr);
+                    webview_value_unref(retValue);
+                    return;
+                }
+
                 switch(values->GetType()) {
                     case VTYPE_BOOL:
                         retValue = webview_value_new_bool(values->GetBool());
