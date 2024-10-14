@@ -3,6 +3,7 @@ import 'dart:async';
 import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
 import 'package:flutter/widgets.dart';
+import 'package:webview_cef/src/webview_inject_user_script.dart';
 
 import 'webview.dart';
 
@@ -18,16 +19,22 @@ class WebviewManager extends ValueNotifier<bool> {
   final Map<int, WebViewController> _webViews = <int, WebViewController>{};
 
   final Map<int, WebViewController> _tempWebViews = <int, WebViewController>{};
+  InjectUserScripts? _injectUserScripts = InjectUserScripts();
 
   int nextIndex = 1;
 
   get ready => _creatingCompleter.future;
 
-  WebViewController createWebView({Widget? loading}) {
+  WebViewController createWebView({
+    Widget? loading,
+    InjectUserScripts? injectUserScripts,
+  }) {
     int browserIndex = nextIndex++;
     final controller =
         WebViewController(pluginChannel, browserIndex, loading: loading);
     _tempWebViews[browserIndex] = controller;
+    _injectUserScripts = injectUserScripts;
+
     return controller;
   }
 
@@ -127,6 +134,8 @@ class WebviewManager extends ValueNotifier<bool> {
         int browserId = call.arguments["browserId"] as int;
         String urlId = call.arguments["urlId"] as String;
 
+        _injectUserScriptIfNeeds(browserId, _injectUserScripts?.retrieveLoadStartInjectScripts());
+
         WebViewController controller =
         _webViews[browserId] as WebViewController;
         _webViews[browserId]?.listener?.onLoadStart?.call(controller, urlId);
@@ -135,12 +144,24 @@ class WebviewManager extends ValueNotifier<bool> {
         int browserId = call.arguments["browserId"] as int;
         String urlId = call.arguments["urlId"] as String;
 
+        _injectUserScriptIfNeeds(browserId, _injectUserScripts?.retrieveLoadEndInjectScripts());
+
         WebViewController controller =
         _webViews[browserId] as WebViewController;
         _webViews[browserId]?.listener?.onLoadEnd?.call(controller, urlId);
         return;
       default:
     }
+  }
+
+  Future<void> _injectUserScriptIfNeeds(int browserId, List<UserScript>? scripts) async {
+    if (scripts == null) return;
+
+    await _webViews[browserId]?.ready;
+
+    scripts.forEach((script) async {
+      await _webViews[browserId]?.executeJavaScript(script.script);
+    },);
   }
 
   Future<void> setCookie(String domain, String key, String val) async {

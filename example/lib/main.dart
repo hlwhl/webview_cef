@@ -2,6 +2,7 @@ import 'dart:async';
 
 import 'package:flutter/material.dart';
 import 'package:webview_cef/webview_cef.dart';
+import 'package:webview_cef/src/webview_inject_user_script.dart';
 
 void main() {
   runApp(const MyApp());
@@ -16,6 +17,7 @@ class MyApp extends StatefulWidget {
 
 class _MyAppState extends State<MyApp> {
   late WebViewController _controller;
+
   // late WebViewController _controller2;
   final _textController = TextEditingController();
   String title = "";
@@ -23,8 +25,30 @@ class _MyAppState extends State<MyApp> {
 
   @override
   void initState() {
-    _controller =
-        WebviewManager().createWebView(loading: const Text("not initialized"));
+    var injectUserScripts = InjectUserScripts();
+    injectUserScripts.add(UserScript("console.log('injectScript_in_LoadStart')",
+        ScriptInjectTime.LOAD_START));
+    injectUserScripts.add(UserScript(
+        "console.log('injectScript_in_LoadEnd')", ScriptInjectTime.LOAD_END));
+
+    // CSS Injection Script Example
+    // injectUserScripts.add(UserScript(
+    //   '''
+    //     const style = document.createElement('style');
+    //     style.innerHTML = `
+    //       body {
+    //         background-color: yellow;
+    //       }
+    //     `;
+    //
+    //     document.head.appendChild(style);
+    //   ''',
+    //   ScriptInjectTime.LOAD_END,
+    // ));
+
+    _controller = WebviewManager().createWebView(
+        loading: const Text("not initialized"),
+        injectUserScripts: injectUserScripts);
     // _controller2 =
     //     WebviewManager().createWebView(loading: const Text("not initialized"));
     super.initState();
