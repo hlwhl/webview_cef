@@ -423,28 +423,22 @@ namespace webview_cef {
 			int browserId = int(webview_value_get_int(webview_value_get_list_value(values, 0)));
 			const auto code = webview_value_get_string(webview_value_get_list_value(values, 1));
 			m_handler->executeJavaScript(browserId, code, [=](CefRefPtr<CefValue> values){
-                printf("AJKAJKA");
                 WValue* retValue;
 
                 switch(values->GetType()) {
                     case VTYPE_BOOL:
-                        printf("VTYPE_BOOL");
                         retValue = webview_value_new_bool(values->GetBool());
                         break;
                     case VTYPE_DOUBLE:
-                        printf("VTYPE_DOUBLE");
                         retValue = webview_value_new_double(values->GetDouble());
                         break;
                     case VTYPE_INT:
-                        printf("VTYPE_INT");
                         retValue = webview_value_new_int(values->GetInt());
                         break;
                     case VTYPE_STRING:
-                        printf("VTYPE_STRING");
                         retValue = webview_value_new_string(values->GetString().ToString().c_str());
                         break;
                     default:
-                        printf("default");
                         break;
                 }
 				result(1, retValue);

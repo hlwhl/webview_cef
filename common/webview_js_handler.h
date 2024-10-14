@@ -37,9 +37,7 @@ public:
 public:
 	static int  GetNextReqID();
 	bool StartRequest(int reqId, const CefString& strCmd, const CefString& strCallback, const CefString& strArgs);
-	bool EvaluateCallback(const CefString& callbackId, const CefString& result);
     bool EvaluateCallback(const CefString& callbackId, const JSValue& result);
-    bool EvaluateCallback(const CefString& callbackId, const CefRefPtr<CefV8Value> result);
 
 	bool CallCppFunction(const CefString& function_name, const CefString& params, CefRefPtr<CefV8Value> callback, CefRefPtr<CefV8Value> rawdata);
 	void RemoveCallbackFuncWithFrame(CefRefPtr<CefFrame> frame);

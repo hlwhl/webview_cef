@@ -588,8 +588,6 @@ void WebviewHandler::executeJavaScript(int browserId, const std::string code, st
                 if(callback != nullptr){
                     std::string callbackId = GetCallbackId();
 
-                    printf("CallbackId: %s\n", callbackId.c_str());
-
                     finalCode = "external.EvaluateCallback('";
                     finalCode += callbackId;
                     finalCode += "',(function(){return ";

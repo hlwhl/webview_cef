@@ -3,28 +3,22 @@
 
 std::atomic_long s_nReqID {1001};
 
-// CefV8Value에서 JSValue로 변환
 JSValue ConvertCefV8ValueToJSValue(CefRefPtr<CefV8Value> value) {
     JSValue result;
 
     if (value->IsString()) {
-        printf("[Carrick]----1\n");
         result.type = JSValue::Type::STRING;
         result.stringValue = value->GetStringValue().ToString();
     } else if (value->IsInt()) {
-        printf("[Carrick]----2\n");
         result.type = JSValue::Type::INT;
         result.intValue = value->GetIntValue();
     } else if (value->IsBool()) {
-        printf("[Carrick]----3\n");
         result.type = JSValue::Type::BOOL;
-        result.boolValue = value->GetBoolValue();  // 불리언 값을 가져옴
+        result.boolValue = value->GetBoolValue();
     } else if (value->IsDouble()) {
-        printf("[Carrick]----4\n");
         result.type = JSValue::Type::DOUBLE;
         result.doubleValue = value->GetDoubleValue();
     } else if (value->IsArray()) {
-        printf("[Carrick]----5\n");
         result.type = JSValue::Type::ARRAY;
         int length = value->GetArrayLength();
         for (int i = 0; i < length; ++i) {
@@ -123,36 +117,9 @@ bool CefJSHandler::Execute(const CefString& name,
     else if (name == "EvaluateCallback") {
         CefString callbackId = arguments[0]->GetStringValue();
         CefRefPtr<CefV8Value> result = arguments[1];
-
         JSValue jsValue = ConvertCefV8ValueToJSValue(result);
 
-        if (jsValue.type == JSValue::Type::STRING) {
-            std::cout << "String value: " << jsValue.stringValue << std::endl;
-        } else if (jsValue.type == JSValue::Type::INT) {
-            std::cout << "Int value: " << jsValue.intValue << std::endl;
-        } else if (jsValue.type == JSValue::Type::BOOL) {
-            std::cout << "Bool value: " << (jsValue.boolValue ? "true" : "false") << std::endl;
-        } else if (jsValue.type == JSValue::Type::DOUBLE) {
-            std::cout << "Double value: " << jsValue.doubleValue << std::endl;
-        } else if (jsValue.type == JSValue::Type::ARRAY) {
-            std::cout << "Array value: [";
-            for (const auto& element : jsValue.arrayValue) {
-                if (element.type == JSValue::Type::STRING) {
-                    std::cout << element.stringValue << ", ";
-                }
-            }
-            std::cout << "]" << std::endl;
-        } else if (jsValue.type == JSValue::Type::OBJECT) {
-            std::cout << "Object value: {";
-            for (const auto& kv : jsValue.objectValue) {
-                std::cout << kv.first << ": " << kv.second.stringValue << ", ";
-            }
-            std::cout << "}" << std::endl;
-        }
-
-        printf("EvaluateCallback: %s, %s\n", callbackId.ToString().c_str(), "A");
         if (!js_bridge_->EvaluateCallback(callbackId, jsValue)) {
-            //        if (!js_bridge_->EvaluateCallback(callbackId, result)) {
             std::ostringstream strStream;
             strStream << "Failed to callback:  " << callbackId.c_str() << ".";
             strStream.flush();
@@ -199,21 +166,6 @@ bool CefJSBridge::StartRequest(int reqId,
     return false;
 }
 
-bool CefJSBridge::EvaluateCallback(const CefString& callbackId, const CefRefPtr<CefV8Value> result) {
-    CefRefPtr<CefV8Context> context = CefV8Context::GetCurrentContext();
-    if(context){
-        CefRefPtr<CefFrame> frame = context->GetFrame();
-        if(frame){
-            CefRefPtr<CefProcessMessage> message = CefProcessMessage::Create(kEvaluateCallbackMessage);
-            message->GetArgumentList()->SetString(0, callbackId);
-            //            message->GetArgumentList()->SetValue(1, result);
-            frame->SendProcessMessage(PID_BROWSER, message);
-            return true;
-        }
-    }
-    return false;
-}
-
 bool CefJSBridge::EvaluateCallback(const CefString& callbackId, const JSValue& result) {
     CefRefPtr<CefV8Context> context = CefV8Context::GetCurrentContext();
     if (context) {
@@ -239,7 +191,6 @@ bool CefJSBridge::EvaluateCallback(const CefString& callbackId, const JSValue& r
                     args->SetDouble(1, result.doubleValue);
                     break;
                 case JSValue::Type::ARRAY: {
-                    // 배열 처리
                     CefRefPtr<CefListValue> arrayList = CefListValue::Create();
                     for (size_t i = 0; i < result.arrayValue.size(); ++i) {
                         const JSValue &element = result.arrayValue[i];
@@ -272,22 +223,6 @@ bool CefJSBridge::EvaluateCallback(const CefString& callbackId, const JSValue& r
     }
     return false;
 }
-
-bool CefJSBridge::EvaluateCallback(const CefString& callbackId, const CefString& result){
-    CefRefPtr<CefV8Context> context = CefV8Context::GetCurrentContext();
-    if(context){
-        CefRefPtr<CefFrame> frame = context->GetFrame();
-        if(frame){
-            CefRefPtr<CefProcessMessage> message = CefProcessMessage::Create(kEvaluateCallbackMessage);
-            message->GetArgumentList()->SetString(0, callbackId);
-            message->GetArgumentList()->SetString(1, result);
-            frame->SendProcessMessage(PID_BROWSER, message);
-            return true;
-        }
-    }
-    return false;
-}
-
 
 int CefJSBridge::GetNextReqID()
 {
