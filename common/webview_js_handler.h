@@ -13,7 +13,7 @@ static const char kEvaluateCallbackMessage[] = "EvaluateCallback";		 //js callba
 static const char kFocusedNodeChangedMessage[] = "FocusedNodeChanged";		 //elements that capture focus in web pages changed message
 
 struct JSValue {
-    enum class Type { STRING, INT, BOOL, DOUBLE, ARRAY, OBJECT, UNKNOWN } type;
+    enum class Type { STRING, INT, BOOL, DOUBLE, ARRAY, UNKNOWN } type;
 
     std::string stringValue;
     int intValue;
