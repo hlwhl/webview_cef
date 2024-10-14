@@ -569,7 +569,7 @@ void WebviewHandler::sendJavaScriptChannelCallBack(const bool error, const std::
 
 static std::string GetCallbackId()
 {
-    auto time = std::chrono::time_point_cast<std::chrono::milliseconds>(std::chrono::system_clock::now());
+    auto time = std::chrono::time_point_cast<std::chrono::nanoseconds>(std::chrono::system_clock::now());
 	time_t timestamp = time.time_since_epoch().count();
     return std::to_string(timestamp);
 } 
