@@ -438,9 +438,31 @@ namespace webview_cef {
                     case VTYPE_STRING:
                         retValue = webview_value_new_string(values->GetString().ToString().c_str());
                         break;
-                    default:
+                    case VTYPE_LIST:
+                        retValue = webview_value_new_list();
+                        CefRefPtr<CefListValue> list = values->GetList();
+                        
+                        if (list) {
+                            for (size_t i = 0; i < list->GetSize(); ++i) {
+                                CefValueType type = list->GetType(i);
+                                CefRefPtr<CefValue> listItem = list->GetValue(i);
+
+                                if (type == VTYPE_INT) {
+                                    webview_value_append(retValue, webview_value_new_int(listItem->GetInt()));
+                                } else if (type == VTYPE_BOOL) {
+                                    webview_value_append(retValue, webview_value_new_bool(listItem->GetBool()));
+                                } else if (type == VTYPE_STRING) {
+                                    webview_value_append(retValue, webview_value_new_string(listItem->GetString().ToString().c_str()));
+                                } else if (type == VTYPE_DOUBLE) {
+                                    webview_value_append(retValue, webview_value_new_double(listItem->GetDouble()));
+                                } else {
+                                    continue;
+                                }
+                            }
+                        }
                         break;
                 }
+
 				result(1, retValue);
 				webview_value_unref(retValue);
 			});
