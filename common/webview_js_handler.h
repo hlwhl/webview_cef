@@ -12,6 +12,20 @@ static const char kExecuteJsCallbackMessage[] = "ExecuteJsCallback";		 //c++ cal
 static const char kEvaluateCallbackMessage[] = "EvaluateCallback";		 //js callback c++ message
 static const char kFocusedNodeChangedMessage[] = "FocusedNodeChanged";		 //elements that capture focus in web pages changed message
 
+struct JSValue {
+    enum class Type { STRING, INT, BOOL, DOUBLE, ARRAY, OBJECT, UNKNOWN } type;
+
+    std::string stringValue;
+    int intValue;
+    bool boolValue;
+    double doubleValue;
+
+    std::vector<JSValue> arrayValue;
+    std::map<std::string, JSValue> objectValue;
+
+    JSValue() : type(Type::UNKNOWN) {}
+};
+
 class CefJSBridge
 {
 	typedef std::map<int/* js_callback_id*/, std::pair<CefRefPtr<CefV8Context>/* context*/, std::pair<CefRefPtr<CefV8Value>/* callback*/, CefRefPtr<CefV8Value>/* rawdata*/>>> RenderCallbackMap;
@@ -24,6 +38,8 @@ public:
 	static int  GetNextReqID();
 	bool StartRequest(int reqId, const CefString& strCmd, const CefString& strCallback, const CefString& strArgs);
 	bool EvaluateCallback(const CefString& callbackId, const CefString& result);
+    bool EvaluateCallback(const CefString& callbackId, const JSValue& result);
+    bool EvaluateCallback(const CefString& callbackId, const CefRefPtr<CefV8Value> result);
 
 	bool CallCppFunction(const CefString& function_name, const CefString& params, CefRefPtr<CefV8Value> callback, CefRefPtr<CefV8Value> rawdata);
 	void RemoveCallbackFuncWithFrame(CefRefPtr<CefFrame> frame);

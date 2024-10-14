@@ -6,6 +6,8 @@
 #define CEF_TESTS_CEFSIMPLE_SIMPLE_HANDLER_H_
 
 #include "include/cef_client.h"
+#include "include/cef_base.h"
+#include "include/cef_app.h"
 
 #include <functional>
 #include <list>
@@ -168,13 +170,13 @@ public:
 
     void setJavaScriptChannels(int browserId, const std::vector<std::string> channels);
     void sendJavaScriptChannelCallBack(const bool error, const std::string result, const std::string callbackId, const int browserId, const std::string frameId);
-    void executeJavaScript(int browserId, const std::string code, std::function<void(std::string)> callback = nullptr);
+    void executeJavaScript(int browserId, const std::string code, std::function<void(CefRefPtr<CefValue>)> callback = nullptr);
     
 private:
     // List of existing browser windows. Only accessed on the CEF UI thread.
     std::unordered_map<int, browser_info> browser_map_;
 
-    std::unordered_map<std::string, std::function<void(std::string)>> js_callbacks_;    
+    std::unordered_map<std::string, std::function<void(CefRefPtr<CefValue>)>> js_callbacks_;
     // Include the default reference counting implementation.
     IMPLEMENT_REFCOUNTING(WebviewHandler);
 

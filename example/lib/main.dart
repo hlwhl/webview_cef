@@ -75,12 +75,15 @@ class _MyAppState extends State<MyApp> {
       onLoadStart: (controller, url) {
         print("onLoadStart => $url");
       },
-      onLoadEnd: (controller, url) {
+      onLoadEnd: (controller, url) async {
         print("onLoadEnd => $url");
+        var ret = await _controller.evaluateJavascript('window.returnHundred();');
+        print("[ReturnHundred] $ret");
       },
     ));
 
     await _controller.initialize(_textController.text);
+    _controller.openDevTools();
 
     // _controller2.setWebviewListener(WebviewEventsListener(
     //   onTitleChanged: (t) {},
