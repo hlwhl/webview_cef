@@ -75,13 +75,12 @@ class _MyAppState extends State<MyApp> {
       onLoadStart: (controller, url) {
         print("onLoadStart => $url");
       },
-      onLoadEnd: (controller, url) async {
+      onLoadEnd: (controller, url) {
         print("onLoadEnd => $url");
       },
     ));
 
     await _controller.initialize(_textController.text);
-    _controller.openDevTools();
 
     // _controller2.setWebviewListener(WebviewEventsListener(
     //   onTitleChanged: (t) {},
