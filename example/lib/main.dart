@@ -77,8 +77,6 @@ class _MyAppState extends State<MyApp> {
       },
       onLoadEnd: (controller, url) async {
         print("onLoadEnd => $url");
-        var ret = await _controller.evaluateJavascript('window.returnHundred();');
-        print("[ReturnHundred] $ret");
       },
     ));
 
