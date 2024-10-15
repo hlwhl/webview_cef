@@ -4,6 +4,7 @@ import 'dart:io';
 import 'package:flutter/gestures.dart';
 import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
+import 'package:webview_cef/src/webview_inject_user_script.dart';
 
 import 'webview_manager.dart';
 import 'webview_events_listener.dart';
