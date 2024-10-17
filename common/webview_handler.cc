@@ -71,11 +71,12 @@ bool WebviewHandler::OnProcessMessageReceived(
     }
     else if(message_name == kEvaluateCallbackMessage){
         CefString callbackId = message->GetArgumentList()->GetString(0);
-        CefString param = message->GetArgumentList()->GetString(1);
-        if(!callbackId.empty() && !param.empty()){
+        CefRefPtr<CefValue> param = message->GetArgumentList()->GetValue(1);
+
+        if(!callbackId.empty()){
             auto it = js_callbacks_.find(callbackId.ToString());
             if(it != js_callbacks_.end()){
-                it->second(param.ToString());
+                it->second(param);
                 js_callbacks_.erase(it);
             }
         }
@@ -574,7 +575,7 @@ static std::string GetCallbackId()
     return std::to_string(timestamp);
 } 
 
-void WebviewHandler::executeJavaScript(int browserId, const std::string code, std::function<void(std::string)> callback)
+void WebviewHandler::executeJavaScript(int browserId, const std::string code, std::function<void(CefRefPtr<CefValue>)> callback)
 {
     if(!code.empty())
     {
@@ -586,6 +587,7 @@ void WebviewHandler::executeJavaScript(int browserId, const std::string code, st
                 std::string finalCode = code;
                 if(callback != nullptr){
                     std::string callbackId = GetCallbackId();
+
                     finalCode = "external.EvaluateCallback('";
                     finalCode += callbackId;
                     finalCode += "',(function(){return ";
