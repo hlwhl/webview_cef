@@ -74,6 +74,15 @@ function(prepare_prebuilt_files filepath)
         download_file(${cef_prebuilt_path} ${CMAKE_CURRENT_SOURCE_DIR}/prebuilt.zip)
         file(MAKE_DIRECTORY ${filepath})
         extract_file(${CMAKE_CURRENT_SOURCE_DIR}/prebuilt.zip ${filepath})
+
+        ## Needed for making it run on arm64 Linux (makes it check for arm64 or aarch64 instead of just arm64)
+        if(CMAKE_SYSTEM_NAME STREQUAL "Linux")
+            execute_process(
+                COMMAND sed -i "s/\"\\\${CMAKE_HOST_SYSTEM_PROCESSOR}\" STREQUAL \"arm64\"/(\"\\\${CMAKE_HOST_SYSTEM_PROCESSOR}\" STREQUAL \"arm64\" OR \"\\\${CMAKE_HOST_SYSTEM_PROCESSOR}\" STREQUAL \"aarch64\")/" ${filepath}/cmake/cef_variables.cmake
+                WORKING_DIRECTORY ${CMAKE_CURRENT_SOURCE_DIR}
+            )
+        endif()
+
         file(WRITE "${filepath}/version.txt" "${cef_prebuilt_version}")
         file(REMOVE_RECURSE ${CMAKE_CURRENT_SOURCE_DIR}/prebuilt.zip)
     endif()
