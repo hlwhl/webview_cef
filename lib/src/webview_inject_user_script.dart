@@ -14,11 +14,11 @@ class InjectUserScripts {
     userScripts.add(script);
   }
 
-  List<UserScript>? retrieveLoadStartInjectScripts() {
+  List<UserScript> retrieveLoadStartInjectScripts() {
     return userScripts.where((e) => e.injectTime == ScriptInjectTime.LOAD_START).toList();
   }
 
-  List<UserScript>? retrieveLoadEndInjectScripts() {
+  List<UserScript> retrieveLoadEndInjectScripts() {
     return userScripts.where((e) => e.injectTime == ScriptInjectTime.LOAD_END).toList();
   }
 }
