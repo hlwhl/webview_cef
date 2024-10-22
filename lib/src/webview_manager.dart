@@ -134,7 +134,7 @@ class WebviewManager extends ValueNotifier<bool> {
         int browserId = call.arguments["browserId"] as int;
         String urlId = call.arguments["urlId"] as String;
 
-        await _injectUserScriptIfNeeds(browserId, _injectUserScripts?.retrieveLoadStartInjectScripts());
+        await _injectUserScriptIfNeeds(browserId, _injectUserScripts?.retrieveLoadStartInjectScripts() ?? []);
 
         WebViewController controller =
         _webViews[browserId] as WebViewController;
@@ -144,7 +144,7 @@ class WebviewManager extends ValueNotifier<bool> {
         int browserId = call.arguments["browserId"] as int;
         String urlId = call.arguments["urlId"] as String;
 
-        await _injectUserScriptIfNeeds(browserId, _injectUserScripts?.retrieveLoadEndInjectScripts());
+        await _injectUserScriptIfNeeds(browserId, _injectUserScripts?.retrieveLoadEndInjectScripts() ?? []);
 
         WebViewController controller =
         _webViews[browserId] as WebViewController;
@@ -154,8 +154,8 @@ class WebviewManager extends ValueNotifier<bool> {
     }
   }
 
-  Future<void> _injectUserScriptIfNeeds(int browserId, List<UserScript>? scripts) async {
-    if (scripts == null) return;
+  Future<void> _injectUserScriptIfNeeds(int browserId, List<UserScript> scripts) async {
+    if (scripts.isEmpty) return;
 
     await _webViews[browserId]?.ready;
 
