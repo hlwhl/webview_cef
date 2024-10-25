@@ -427,7 +427,6 @@ namespace webview_cef {
 
                 if (values == nullptr) {
                     result(1, nullptr);
-                    webview_value_unref(retValue);
                     return;
                 }
 
@@ -444,7 +443,7 @@ namespace webview_cef {
                     case VTYPE_STRING:
                         retValue = webview_value_new_string(values->GetString().ToString().c_str());
                         break;
-                    case VTYPE_LIST:
+                    case VTYPE_LIST: {
                         retValue = webview_value_new_list();
                         CefRefPtr<CefListValue> list = values->GetList();
                         
@@ -467,6 +466,11 @@ namespace webview_cef {
                             }
                         }
                         break;
+                    }
+                    default:
+                        // Return null as fallback
+                        result(1, nullptr);
+                        return;
                 }
 
 				result(1, retValue);
