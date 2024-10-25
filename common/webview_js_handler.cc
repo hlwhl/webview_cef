@@ -214,6 +214,10 @@ bool CefJSBridge::EvaluateCallback(const CefString& callbackId, const JSValue& r
                     args->SetList(1, arrayList);
                     break;
                 }
+                default:
+                    // For avoiding values like
+                    // error: enumeration value 'UNKNOWN' not handled in switch [-Werror,-Wswitch]
+                    break;
             }
 
             // 메시지 전송
