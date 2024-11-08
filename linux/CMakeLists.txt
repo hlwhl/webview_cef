@@ -11,6 +11,14 @@ set(PROJECT_NAME "webview_cef")
 project(${PROJECT_NAME} LANGUAGES CXX C)
 set(CMAKE_CXX_STANDARD 17)
 
+# Auto setup Linux target
+execute_process(
+  COMMAND bash "${CMAKE_CURRENT_SOURCE_DIR}/target_modifier/modify_target.sh"
+  OUTPUT_VARIABLE patch_output
+)
+message(WARNING "${patch_output}")
+
+# Setup CEF
 include(${CMAKE_CURRENT_SOURCE_DIR}/../third/download.cmake)
 prepare_prebuilt_files(${CMAKE_CURRENT_SOURCE_DIR}/../third/cef)
 
