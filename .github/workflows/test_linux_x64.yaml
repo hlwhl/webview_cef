@@ -1,4 +1,4 @@
-name: Test if the example app still builds on Linux x86
+name: Test if the example app still builds on Linux x64
 on:
   push:
     branches: ["main"]
@@ -9,7 +9,7 @@ on:
       - "linux/**"
       - "third/**"
       - "pubspec.yaml"
-      - ".github/workflows/test_linux_x86.yaml"
+      - ".github/workflows/test_linux_x64.yaml"
   pull_request:
     paths:
       - "common/**"
@@ -18,7 +18,7 @@ on:
       - "linux/**"
       - "third/**"
       - "pubspec.yaml"
-      - ".github/workflows/test_linux_x86.yaml"
+      - ".github/workflows/test_linux_x64.yaml"
 
 jobs:
   main:
