@@ -86,8 +86,7 @@ Then follow the below steps inside the `macos/` folder <b>of the cloned reposito
 
 ### Linux <img src="https://1000logos.net/wp-content/uploads/2017/03/LINUX-LOGO.png" width="16">
 
-This part of the content needs to be summarized. You can refer to the methods in the example first(Very similar to on the Windows). In addition, you need to modify the method of copying resources in the linux/CMakeLists.txt under your own project to be consistent with that in windows. Otherwise, the resource files cannot be copied properly under linux.
-![image](https://github.com/hlwhl/webview_cef/assets/49640121/dd03a510-2bc1-4c73-bf9c-ba4b5abee135)
+For Linux, just adding `webview_cef` to your `pubspec.yaml` (e.g. by running `flutter pub add webview_cef`) does the job.
 
 ## TODOs
 

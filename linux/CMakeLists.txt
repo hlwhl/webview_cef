@@ -11,6 +11,14 @@ set(PROJECT_NAME "webview_cef")
 project(${PROJECT_NAME} LANGUAGES CXX C)
 set(CMAKE_CXX_STANDARD 17)
 
+# Auto setup Linux target
+execute_process(
+  COMMAND bash "${CMAKE_CURRENT_SOURCE_DIR}/target_modifier/modify_target.sh"
+  OUTPUT_VARIABLE patch_output
+)
+message(WARNING "${patch_output}")
+
+# Setup CEF
 include(${CMAKE_CURRENT_SOURCE_DIR}/../third/download.cmake)
 prepare_prebuilt_files(${CMAKE_CURRENT_SOURCE_DIR}/../third/cef)
 
@@ -96,14 +104,34 @@ add_definitions("-DGTK_DISABLE_DEPRECATED")
 # Set SUID permissions on the chrome-sandbox target.
 # SET_LINUX_SUID_PERMISSIONS("${CEF_TARGET}" "${CEF_TARGET_OUT_DIR}/chrome-sandbox")
 
+
+# Init INSTALL_BUNDLE_APPLICATION_DIR_WEBVIEW_CEV that contains the build dir of the application
+set(INSTALL_BUNDLE_APPLICATION_DIR_WEBVIEW_CEV "${PROJECT_BINARY_DIR}")
+get_filename_component(INSTALL_BUNDLE_APPLICATION_DIR_WEBVIEW_CEV "${INSTALL_BUNDLE_APPLICATION_DIR_WEBVIEW_CEV}" DIRECTORY)
+get_filename_component(INSTALL_BUNDLE_APPLICATION_DIR_WEBVIEW_CEV "${INSTALL_BUNDLE_APPLICATION_DIR_WEBVIEW_CEV}" DIRECTORY)
+set(INSTALL_BUNDLE_APPLICATION_DIR_WEBVIEW_CEV "${INSTALL_BUNDLE_APPLICATION_DIR_WEBVIEW_CEV}/bundle/lib")
+
+
 #set CEF binary and resource files which need to copy to the target output directory
 set(cef_library_list "")
 foreach(FILE ${CEF_BINARY_FILES})
   list(APPEND cef_library_list ${CEF_BINARY_DIR}/${FILE})
 endforeach()
-foreach(FILE ${CEF_RESOURCE_FILES})
 
-  list(APPEND cef_library_list ${CEF_RESOURCE_DIR}/${FILE})
+foreach(FILE ${CEF_RESOURCE_FILES})
+  # If ${FILE} is a directory (e.g. locales), install them directly.
+  # Avoids error with the Linux target CMakeList
+  if(IS_DIRECTORY ${CEF_RESOURCE_DIR}/${FILE})
+    file(GLOB LOCAL_FILES "${CEF_RESOURCE_DIR}/${FILE}/*")
+    foreach(LOCAL_FILE ${LOCAL_FILES})
+      install(FILES "${LOCAL_FILE}"
+              DESTINATION "${INSTALL_BUNDLE_APPLICATION_DIR_WEBVIEW_CEV}/${FILE}"
+              COMPONENT Runtime)
+    endforeach()
+  else()
+    # If ${FILE} is not a directory, treat it normally
+    list(APPEND cef_library_list ${CEF_RESOURCE_DIR}/${FILE})
+  endif()
 endforeach(FILE)
 #######################################cef end#######################################
 
