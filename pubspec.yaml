@@ -1,6 +1,6 @@
 name: webview_cef
 description: Flutter Desktop Webview backed by CEF (Chromium Embedded Framework).
-version: 0.2.1
+version: 0.2.2
 homepage: https://github.com/hlwhl/webview_cef
 repository: https://github.com/hlwhl/webview_cef
 
