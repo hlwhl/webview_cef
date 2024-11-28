@@ -17,9 +17,10 @@ class WebviewManager extends ValueNotifier<bool> {
   final MethodChannel pluginChannel = const MethodChannel("webview_cef");
 
   final Map<int, WebViewController> _webViews = <int, WebViewController>{};
+  final Map<int, InjectUserScripts?> _injectUserScripts = <int, InjectUserScripts>{};
 
   final Map<int, WebViewController> _tempWebViews = <int, WebViewController>{};
-  InjectUserScripts? _injectUserScripts = InjectUserScripts();
+  final Map<int, InjectUserScripts?> _tempInjectUserScripts = <int, InjectUserScripts>{};
 
   int nextIndex = 1;
 
@@ -33,7 +34,7 @@ class WebviewManager extends ValueNotifier<bool> {
     final controller =
         WebViewController(pluginChannel, browserIndex, loading: loading);
     _tempWebViews[browserIndex] = controller;
-    _injectUserScripts = injectUserScripts;
+    _tempInjectUserScripts[browserIndex] = injectUserScripts;
 
     return controller;
   }
@@ -74,7 +75,10 @@ class WebviewManager extends ValueNotifier<bool> {
 
   void onBrowserCreated(int browserIndex, int browserId) {
     _webViews[browserId] = _tempWebViews[browserIndex]!;
+    _injectUserScripts[browserId] = _tempInjectUserScripts[browserIndex];
+
     _tempWebViews.remove(browserIndex);
+    _tempInjectUserScripts.remove(browserIndex);
   }
 
   Future<void> methodCallhandler(MethodCall call) async {
@@ -134,7 +138,7 @@ class WebviewManager extends ValueNotifier<bool> {
         int browserId = call.arguments["browserId"] as int;
         String urlId = call.arguments["urlId"] as String;
 
-        await _injectUserScriptIfNeeds(browserId, _injectUserScripts?.retrieveLoadStartInjectScripts() ?? []);
+        await _injectUserScriptIfNeeds(browserId, _injectUserScripts[browserId]?.retrieveLoadStartInjectScripts() ?? []);
 
         WebViewController controller =
         _webViews[browserId] as WebViewController;
@@ -144,7 +148,7 @@ class WebviewManager extends ValueNotifier<bool> {
         int browserId = call.arguments["browserId"] as int;
         String urlId = call.arguments["urlId"] as String;
 
-        await _injectUserScriptIfNeeds(browserId, _injectUserScripts?.retrieveLoadEndInjectScripts() ?? []);
+        await _injectUserScriptIfNeeds(browserId, _injectUserScripts[browserId]?.retrieveLoadEndInjectScripts() ?? []);
 
         WebViewController controller =
         _webViews[browserId] as WebViewController;
