@@ -4,6 +4,7 @@ import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
 import 'package:flutter/widgets.dart';
 import 'package:webview_cef/src/webview_inject_user_script.dart';
+import 'package:webview_cef/webview_cef_platform_interface.dart';
 
 import 'webview.dart';
 
@@ -14,7 +15,7 @@ class WebviewManager extends ValueNotifier<bool> {
 
   late Completer<void> _creatingCompleter;
 
-  final MethodChannel pluginChannel = const MethodChannel("webview_cef");
+  final WebviewCefPlatform _platform = WebviewCefPlatform.instance;
 
   final Map<int, WebViewController> _webViews = <int, WebViewController>{};
   final Map<int, InjectUserScripts?> _injectUserScripts = <int, InjectUserScripts>{};
@@ -32,7 +33,7 @@ class WebviewManager extends ValueNotifier<bool> {
   }) {
     int browserIndex = nextIndex++;
     final controller =
-        WebViewController(pluginChannel, browserIndex, loading: loading);
+        WebViewController(_platform, browserIndex, loading: loading);
     _tempWebViews[browserIndex] = controller;
     _tempInjectUserScripts[browserIndex] = injectUserScripts;
 
@@ -50,12 +51,8 @@ class WebviewManager extends ValueNotifier<bool> {
   Future<void> initialize({String? userAgent}) async {
     _creatingCompleter = Completer<void>();
     try {
-      if (userAgent != null && userAgent.isNotEmpty) {
-        await pluginChannel.invokeMethod('init', userAgent);
-      } else {
-        await pluginChannel.invokeMethod('init');
-      }
-      pluginChannel.setMethodCallHandler(methodCallhandler);
+      await _platform.initialize(userAgent: userAgent);
+      _platform.setMethodCallHandler(methodCallhandler);
       // Wait for the platform to complete initialization.
       await Future.delayed(const Duration(milliseconds: 300));
       _creatingCompleter.complete();
@@ -69,7 +66,7 @@ class WebviewManager extends ValueNotifier<bool> {
   @override
   Future<void> dispose() async {
     super.dispose();
-    pluginChannel.setMethodCallHandler(null);
+    _platform.setMethodCallHandler(null);
     _webViews.clear();
   }
 
@@ -170,27 +167,27 @@ class WebviewManager extends ValueNotifier<bool> {
 
   Future<void> setCookie(String domain, String key, String val) async {
     assert(value);
-    return pluginChannel.invokeMethod('setCookie', [domain, key, val]);
+    return _platform.setCookie(domain, key, val);
   }
 
   Future<void> deleteCookie(String domain, String key) async {
     assert(value);
-    return pluginChannel.invokeMethod('deleteCookie', [domain, key]);
+    return _platform.deleteCookie(domain, key);
   }
 
   Future<dynamic> visitAllCookies() async {
     assert(value);
-    return pluginChannel.invokeMethod('visitAllCookies');
+    return _platform.visitAllCookies();
   }
 
   Future<dynamic> visitUrlCookies(String domain, bool isHttpOnly) async {
     assert(value);
-    return pluginChannel.invokeMethod('visitUrlCookies', [domain, isHttpOnly]);
+    return _platform.visitUrlCookies(domain, isHttpOnly);
   }
 
   Future<void> quit() async {
     //only call this method when you want to quit the app
     assert(value);
-    return pluginChannel.invokeMethod('quit');
+    return _platform.quit();
   }
 }

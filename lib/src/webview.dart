@@ -5,6 +5,7 @@ import 'package:flutter/gestures.dart';
 import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
 import 'package:webview_cef/src/webview_inject_user_script.dart';
+import 'package:webview_cef/webview_cef_platform_interface.dart';
 
 import 'webview_manager.dart';
 import 'webview_events_listener.dart';
@@ -13,11 +14,11 @@ import 'webview_textinput.dart';
 import 'webview_tooltip.dart';
 
 class WebViewController extends ValueNotifier<bool> {
-  WebViewController(this._pluginChannel, this._index, {Widget? loading})
+  WebViewController(this._platform, this._index, {Widget? loading})
       : super(false) {
     _loadingWidget = loading;
   }
-  final MethodChannel _pluginChannel;
+  final WebviewCefPlatform _platform;
   Widget? _loadingWidget;
 
   late WebView _webviewWidget;
@@ -62,9 +63,9 @@ class WebViewController extends ValueNotifier<bool> {
     _creatingCompleter = Completer<void>();
     try {
       await WebviewManager().ready;
-      List args = await _pluginChannel.invokeMethod('create', url);
-      _browserId = args[0] as int;
-      _textureId = args[1] as int;
+      List<int> args = await _platform.createWebview(url);
+      _browserId = args[0];
+      _textureId = args[1];
       WebviewManager().onBrowserCreated(_index, _browserId);
       await Future.delayed(const Duration(milliseconds: 50));
       _webviewWidget = WebView(this);
@@ -86,7 +87,7 @@ class WebViewController extends ValueNotifier<bool> {
     if (!_isDisposed) {
       _isDisposed = true;
       WebviewManager().removeWebView(_browserId);
-      await _pluginChannel.invokeMethod('close', _browserId);
+      await _platform.closeWebview(_browserId);
     }
     super.dispose();
   }
@@ -97,7 +98,7 @@ class WebViewController extends ValueNotifier<bool> {
       return;
     }
     assert(value);
-    return _pluginChannel.invokeMethod('loadUrl', [_browserId, url]);
+    return _platform.loadUrl(_browserId, url);
   }
 
   /// Reloads the current document.
@@ -106,7 +107,7 @@ class WebViewController extends ValueNotifier<bool> {
       return;
     }
     assert(value);
-    return _pluginChannel.invokeMethod('reload', _browserId);
+    return _platform.reload(_browserId);
   }
 
   Future<void> goForward() async {
@@ -114,7 +115,7 @@ class WebViewController extends ValueNotifier<bool> {
       return;
     }
     assert(value);
-    return _pluginChannel.invokeMethod('goForward', _browserId);
+    return _platform.goForward(_browserId);
   }
 
   Future<void> goBack() async {
@@ -122,7 +123,7 @@ class WebViewController extends ValueNotifier<bool> {
       return;
     }
     assert(value);
-    return _pluginChannel.invokeMethod('goBack', _browserId);
+    return _platform.goBack(_browserId);
   }
 
   Future<void> openDevTools() async {
@@ -130,7 +131,7 @@ class WebViewController extends ValueNotifier<bool> {
       return;
     }
     assert(value);
-    return _pluginChannel.invokeMethod('openDevTools', _browserId);
+    return _platform.openDevTools(_browserId);
   }
 
   Future<void> imeSetComposition(String composingText) async {
@@ -138,8 +139,7 @@ class WebViewController extends ValueNotifier<bool> {
       return;
     }
     assert(value);
-    return _pluginChannel
-        .invokeMethod('imeSetComposition', [_browserId, composingText]);
+    return _platform.imeSetComposition(_browserId, composingText);
   }
 
   Future<void> imeCommitText(String composingText) async {
@@ -147,8 +147,7 @@ class WebViewController extends ValueNotifier<bool> {
       return;
     }
     assert(value);
-    return _pluginChannel
-        .invokeMethod('imeCommitText', [_browserId, composingText]);
+    return _platform.imeCommitText(_browserId, composingText);
   }
 
   Future<void> setClientFocus(bool focus) async {
@@ -156,7 +155,7 @@ class WebViewController extends ValueNotifier<bool> {
       return;
     }
     assert(value);
-    return _pluginChannel.invokeMethod('setClientFocus', [_browserId, focus]);
+    return _platform.setClientFocus(_browserId, focus);
   }
 
   Future<void> setJavaScriptChannels(Set<JavascriptChannel> channels) async {
@@ -170,8 +169,7 @@ class WebViewController extends ValueNotifier<bool> {
       _javascriptChannels[channel.name] = channel;
     }
 
-    return _pluginChannel.invokeMethod('setJavaScriptChannels',
-        [_browserId, _extractJavascriptChannelNames(channels).toList()]);
+    return _platform.setJavaScriptChannels(_browserId, _extractJavascriptChannelNames(channels).toList());
   }
 
   Future<void> sendJavaScriptChannelCallBack(
@@ -180,8 +178,7 @@ class WebViewController extends ValueNotifier<bool> {
       return;
     }
     assert(value);
-    return _pluginChannel.invokeMethod('sendJavaScriptChannelCallBack',
-        [error, result, callbackId, _browserId, frameId]);
+    return _platform.sendJavaScriptChannelCallBack(error, result, callbackId, _browserId, frameId);
   }
 
   Future<void> executeJavaScript(String code) async {
@@ -189,7 +186,7 @@ class WebViewController extends ValueNotifier<bool> {
       return;
     }
     assert(value);
-    return _pluginChannel.invokeMethod('executeJavaScript', [_browserId, code]);
+    return _platform.executeJavaScript(_browserId, code);
   }
 
   Future<dynamic> evaluateJavascript(String code) async {
@@ -197,8 +194,7 @@ class WebViewController extends ValueNotifier<bool> {
       return;
     }
     assert(value);
-    return _pluginChannel
-        .invokeMethod('evaluateJavascript', [_browserId, code]);
+    return _platform.evaluateJavascript(_browserId, code);
   }
 
   /// Moves the virtual cursor to [position].
@@ -207,8 +203,7 @@ class WebViewController extends ValueNotifier<bool> {
       return;
     }
     assert(value);
-    return _pluginChannel.invokeMethod(
-        'cursorMove', [_browserId, position.dx.round(), position.dy.round()]);
+    return _platform.cursorMove(_browserId, position.dx.round(), position.dy.round());
   }
 
   Future<void> _cursorDragging(Offset position) async {
@@ -216,8 +211,7 @@ class WebViewController extends ValueNotifier<bool> {
       return;
     }
     assert(value);
-    return _pluginChannel.invokeMethod('cursorDragging',
-        [_browserId, position.dx.round(), position.dy.round()]);
+    return _platform.cursorDragging(_browserId, position.dx.round(), position.dy.round());
   }
 
   Future<void> _cursorClickDown(Offset position) async {
@@ -225,8 +219,7 @@ class WebViewController extends ValueNotifier<bool> {
       return;
     }
     assert(value);
-    return _pluginChannel.invokeMethod('cursorClickDown',
-        [_browserId, position.dx.round(), position.dy.round()]);
+    return _platform.cursorClickDown(_browserId, position.dx.round(), position.dy.round());
   }
 
   Future<void> _cursorClickUp(Offset position) async {
@@ -234,8 +227,7 @@ class WebViewController extends ValueNotifier<bool> {
       return;
     }
     assert(value);
-    return _pluginChannel.invokeMethod('cursorClickUp',
-        [_browserId, position.dx.round(), position.dy.round()]);
+    return _platform.cursorClickUp(_browserId, position.dx.round(), position.dy.round());
   }
 
   /// Sets the horizontal and vertical scroll delta.
@@ -244,8 +236,7 @@ class WebViewController extends ValueNotifier<bool> {
       return;
     }
     assert(value);
-    return _pluginChannel.invokeMethod('setScrollDelta',
-        [_browserId, position.dx.round(), position.dy.round(), dx, dy]);
+    return _platform.setScrollDelta(_browserId, position.dx.round(), position.dy.round(), dx, dy);
   }
 
   /// Sets the surface size to the provided [size].
@@ -254,8 +245,7 @@ class WebViewController extends ValueNotifier<bool> {
       return;
     }
     assert(value);
-    return _pluginChannel
-        .invokeMethod('setSize', [_browserId, dpi, size.width, size.height]);
+    return _platform.setSize(_browserId, dpi, size.width, size.height);
   }
 
   Set<String> _extractJavascriptChannelNames(Set<JavascriptChannel> channels) {
