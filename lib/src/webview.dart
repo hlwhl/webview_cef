@@ -11,6 +11,13 @@ import 'webview_javascript.dart';
 import 'webview_textinput.dart';
 import 'webview_tooltip.dart';
 
+class _ScrollEvent {
+  final Offset pos;
+  final int dx;
+  final int dy;
+  const _ScrollEvent(this.pos, this.dx, this.dy);
+}
+
 class WebViewController extends ValueNotifier<bool> {
   WebViewController(this._pluginChannel, this._index, {Widget? loading})
       : super(false) {
@@ -68,7 +75,8 @@ class WebViewController extends ValueNotifier<bool> {
     _creatingCompleter = Completer<void>();
     try {
       await WebviewManager().ready;
-      List args = await _pluginChannel.invokeMethod('create', url);
+      final List<dynamic> args =
+          await _pluginChannel.invokeMethod('create', url);
       _browserId = args[0] as int;
       _textureId = args[1] as int;
       WebviewManager().onBrowserCreated(_index, _browserId);
@@ -339,6 +347,14 @@ class WebViewState extends State<WebView> with WebeViewTextInput {
   bool isPrimaryFocus = false;
   WebviewTooltip? _tooltip;
   MouseCursor _mouseType = SystemMouseCursors.basic;
+  // Cache last reported surface parameters to avoid redundant platform calls.
+  Size? _lastReportedSize;
+  double? _lastReportedDpi;
+  // Coalescing state for high-frequency input events.
+  Offset? _lastHoverPos;
+  Offset? _lastDragPos;
+  _ScrollEvent? _lastScroll;
+  bool _inputFlushScheduled = false;
 
   WebViewController get _controller => widget.controller;
 
@@ -462,7 +478,8 @@ class WebViewState extends State<WebView> with WebeViewTextInput {
       child: SizeChangedLayoutNotifier(
         child: Listener(
           onPointerHover: (ev) {
-            _controller._cursorMove(ev.localPosition);
+            _lastHoverPos = ev.localPosition;
+            _scheduleInputFlush();
             _tooltip?.cursorOffset = ev.position;
           },
           onPointerDown: (ev) {
@@ -481,23 +498,26 @@ class WebViewState extends State<WebView> with WebeViewTextInput {
             _controller._cursorClickUp(ev.localPosition);
           },
           onPointerMove: (ev) {
-            _controller._cursorDragging(ev.localPosition);
+            _lastDragPos = ev.localPosition;
+            _scheduleInputFlush();
           },
           onPointerSignal: (signal) {
             if (signal is PointerScrollEvent) {
-              _controller._setScrollDelta(
+              _lastScroll = _ScrollEvent(
                 signal.localPosition,
                 signal.scrollDelta.dx.round(),
                 signal.scrollDelta.dy.round(),
               );
+              _scheduleInputFlush();
             }
           },
           onPointerPanZoomUpdate: (event) {
-            _controller._setScrollDelta(
+            _lastScroll = _ScrollEvent(
               event.localPosition,
               event.panDelta.dx.round(),
               event.panDelta.dy.round(),
             );
+            _scheduleInputFlush();
           },
           child: MouseRegion(
             cursor: _mouseType,
@@ -513,9 +533,39 @@ class WebViewState extends State<WebView> with WebeViewTextInput {
     final box = _key.currentContext?.findRenderObject() as RenderBox?;
     if (box != null) {
       await _controller.ready;
-      unawaited(
-        _controller._setSize(dpi, Size(box.size.width, box.size.height)),
-      );
+      final Size sz = Size(box.size.width, box.size.height);
+      // Only notify platform when size or dpi actually changed.
+      if (_lastReportedSize != sz || _lastReportedDpi != dpi) {
+        _lastReportedSize = sz;
+        _lastReportedDpi = dpi;
+        unawaited(_controller._setSize(dpi, sz));
+      }
     }
+  }
+
+  void _scheduleInputFlush() {
+    if (_inputFlushScheduled) return;
+    _inputFlushScheduled = true;
+    WidgetsBinding.instance.addPostFrameCallback((_) {
+      _inputFlushScheduled = false;
+      // Drain latest hover
+      final hover = _lastHoverPos;
+      if (hover != null) {
+        _lastHoverPos = null;
+        _controller._cursorMove(hover);
+      }
+      // Drain latest drag
+      final drag = _lastDragPos;
+      if (drag != null) {
+        _lastDragPos = null;
+        _controller._cursorDragging(drag);
+      }
+      // Drain latest scroll
+      final scroll = _lastScroll;
+      if (scroll != null) {
+        _lastScroll = null;
+        _controller._setScrollDelta(scroll.pos, scroll.dx, scroll.dy);
+      }
+    });
   }
 }
