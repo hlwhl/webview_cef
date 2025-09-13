@@ -91,6 +91,19 @@ Then follow the below steps inside the `macos/` folder <b>of the cloned reposito
 
 For Linux, just adding `webview_cef` to your `pubspec.yaml` (e.g. by running `flutter pub add webview_cef`) does the job.
 
+#### Optional: choose CEF flavor (Linux only)
+
+You can control which CEF package is downloaded by passing a CMake variable when building your app:
+
+- `DOWNLOAD_CEF_FLAVOR=standard` (default): downloads the full CEF package.
+- `DOWNLOAD_CEF_FLAVOR=minimal`: downloads a smaller, minimal package to reduce size.
+
+Example (Flutter app): add this line near the top of your app's `linux/CMakeLists.txt` (before plugin registration):
+
+```
+set(DOWNLOAD_CEF_FLAVOR minimal CACHE STRING "")
+```
+
 ## TODOs
 
 > Pull requests are welcome.
@@ -124,5 +137,26 @@ This demo is a simple webview app that can be used to test the `webview_cef` plu
 | <img src="https://user-images.githubusercontent.com/7610615/195815041-b9ec4da8-560f-4257-9303-f03a016da5c6.png" width="400" /> | <img width="400" alt="image" src="https://user-images.githubusercontent.com/7610615/195818746-e5adf0ef-dc8c-48ad-9b11-e552ca65b08a.png"> | <img src="https://github.com/hlwhl/webview_cef/assets/49640121/3a81f576-b555-4e16-8609-b3c7d6eec869" width="400" /> |
 
 ## Credits
+## Contributing
+
+Pull requests are welcome. There is no formal contribution guide yet; please use a feature/issue-based branch name and a clear PR description. Suggested branch naming:
+
+- `feat/cache-path-and-cef-flavor`
+- `fix/<short-description>`
+- `chore/update-deps`
+
+Before opening a PR:
+
+- Run on at least one target OS (Linux/Windows/macOS if your change affects it).
+- Update README or example usage when adding new behavior.
+- Keep changes focused and add brief comments where behavior differs by platform.
+
+### New options added
+
+- Initialize with cache path and persistence flags:
+  - Dart: `await WebviewManager().initialize(userAgent: "...", cachePath: "/path/to/cache", persistSessionCookies: true, persistUserPreferences: true);`
+  - Native: Wired to `CefSettings.cache_path`, `persist_session_cookies`, and `persist_user_preferences`.
+- Linux only: `DOWNLOAD_CEF_FLAVOR` CMake option to fetch `minimal` or `standard` CEF builds.
+
 
 This project is inspired from [**`flutter_webview_windows`**](https://github.com/jnschulze/flutter-webview-windows).

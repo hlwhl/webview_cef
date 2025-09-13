@@ -1,5 +1,6 @@
 import 'dart:io';
 
+import 'package:flutter/foundation.dart';
 import 'package:flutter/services.dart';
 
 mixin WebeViewTextInput implements DeltaTextInputClient {
@@ -11,7 +12,7 @@ mixin WebeViewTextInput implements DeltaTextInputClient {
 
   TextInputConnection? _textInputConnection;
 
-  attachTextInputClient() {
+  void attachTextInputClient() {
     _textInputConnection?.close();
     _textInputConnection = TextInput.attach(
         this, const TextInputConfiguration(enableDeltaModel: true));
@@ -21,11 +22,11 @@ mixin WebeViewTextInput implements DeltaTextInputClient {
     // _textInputConnection
   }
 
-  detachTextInputClient() {
+  void detachTextInputClient() {
     _textInputConnection?.close();
   }
 
-  updateIMEComposionPosition(double x, double y, Offset offset) {
+  void updateIMEComposionPosition(double x, double y, Offset offset) {
     /// 1.It always displays at the last position, which should be a bug in the Flutter engine.
     /// 2.If switch windows and switch back, this function can run well once.I think there must have a flush function called when switching windows
     /// 3.Windows can run well, but Linux can't.
@@ -36,7 +37,7 @@ mixin WebeViewTextInput implements DeltaTextInputClient {
   @override
   didChangeInputControl(
       TextInputControl? oldControl, TextInputControl? newControl) {
-    print("changed");
+    debugPrint("changed");
   }
 
   @override

@@ -1,3 +1,4 @@
+// ignore: constant_identifier_names
 enum ScriptInjectTime { LOAD_START, LOAD_END }
 
 class UserScript {
@@ -15,10 +16,14 @@ class InjectUserScripts {
   }
 
   List<UserScript> retrieveLoadStartInjectScripts() {
-    return userScripts.where((e) => e.injectTime == ScriptInjectTime.LOAD_START).toList();
+    return userScripts
+        .where((e) => e.injectTime == ScriptInjectTime.LOAD_START)
+        .toList();
   }
 
   List<UserScript> retrieveLoadEndInjectScripts() {
-    return userScripts.where((e) => e.injectTime == ScriptInjectTime.LOAD_END).toList();
+    return userScripts
+        .where((e) => e.injectTime == ScriptInjectTime.LOAD_END)
+        .toList();
   }
 }

@@ -20,6 +20,11 @@ message(WARNING "${patch_output}")
 
 # Setup CEF
 include(${CMAKE_CURRENT_SOURCE_DIR}/../third/download.cmake)
+# Allow overriding from parent with -DDOWNLOAD_CEF_FLAVOR=minimal|standard
+if(NOT DEFINED DOWNLOAD_CEF_FLAVOR)
+  set(DOWNLOAD_CEF_FLAVOR "standard")
+endif()
+message(STATUS "CEF download flavor: ${DOWNLOAD_CEF_FLAVOR}")
 prepare_prebuilt_files(${CMAKE_CURRENT_SOURCE_DIR}/../third/cef)
 
 set(CEF_ROOT "${CMAKE_CURRENT_SOURCE_DIR}/../third/cef")
