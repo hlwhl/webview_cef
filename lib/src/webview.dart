@@ -181,7 +181,7 @@ class WebViewController extends ValueNotifier<bool> {
     if (_isDisposed) {
       return;
     }
-    assert(value);
+    await ready;
     _assertJavascriptChannelNamesAreUnique(channels);
 
     for (var channel in channels) {
@@ -203,7 +203,7 @@ class WebViewController extends ValueNotifier<bool> {
     if (_isDisposed) {
       return;
     }
-    assert(value);
+    await ready;
     return _pluginChannel.invokeMethod('sendJavaScriptChannelCallBack', [
       error,
       result,
@@ -217,7 +217,7 @@ class WebViewController extends ValueNotifier<bool> {
     if (_isDisposed) {
       return;
     }
-    assert(value);
+    await ready;
     return _pluginChannel.invokeMethod('executeJavaScript', [_browserId, code]);
   }
 
@@ -225,7 +225,7 @@ class WebViewController extends ValueNotifier<bool> {
     if (_isDisposed) {
       return;
     }
-    assert(value);
+    await ready;
     return _pluginChannel.invokeMethod('evaluateJavascript', [
       _browserId,
       code,

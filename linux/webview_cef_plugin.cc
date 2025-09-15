@@ -273,8 +273,10 @@ static void webview_cef_plugin_handle_method_call(
 
 static void webview_cef_plugin_dispose(GObject *object)
 {
+  // Remove this window's plugin instance from the global registry first.
   webviewPlugins.erase(WEBVIEW_CEF_PLUGIN(object)->m_window);
-  WEBVIEW_CEF_PLUGIN(object)->m_plugin = nullptr;
+  // Explicitly release the shared_ptr to break cycles before GObject teardown.
+  WEBVIEW_CEF_PLUGIN(object)->m_plugin.reset();
   // CEF shutdown is handled explicitly via 'quit' or by the atexit handler.
   G_OBJECT_CLASS(webview_cef_plugin_parent_class)->dispose(object);
 }

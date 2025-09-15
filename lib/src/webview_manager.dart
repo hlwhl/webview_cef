@@ -67,11 +67,13 @@ class WebviewManager extends ValueNotifier<bool> {
   ///   when [cachePath] is non-empty.
   /// - [persistUserPreferences]: Persist user preferences (JSON) in [cachePath].
   ///   Effective only when [cachePath] is non-empty.
+  /// - [enableGPU]: Enable GPU acceleration (true/false).
   Future<void> initialize({
     String? userAgent,
     String? cachePath,
     bool persistSessionCookies = false,
     bool persistUserPreferences = false,
+    bool enableGPU = false,
   }) async {
     _creatingCompleter = Completer<void>();
     try {
@@ -79,7 +81,8 @@ class WebviewManager extends ValueNotifier<bool> {
       final hasAnyOption = (userAgent != null && userAgent.isNotEmpty) ||
           (cachePath != null && cachePath.isNotEmpty) ||
           persistSessionCookies ||
-          persistUserPreferences;
+          persistUserPreferences ||
+          enableGPU;
 
       if (hasAnyOption) {
         final Map<String, dynamic> opts = {};
@@ -91,6 +94,7 @@ class WebviewManager extends ValueNotifier<bool> {
         }
         if (persistSessionCookies) opts['persistSessionCookies'] = true;
         if (persistUserPreferences) opts['persistUserPreferences'] = true;
+        if (enableGPU) opts['enableGPU'] = true;
         await pluginChannel.invokeMethod('init', opts);
       } else {
         await pluginChannel.invokeMethod('init');

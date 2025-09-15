@@ -104,6 +104,33 @@ Example (Flutter app): add this line near the top of your app's `linux/CMakeList
 set(DOWNLOAD_CEF_FLAVOR minimal CACHE STRING "")
 ```
 
+#### Native file dialogs (Linux)
+
+On Linux, file dialogs are handled natively via GTK (Open, Save, and Select Folder). Multiple selection and basic file filters are supported. No additional Flutter plugins are required.
+
+#### Debug vs. Release CEF artifacts (Linux)
+
+When building in Debug, if Debug CEF binaries are not present, the build will automatically fall back to the Release `libcef.so` and resources. This helps local development but may limit debug symbol availability. To get full debug info, install the Debug CEF bundle.
+
+### Initialization options
+
+You can configure CEF at startup. Call this once before creating any WebViews:
+
+```dart
+await WebviewManager().initialize(
+  userAgent: "MyApp/1.0",               // optional: appended to default UA
+  cachePath: "/path/to/cache",          // optional: writable directory for cache
+  persistSessionCookies: true,            // effective only if cachePath is set
+  persistUserPreferences: true,           // effective only if cachePath is set
+  enableGPU: false,                       // set true to enable GPU acceleration
+);
+```
+
+Notes:
+- If `cachePath` is empty or omitted, CEF runs in-memory (incognito-like) and nothing is persisted to disk.
+- `persistSessionCookies` and `persistUserPreferences` require a non-empty `cachePath`.
+- On Linux, enabling GPU can reduce software-rendering warnings for WebGL, but driver support varies by system.
+
 ## TODOs
 
 > Pull requests are welcome.
@@ -130,11 +157,11 @@ This demo is a simple webview app that can be used to test the `webview_cef` plu
 
 ### Screenshots
 
-| Windows <img src="https://upload.wikimedia.org/wikipedia/commons/thumb/8/87/Windows_logo_-_2021.svg/1200px-Windows_logo_-_2021.svg.png" width="12"> | macOS <img src="https://seeklogo.com/images/A/apple-logo-52C416BDDD-seeklogo.com.png" width="11"> | Linux <img src="https://1000logos.net/wp-content/uploads/2017/03/LINUX-LOGO.png" width="12"> |
-| --- | --- | --- |
-| <img src="https://user-images.githubusercontent.com/7610615/190431027-6824fac1-015d-4091-b034-dd58f79adbcb.png" width="400" /> | <img src="https://user-images.githubusercontent.com/7610615/190911381-db88cf33-70a2-4abc-9916-e563e54eb3f9.png" width="400" /> | <img src ="https://github.com/hlwhl/webview_cef/assets/49640121/50a4c2f6-1f24-4d10-9913-ad274d76cf3f" width="400" /> |
-| <img src="https://user-images.githubusercontent.com/7610615/190431037-62ba0ea7-f7d1-4fca-8ce1-596a0a508f93.png" width="400" /> | <img src="https://user-images.githubusercontent.com/7610615/190911410-bd01e912-5482-4f9e-9dae-858874e5aaed.png" width="400" /> | <img src="https://github.com/hlwhl/webview_cef/assets/49640121/10a693d5-4ee0-4389-a1e8-1b0355f7c0a6" width="400" /> |
-| <img src="https://user-images.githubusercontent.com/7610615/195815041-b9ec4da8-560f-4257-9303-f03a016da5c6.png" width="400" /> | <img width="400" alt="image" src="https://user-images.githubusercontent.com/7610615/195818746-e5adf0ef-dc8c-48ad-9b11-e552ca65b08a.png"> | <img src="https://github.com/hlwhl/webview_cef/assets/49640121/3a81f576-b555-4e16-8609-b3c7d6eec869" width="400" /> |
+| Windows <img src="https://upload.wikimedia.org/wikipedia/commons/thumb/8/87/Windows_logo_-_2021.svg/1200px-Windows_logo_-_2021.svg.png" width="12"> | macOS <img src="https://seeklogo.com/images/A/apple-logo-52C416BDDD-seeklogo.com.png" width="11">                                        | Linux <img src="https://1000logos.net/wp-content/uploads/2017/03/LINUX-LOGO.png" width="12">                         |
+| --------------------------------------------------------------------------------------------------------------------------------------------------- | ---------------------------------------------------------------------------------------------------------------------------------------- | -------------------------------------------------------------------------------------------------------------------- |
+| <img src="https://user-images.githubusercontent.com/7610615/190431027-6824fac1-015d-4091-b034-dd58f79adbcb.png" width="400" />                      | <img src="https://user-images.githubusercontent.com/7610615/190911381-db88cf33-70a2-4abc-9916-e563e54eb3f9.png" width="400" />           | <img src ="https://github.com/hlwhl/webview_cef/assets/49640121/50a4c2f6-1f24-4d10-9913-ad274d76cf3f" width="400" /> |
+| <img src="https://user-images.githubusercontent.com/7610615/190431037-62ba0ea7-f7d1-4fca-8ce1-596a0a508f93.png" width="400" />                      | <img src="https://user-images.githubusercontent.com/7610615/190911410-bd01e912-5482-4f9e-9dae-858874e5aaed.png" width="400" />           | <img src="https://github.com/hlwhl/webview_cef/assets/49640121/10a693d5-4ee0-4389-a1e8-1b0355f7c0a6" width="400" />  |
+| <img src="https://user-images.githubusercontent.com/7610615/195815041-b9ec4da8-560f-4257-9303-f03a016da5c6.png" width="400" />                      | <img width="400" alt="image" src="https://user-images.githubusercontent.com/7610615/195818746-e5adf0ef-dc8c-48ad-9b11-e552ca65b08a.png"> | <img src="https://github.com/hlwhl/webview_cef/assets/49640121/3a81f576-b555-4e16-8609-b3c7d6eec869" width="400" />  |
 
 ## Credits
 ## Contributing
@@ -157,6 +184,8 @@ Before opening a PR:
   - Dart: `await WebviewManager().initialize(userAgent: "...", cachePath: "/path/to/cache", persistSessionCookies: true, persistUserPreferences: true);`
   - Native: Wired to `CefSettings.cache_path`, `persist_session_cookies`, and `persist_user_preferences`.
 - Linux only: `DOWNLOAD_CEF_FLAVOR` CMake option to fetch `minimal` or `standard` CEF builds.
+- Linux: Native GTK file dialogs (Open/Save/Select Folder) with multiple selection and basic filters.
+- Optional `enableGPU` flag at initialization to toggle hardware acceleration.
 
 
 This project is inspired from [**`flutter_webview_windows`**](https://github.com/jnschulze/flutter-webview-windows).

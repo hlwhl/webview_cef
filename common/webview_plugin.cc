@@ -12,6 +12,7 @@
 #include <cstdlib>
 #include <atomic>
 #include <mutex>
+#include <condition_variable>
 #include <vector>
 #include <algorithm>
 #include <chrono>
@@ -56,6 +57,28 @@ namespace
 			CefPostTask(TID_IO, new LambdaTask(std::move(fn)));
 		}
 	}
+
+	// Execute on CEF UI thread and block until completion (with short timeout).
+	inline void RunOnCefUISync(std::function<void()> fn)
+	{
+		if (CefCurrentlyOn(TID_UI))
+		{
+			fn();
+			return;
+		}
+		std::mutex mtx;
+		std::condition_variable cv;
+		bool done = false;
+		CefPostTask(TID_UI, new LambdaTask([&]()
+										   {
+			fn();
+			std::unique_lock<std::mutex> lk(mtx);
+			done = true;
+			cv.notify_one(); }));
+		std::unique_lock<std::mutex> lk(mtx);
+		cv.wait_for(lk, std::chrono::seconds(2), [&]()
+					{ return done; });
+	}
 }
 
 namespace webview_cef
@@ -64,19 +87,17 @@ namespace webview_cef
 	CefRefPtr<WebviewApp> app;
 	CefString userAgent;
 	CefString cachePath;
+	bool enableGPU = false;
 	bool persistSessionCookies = false;
 	bool persistUserPreferences = false;
 	bool isCefInitialized = false;
-	static bool atexitRegistered = false;
+	// atexit-based shutdown is disabled for Flutter integration.
 	static std::atomic<int> s_openBrowsers{0};
 	static std::atomic<bool> s_shutdownRequested{false};
 	static std::mutex s_handlerMutex;
 	static std::vector<CefRefPtr<WebviewHandler>> s_handlers;
 
-	static void atexit_shutdown()
-	{
-		stopCEF();
-	}
+	// no-op
 
 	WebviewPlugin::WebviewPlugin()
 	{
@@ -363,7 +384,20 @@ namespace webview_cef
 								persistUserPreferences = webview_value_get_bool(pup);
 							}
 						}
+						// enableGPU
+						if (auto egpu = webview_value_get_by_string(values, "enableGPU"))
+						{
+							if (webview_value_get_type(egpu) == Webview_Value_Type_Bool)
+							{
+								enableGPU = webview_value_get_bool(egpu);
+							}
+						}
 					}
+				}
+				// Configure optional runtime toggles
+				if (app.get())
+				{
+					app->SetEnableGPU(enableGPU);
 				}
 				startCEF();
 			}
@@ -372,7 +406,22 @@ namespace webview_cef
 		}
 		else if (name.compare("quit") == 0)
 		{
-			// only call this method when you want to quit the app
+			// Release plugin-held references before shutting down CEF to avoid
+			// "Object reference incorrectly held at CefShutdown" fatals.
+			uninitCallback();
+			// Drop renderers on the plugin side.
+			if (!m_renderers.empty())
+			{
+				m_renderers.clear();
+			}
+			// Ask existing browsers to close on the CEF UI thread.
+			// Close browsers synchronously on the CEF UI thread.
+			RunOnCefUISync([this]()
+						   {
+				if (m_handler.get()) m_handler->CloseAllBrowsers(true); });
+			// Finally drop the handler reference held by the plugin.
+			m_handler = nullptr;
+			// Now perform shutdown.
 			stopCEF();
 			result(1, nullptr);
 		}
@@ -786,11 +835,7 @@ namespace webview_cef
 		if (CefInitialize(mainArgs, cefs, app.get(), nullptr))
 		{
 			isCefInitialized = true;
-			if (!atexitRegistered)
-			{
-				std::atexit(atexit_shutdown);
-				atexitRegistered = true;
-			}
+			// Disable atexit shutdown for Flutter apps; lifecycle managed explicitly via 'quit'.
 		}
 	}
 
@@ -825,33 +870,37 @@ namespace webview_cef
 		if (!s_shutdownRequested || !isCefInitialized)
 			return;
 
-		// Ask all handlers to close browsers on the UI thread.
+		// Ask all handlers to close browsers synchronously on the UI thread.
 		{
 			std::lock_guard<std::mutex> lock(s_handlerMutex);
 			for (auto &h : s_handlers)
 			{
 				if (!h.get())
 					continue;
-				if (!CefCurrentlyOn(TID_UI))
-				{
-					CefPostTask(TID_UI, new LambdaTask([h]()
-													   {
-						if (h.get()) h->CloseAllBrowsers(true); }));
-				}
-				else
-				{
-					h->CloseAllBrowsers(true);
-				}
+				RunOnCefUISync([h]()
+							   {
+					if (h.get())
+						h->CloseAllBrowsers(true); });
 			}
 		}
 
 		// Wait up to 2 seconds for browsers to close.
-		for (int i = 0; i < 200; ++i)
+		for (int i = 0; i < 1000; ++i)
 		{
 			if (s_openBrowsers.load() == 0)
 				break;
 			std::this_thread::sleep_for(std::chrono::milliseconds(10));
 		}
+
+		// Drop all remaining handler references before CefShutdown to avoid
+		// "Object reference incorrectly held at CefShutdown" fatals.
+		{
+			std::lock_guard<std::mutex> lock(s_handlerMutex);
+			s_handlers.clear();
+		}
+
+		// Release the global application reference as well.
+		app = nullptr;
 
 		CefShutdown();
 		isCefInitialized = false;

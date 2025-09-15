@@ -236,6 +236,11 @@ void WebviewHandler::OnBeforeClose(CefRefPtr<CefBrowser> browser)
     {
         // Decrement open browser count.
         webview_cef::NotifyBrowserClosed();
+        // Clear global focused browser reference if it matches the closing one.
+        if (current_focused_browser_ && current_focused_browser_->IsSame(browser))
+        {
+            current_focused_browser_ = nullptr;
+        }
     }
 }
 
@@ -507,6 +512,113 @@ void WebviewHandler::OnImeCompositionRangeChanged(CefRefPtr<CefBrowser> browser,
             }
         }
     }
+}
+
+#ifdef __linux__
+#include <gtk/gtk.h>
+#endif
+
+bool WebviewHandler::OnFileDialog(CefRefPtr<CefBrowser> browser,
+                                  FileDialogMode mode,
+                                  const CefString &title,
+                                  const CefString &default_file_path,
+                                  const std::vector<CefString> &accept_filters,
+                                  const std::vector<CefString> &accept_extensions,
+                                  const std::vector<CefString> &accept_descriptions,
+                                  CefRefPtr<CefFileDialogCallback> callback)
+{
+#ifdef __linux__
+    CEF_REQUIRE_UI_THREAD();
+
+    GtkFileChooserAction action = GTK_FILE_CHOOSER_ACTION_OPEN;
+    bool select_folders = false;
+    bool allow_multiple = false;
+
+    if (mode & FILE_DIALOG_OPEN_FOLDER)
+    {
+        action = GTK_FILE_CHOOSER_ACTION_SELECT_FOLDER;
+        select_folders = true;
+    }
+    else if (mode & FILE_DIALOG_SAVE)
+    {
+        action = GTK_FILE_CHOOSER_ACTION_SAVE;
+    }
+    else if (mode & FILE_DIALOG_OPEN_MULTIPLE)
+    {
+        action = GTK_FILE_CHOOSER_ACTION_OPEN;
+        allow_multiple = true;
+    }
+
+    GtkFileChooserNative *native = gtk_file_chooser_native_new(
+        title.empty() ? "Select" : std::string(title).c_str(),
+        nullptr,
+        action,
+        NULL,
+        NULL);
+
+    GtkFileChooser *chooser = GTK_FILE_CHOOSER(native);
+    gtk_file_chooser_set_select_multiple(chooser, allow_multiple);
+
+    if (!default_file_path.empty())
+    {
+        std::string path = default_file_path;
+        if (select_folders)
+        {
+            gtk_file_chooser_set_current_folder(chooser, path.c_str());
+        }
+        else
+        {
+            gtk_file_chooser_set_filename(chooser, path.c_str());
+        }
+    }
+
+    for (const auto &filter : accept_filters)
+    {
+        GtkFileFilter *gtk_filter = gtk_file_filter_new();
+        gtk_file_filter_add_pattern(gtk_filter, std::string(filter).c_str());
+        gtk_file_filter_set_name(gtk_filter, std::string(filter).c_str());
+        gtk_file_chooser_add_filter(chooser, gtk_filter);
+    }
+
+    std::vector<CefString> file_paths;
+    if (gtk_native_dialog_run(GTK_NATIVE_DIALOG(native)) == GTK_RESPONSE_ACCEPT)
+    {
+        if (allow_multiple)
+        {
+            GSList *files = gtk_file_chooser_get_filenames(chooser);
+            for (GSList *iter = files; iter != NULL; iter = iter->next)
+            {
+                char *fname = static_cast<char *>(iter->data);
+                file_paths.push_back(CefString(fname));
+                g_free(fname);
+            }
+            g_slist_free(files);
+        }
+        else
+        {
+            char *fname = gtk_file_chooser_get_filename(chooser);
+            if (fname)
+            {
+                file_paths.push_back(CefString(fname));
+                g_free(fname);
+            }
+        }
+    }
+
+    g_object_unref(native);
+
+    if (!file_paths.empty())
+    {
+        callback->Continue(file_paths);
+    }
+    else
+    {
+        callback->Cancel();
+    }
+    return true;
+#else
+    return false;
+#endif
 }
 
 void WebviewHandler::sendKeyEvent(CefKeyEvent &ev)
