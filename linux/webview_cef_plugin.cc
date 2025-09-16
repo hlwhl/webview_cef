@@ -6,6 +6,7 @@
 
 #include <cstring>
 #include <unordered_map>
+#include <memory>
 #include <webview_plugin.h>
 #include "webview_cef_keyevent.h"
 #include "webview_cef_texture.h"
@@ -33,13 +34,33 @@ public:
   {
     register_ = texture_register;
     texture = webview_cef_texture_new();
-    fl_texture_registrar_register_texture(register_, FL_TEXTURE(texture));
     textureId = (int64_t)texture;
+    struct RegData
+    {
+      FlTextureRegistrar *registrar;
+      WebviewCefTexture *texture;
+    };
+    RegData *data = new RegData{register_, texture};
+    g_main_context_invoke(nullptr, (GSourceFunc) + [](gpointer user_data) -> gboolean
+                          {
+      std::unique_ptr<RegData> d(static_cast<RegData*>(user_data));
+      fl_texture_registrar_register_texture(d->registrar, FL_TEXTURE(d->texture));
+      return G_SOURCE_REMOVE; }, data);
   }
 
   virtual ~WebviewTextureRenderer()
   {
-    fl_texture_registrar_unregister_texture(register_, FL_TEXTURE(texture));
+    struct UnregData
+    {
+      FlTextureRegistrar *registrar;
+      WebviewCefTexture *texture;
+    };
+    UnregData *data = new UnregData{register_, texture};
+    g_main_context_invoke(nullptr, (GSourceFunc) + [](gpointer user_data) -> gboolean
+                          {
+      std::unique_ptr<UnregData> d(static_cast<UnregData*>(user_data));
+      fl_texture_registrar_unregister_texture(d->registrar, FL_TEXTURE(d->texture));
+      return G_SOURCE_REMOVE; }, data);
     register_ = nullptr;
   }
 
@@ -48,10 +69,21 @@ public:
     texture->width = width;
     texture->height = height;
     const auto size = width * height * 4;
-    delete texture->buffer;
+    delete[] texture->buffer;
     texture->buffer = new uint8_t[size];
     webview_cef::SwapBufferFromBgraToRgba((void *)texture->buffer, buffer, width, height);
-    fl_texture_registrar_mark_texture_frame_available(register_, FL_TEXTURE(texture));
+
+    struct NotifyData
+    {
+      FlTextureRegistrar *registrar;
+      WebviewCefTexture *texture;
+    };
+    NotifyData *data = new NotifyData{register_, texture};
+    g_main_context_invoke(nullptr, (GSourceFunc) + [](gpointer user_data) -> gboolean
+                          {
+      std::unique_ptr<NotifyData> d(static_cast<NotifyData*>(user_data));
+      fl_texture_registrar_mark_texture_frame_available(d->registrar, FL_TEXTURE(d->texture));
+      return G_SOURCE_REMOVE; }, data);
   }
   FlTextureRegistrar *register_;
   WebviewCefTexture *texture;
@@ -215,28 +247,62 @@ static void webview_cef_plugin_handle_method_call(
   const gchar *method = fl_method_call_get_name(method_call);
   WValue *encodeArgs = encode_flvalue_to_wvalue(fl_method_call_get_args(method_call));
   g_object_ref(method_call);
-  self->m_plugin->HandleMethodCall(method, encodeArgs, [=](int ret, WValue *responseArgs){
-    if (ret > 0){
-      fl_method_call_respond_success(method_call, encode_wavlue_to_flvalue(responseArgs), nullptr);
-    }
-    else if (ret < 0){
-      fl_method_call_respond_error(method_call, "error", "error", encode_wavlue_to_flvalue(responseArgs), nullptr);
-    }
-    else{
-      fl_method_call_respond_not_implemented(method_call, nullptr);
-    }
-    g_object_unref(method_call); 
-  });
+  if (g_strcmp0(method, "init") == 0)
+  {
+    // Respond immediately to avoid blocking Flutter while heavy init runs.
+    fl_method_call_respond_success(method_call, fl_value_new_null(), nullptr);
+    g_object_unref(method_call);
+
+    // Schedule actual initialization on the GTK main loop so the response is flushed first.
+    struct InitData
+    {
+      WebviewCefPlugin *self;
+      WValue *args;
+    };
+    InitData *data = new InitData{self, webview_value_ref(encodeArgs)};
+    g_main_context_invoke(nullptr, (GSourceFunc) + [](gpointer user_data) -> gboolean
+                          {
+      std::unique_ptr<InitData> d(static_cast<InitData*>(user_data));
+      // Invoke the existing init handler but discard its result since we've already responded.
+      d->self->m_plugin->HandleMethodCall("init", d->args, [](int /*ret*/, WValue* /*responseArgs*/) {});
+      webview_value_unref(d->args);
+      return G_SOURCE_REMOVE; }, data);
+  }
+  else
+  {
+    // For all other calls, marshal response back to GTK main thread.
+    self->m_plugin->HandleMethodCall(method, encodeArgs, [=](int ret, WValue *responseArgs)
+                                     {
+      struct ResponseData {
+        FlMethodCall* method_call;
+        int ret;
+        WValue* responseArgs;
+      };
+      ResponseData* data = new ResponseData{method_call, ret, responseArgs ? webview_value_ref(responseArgs) : nullptr};
+      g_main_context_invoke(nullptr, (GSourceFunc)+[](gpointer user_data) -> gboolean {
+        std::unique_ptr<ResponseData> d(static_cast<ResponseData*>(user_data));
+        if (d->ret > 0) {
+          fl_method_call_respond_success(d->method_call, d->responseArgs ? encode_wavlue_to_flvalue(d->responseArgs) : fl_value_new_null(), nullptr);
+        } else if (d->ret < 0) {
+          fl_method_call_respond_error(d->method_call, "error", "error", d->responseArgs ? encode_wavlue_to_flvalue(d->responseArgs) : fl_value_new_null(), nullptr);
+        } else {
+          fl_method_call_respond_not_implemented(d->method_call, nullptr);
+        }
+        if (d->responseArgs) webview_value_unref(d->responseArgs);
+        g_object_unref(d->method_call);
+        return G_SOURCE_REMOVE;
+      }, data); });
+  }
   webview_value_unref(encodeArgs);
 }
 
 static void webview_cef_plugin_dispose(GObject *object)
 {
+  // Remove this window's plugin instance from the global registry first.
   webviewPlugins.erase(WEBVIEW_CEF_PLUGIN(object)->m_window);
-  WEBVIEW_CEF_PLUGIN(object)->m_plugin = nullptr; 
-  if(webviewPlugins.empty()){
-    webview_cef::stopCEF();
-  }
+  // Explicitly release the shared_ptr to break cycles before GObject teardown.
+  WEBVIEW_CEF_PLUGIN(object)->m_plugin.reset();
+  // CEF shutdown is handled explicitly via 'quit' or by the atexit handler.
   G_OBJECT_CLASS(webview_cef_plugin_parent_class)->dispose(object);
 }
 
@@ -245,7 +311,8 @@ static void webview_cef_plugin_class_init(WebviewCefPluginClass *klass)
   G_OBJECT_CLASS(klass)->dispose = webview_cef_plugin_dispose;
 }
 
-static void webview_cef_plugin_init(WebviewCefPlugin *self) {
+static void webview_cef_plugin_init(WebviewCefPlugin *self)
+{
   self->m_plugin = std::make_shared<webview_cef::WebviewPlugin>();
 }
 
@@ -275,16 +342,29 @@ void webview_cef_plugin_register_with_registrar(FlPluginRegistrar *registrar)
                                             g_object_ref(plugin),
                                             g_object_unref);
 
-  plugin->m_plugin->setInvokeMethodFunc([=](std::string method, WValue *arguments) {
-    FlValue *args = encode_wavlue_to_flvalue(arguments);
-    fl_method_channel_invoke_method(channel, method.c_str(), args, NULL, NULL, NULL);
-    fl_value_unref(args);
-  });
+  // Ensure method channel invocations happen on the platform (GTK) thread.
+  plugin->m_plugin->setInvokeMethodFunc([channel](std::string method, WValue *arguments)
+                                        {
+    struct InvokeData {
+      FlMethodChannel* channel;
+      std::string method;
+      WValue* args;
+    };
+    InvokeData* data = new InvokeData{channel, method, webview_value_ref(arguments)};
 
-  plugin->m_plugin->setCreateTextureFunc([=](){
+    g_main_context_invoke(nullptr, (GSourceFunc)+[](gpointer user_data) -> gboolean {
+      std::unique_ptr<InvokeData> d(static_cast<InvokeData*>(user_data));
+      FlValue *args = encode_wavlue_to_flvalue(d->args);
+      fl_method_channel_invoke_method(d->channel, d->method.c_str(), args, NULL, NULL, NULL);
+      fl_value_unref(args);
+      webview_value_unref(d->args);
+      return G_SOURCE_REMOVE;
+    }, data); });
+
+  plugin->m_plugin->setCreateTextureFunc([=]()
+                                         {
     std::shared_ptr<WebviewTextureRenderer> renderer = std::make_shared<WebviewTextureRenderer>(plugin->m_textureRegister);
-    return std::dynamic_pointer_cast<webview_cef::WebviewTexture>(renderer);
-  });
+    return std::dynamic_pointer_cast<webview_cef::WebviewTexture>(renderer); });
 
   g_object_unref(plugin);
 }
@@ -322,16 +402,19 @@ FLUTTER_PLUGIN_EXPORT gboolean processKeyEventForCEF(GtkWidget *widget, GdkEvent
       // is apparently just how webkit handles it and what it expects.
       key_event.unmodified_character = '\r';
     }
-    else if((windows_key_code == KeyboardCode::VKEY_V) && (key_event.modifiers & EVENTFLAG_CONTROL_DOWN) && (event->type == GDK_KEY_PRESS)){
-      //try to fix copy request freeze process problem(flutter engine will send a copy request when ctrl+v pressed)
+    else if ((windows_key_code == KeyboardCode::VKEY_V) && (key_event.modifiers & EVENTFLAG_CONTROL_DOWN) && (event->type == GDK_KEY_PRESS))
+    {
+      // try to fix copy request freeze process problem(flutter engine will send a copy request when ctrl+v pressed)
       int res = 0;
-      if(system("xclip -o -sel clipboard | xclip -i -sel clipboard  &>/dev/null") == 0){
+      if (system("xclip -o -sel clipboard | xclip -i -sel clipboard  &>/dev/null") == 0)
+      {
         res = system("xclip -o -sel clipboard | xclip -i &>/dev/null");
       }
       // Suppress unused variable warning
       (void)res;
     }
-    else {
+    else
+    {
       // FIXME: fix for non BMP chars
       key_event.unmodified_character =
           static_cast<int>(gdk_keyval_to_unicode(event->keyval));

@@ -1,4 +1,5 @@
 /// A message that was sent by JavaScript code running in a [WebView].
+library webview_javascript;
 
 class JavascriptMessage {
   /// Constructs a JavaScript message object.
@@ -22,10 +23,8 @@ class JavascriptChannel {
   /// Constructs a Javascript channel.
   ///
   /// The parameters `name` and `onMessageReceived` must not be null.
-  JavascriptChannel({
-    required this.name,
-    required this.onMessageReceived,
-  }) : assert(_validChannelNames.hasMatch(name));
+  JavascriptChannel({required this.name, required this.onMessageReceived})
+      : assert(_validChannelNames.hasMatch(name));
 
   /// The channel's name.
   ///
@@ -45,4 +44,4 @@ class JavascriptChannel {
 }
 
 /// Callback type for handling messages sent from Javascript running in a web view.
-typedef void JavascriptMessageHandler(JavascriptMessage message);
+typedef JavascriptMessageHandler = void Function(JavascriptMessage message);

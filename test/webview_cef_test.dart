@@ -1,5 +1,5 @@
 import 'package:flutter_test/flutter_test.dart';
-import 'package:webview_cef/webview_cef.dart';
+// import 'package:webview_cef/webview_cef.dart'; // Not used: wrapper class not present in this package
 import 'package:webview_cef/webview_cef_platform_interface.dart';
 import 'package:webview_cef/webview_cef_method_channel.dart';
 import 'package:plugin_platform_interface/plugin_platform_interface.dart';
@@ -19,10 +19,9 @@ void main() {
   });
 
   test('getPlatformVersion', () async {
-    WebviewCef webviewCefPlugin = WebviewCef();
     MockWebviewCefPlatform fakePlatform = MockWebviewCefPlatform();
     WebviewCefPlatform.instance = fakePlatform;
 
-    expect(await webviewCefPlugin.getPlatformVersion(), '42');
+    expect(await WebviewCefPlatform.instance.getPlatformVersion(), '42');
   });
 }

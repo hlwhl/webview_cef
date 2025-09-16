@@ -2,14 +2,13 @@ import 'dart:async';
 
 import 'package:flutter/material.dart';
 import 'package:webview_cef/webview_cef.dart';
-import 'package:webview_cef/src/webview_inject_user_script.dart';
 
 void main() {
   runApp(const MyApp());
 }
 
 class MyApp extends StatefulWidget {
-  const MyApp({Key? key}) : super(key: key);
+  const MyApp({super.key});
 
   @override
   State<MyApp> createState() => _MyAppState();
@@ -64,7 +63,12 @@ class _MyAppState extends State<MyApp> {
 
   // Platform messages are asynchronous, so we initialize in an async method.
   Future<void> initPlatformState() async {
-    await WebviewManager().initialize(userAgent: "test/userAgent");
+    await WebviewManager().initialize(
+        userAgent: "test/userAgent",
+        enableGPU: true,
+        cachePath: "/tmp/webview_cef_cache",
+        persistSessionCookies: true,
+        persistUserPreferences: true);
     String url = "www.baidu.com";
     _textController.text = url;
     //unified interface for all platforms set user agent
@@ -80,7 +84,7 @@ class _MyAppState extends State<MyApp> {
           JavascriptChannel(
               name: 'Print',
               onMessageReceived: (JavascriptMessage message) {
-                print(message.message);
+                debugPrint(message.message);
                 _controller.sendJavaScriptChannelCallBack(
                     false,
                     "{'code':'200','message':'print succeed!'}",
@@ -94,13 +98,13 @@ class _MyAppState extends State<MyApp> {
         _controller.executeJavaScript("function abc(e){return 'abc:'+ e}");
         _controller
             .evaluateJavascript("abc('test')")
-            .then((value) => print(value));
+            .then((value) => debugPrint(value));
       },
       onLoadStart: (controller, url) {
-        print("onLoadStart => $url");
+        debugPrint("onLoadStart => $url");
       },
       onLoadEnd: (controller, url) {
-        print("onLoadEnd => $url");
+        debugPrint("onLoadEnd => $url");
       },
     ));
 

@@ -20,11 +20,33 @@ message(WARNING "${patch_output}")
 
 # Setup CEF
 include(${CMAKE_CURRENT_SOURCE_DIR}/../third/download.cmake)
+# Allow overriding from parent with -DDOWNLOAD_CEF_FLAVOR=minimal|standard
+if(NOT DEFINED DOWNLOAD_CEF_FLAVOR)
+  set(DOWNLOAD_CEF_FLAVOR "standard")
+endif()
+message(STATUS "CEF download flavor: ${DOWNLOAD_CEF_FLAVOR}")
 prepare_prebuilt_files(${CMAKE_CURRENT_SOURCE_DIR}/../third/cef)
 
 set(CEF_ROOT "${CMAKE_CURRENT_SOURCE_DIR}/../third/cef")
 set(CMAKE_MODULE_PATH ${CMAKE_MODULE_PATH} "${CEF_ROOT}/cmake")
 find_package(CEF REQUIRED)
+
+# Some prebuilt CEF packages don’t include Debug binaries on Linux.
+# If the Debug lib is missing, fall back to the Release lib to allow Debug builds of the plugin.
+if(NOT EXISTS "${CEF_LIB_DEBUG}" AND EXISTS "${CEF_LIB_RELEASE}")
+  message(WARNING "CEF Debug lib not found: ${CEF_LIB_DEBUG}. Falling back to Release lib: ${CEF_LIB_RELEASE} for Debug configuration.")
+  set(CEF_LIB_DEBUG "${CEF_LIB_RELEASE}")
+endif()
+
+# Likewise, adjust CEF directories if Debug tree is missing to avoid missing chrome-sandbox and others.
+if(CMAKE_BUILD_TYPE STREQUAL "Debug")
+  if(EXISTS "${CEF_ROOT}/Release/libcef.so" AND NOT EXISTS "${CEF_ROOT}/Debug/libcef.so")
+    message(WARNING "CEF Debug tree not found; using Release directories for binaries and resources.")
+    set(CEF_BINARY_DIR "${CEF_ROOT}/Release")
+    # CEF_RESOURCE_DIR typically points to Resources under root.
+    set(CEF_RESOURCE_DIR "${CEF_ROOT}/Resources")
+  endif()
+endif()
 
 # This value is used when generating builds using this plugin, so it must
 # not be changed.

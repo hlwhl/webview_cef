@@ -2,15 +2,21 @@ import 'dart:async';
 import 'dart:io';
 
 import 'package:flutter/gestures.dart';
-import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
-import 'package:webview_cef/src/webview_inject_user_script.dart';
+import 'package:flutter/widgets.dart';
 
 import 'webview_manager.dart';
 import 'webview_events_listener.dart';
 import 'webview_javascript.dart';
 import 'webview_textinput.dart';
 import 'webview_tooltip.dart';
+
+class _ScrollEvent {
+  final Offset pos;
+  final int dx;
+  final int dy;
+  const _ScrollEvent(this.pos, this.dx, this.dy);
+}
 
 class WebViewController extends ValueNotifier<bool> {
   WebViewController(this._pluginChannel, this._index, {Widget? loading})
@@ -38,20 +44,27 @@ class WebViewController extends ValueNotifier<bool> {
   WebviewEventsListener? _listener;
   WebviewEventsListener? get listener => _listener;
 
-  get onJavascriptChannelMessage => (final String channelName,
-          final String message, final String callbackId, final String frameId) {
-        if (_javascriptChannels.containsKey(channelName)) {
-          _javascriptChannels[channelName]!.onMessageReceived(
-              JavascriptMessage(message, callbackId, frameId));
-        } else {
-          print('Channel "$channelName" is not exstis');
-        }
-      };
+  void Function(String, String, String, String)?
+      get onJavascriptChannelMessage => (
+            final String channelName,
+            final String message,
+            final String callbackId,
+            final String frameId,
+          ) {
+            if (_javascriptChannels.containsKey(channelName)) {
+              _javascriptChannels[channelName]!.onMessageReceived(
+                JavascriptMessage(message, callbackId, frameId),
+              );
+            } else {
+              debugPrint('Channel "$channelName" is not exists');
+            }
+          };
 
-  get onToolTip => _onToolTip;
-  get onCursorChanged => _onCursorChanged;
-  get onFocusedNodeChangeMessage => _onFocusedNodeChangeMessage;
-  get onImeCompositionRangeChangedMessage =>
+  void Function(String)? get onToolTip => _onToolTip;
+  void Function(int)? get onCursorChanged => _onCursorChanged;
+  void Function(bool)? get onFocusedNodeChangeMessage =>
+      _onFocusedNodeChangeMessage;
+  void Function(int, int)? get onImeCompositionRangeChangedMessage =>
       _onImeCompositionRangeChangedMessage;
 
   /// Initializes the underlying platform view.
@@ -62,7 +75,8 @@ class WebViewController extends ValueNotifier<bool> {
     _creatingCompleter = Completer<void>();
     try {
       await WebviewManager().ready;
-      List args = await _pluginChannel.invokeMethod('create', url);
+      final List<dynamic> args =
+          await _pluginChannel.invokeMethod('create', url);
       _browserId = args[0] as int;
       _textureId = args[1] as int;
       WebviewManager().onBrowserCreated(_index, _browserId);
@@ -76,7 +90,7 @@ class WebViewController extends ValueNotifier<bool> {
     return _creatingCompleter.future;
   }
 
-  setWebviewListener(WebviewEventsListener listener) {
+  void setWebviewListener(WebviewEventsListener listener) {
     _listener = listener;
   }
 
@@ -138,8 +152,10 @@ class WebViewController extends ValueNotifier<bool> {
       return;
     }
     assert(value);
-    return _pluginChannel
-        .invokeMethod('imeSetComposition', [_browserId, composingText]);
+    return _pluginChannel.invokeMethod('imeSetComposition', [
+      _browserId,
+      composingText,
+    ]);
   }
 
   Future<void> imeCommitText(String composingText) async {
@@ -147,8 +163,10 @@ class WebViewController extends ValueNotifier<bool> {
       return;
     }
     assert(value);
-    return _pluginChannel
-        .invokeMethod('imeCommitText', [_browserId, composingText]);
+    return _pluginChannel.invokeMethod('imeCommitText', [
+      _browserId,
+      composingText,
+    ]);
   }
 
   Future<void> setClientFocus(bool focus) async {
@@ -163,32 +181,43 @@ class WebViewController extends ValueNotifier<bool> {
     if (_isDisposed) {
       return;
     }
-    assert(value);
+    await ready;
     _assertJavascriptChannelNamesAreUnique(channels);
 
     for (var channel in channels) {
       _javascriptChannels[channel.name] = channel;
     }
 
-    return _pluginChannel.invokeMethod('setJavaScriptChannels',
-        [_browserId, _extractJavascriptChannelNames(channels).toList()]);
+    return _pluginChannel.invokeMethod('setJavaScriptChannels', [
+      _browserId,
+      _extractJavascriptChannelNames(channels).toList(),
+    ]);
   }
 
   Future<void> sendJavaScriptChannelCallBack(
-      bool error, String result, String callbackId, String frameId) async {
+    bool error,
+    String result,
+    String callbackId,
+    String frameId,
+  ) async {
     if (_isDisposed) {
       return;
     }
-    assert(value);
-    return _pluginChannel.invokeMethod('sendJavaScriptChannelCallBack',
-        [error, result, callbackId, _browserId, frameId]);
+    await ready;
+    return _pluginChannel.invokeMethod('sendJavaScriptChannelCallBack', [
+      error,
+      result,
+      callbackId,
+      _browserId,
+      frameId,
+    ]);
   }
 
   Future<void> executeJavaScript(String code) async {
     if (_isDisposed) {
       return;
     }
-    assert(value);
+    await ready;
     return _pluginChannel.invokeMethod('executeJavaScript', [_browserId, code]);
   }
 
@@ -196,9 +225,11 @@ class WebViewController extends ValueNotifier<bool> {
     if (_isDisposed) {
       return;
     }
-    assert(value);
-    return _pluginChannel
-        .invokeMethod('evaluateJavascript', [_browserId, code]);
+    await ready;
+    return _pluginChannel.invokeMethod('evaluateJavascript', [
+      _browserId,
+      code,
+    ]);
   }
 
   /// Moves the virtual cursor to [position].
@@ -207,8 +238,11 @@ class WebViewController extends ValueNotifier<bool> {
       return;
     }
     assert(value);
-    return _pluginChannel.invokeMethod(
-        'cursorMove', [_browserId, position.dx.round(), position.dy.round()]);
+    return _pluginChannel.invokeMethod('cursorMove', [
+      _browserId,
+      position.dx.round(),
+      position.dy.round(),
+    ]);
   }
 
   Future<void> _cursorDragging(Offset position) async {
@@ -216,8 +250,11 @@ class WebViewController extends ValueNotifier<bool> {
       return;
     }
     assert(value);
-    return _pluginChannel.invokeMethod('cursorDragging',
-        [_browserId, position.dx.round(), position.dy.round()]);
+    return _pluginChannel.invokeMethod('cursorDragging', [
+      _browserId,
+      position.dx.round(),
+      position.dy.round(),
+    ]);
   }
 
   Future<void> _cursorClickDown(Offset position) async {
@@ -225,8 +262,11 @@ class WebViewController extends ValueNotifier<bool> {
       return;
     }
     assert(value);
-    return _pluginChannel.invokeMethod('cursorClickDown',
-        [_browserId, position.dx.round(), position.dy.round()]);
+    return _pluginChannel.invokeMethod('cursorClickDown', [
+      _browserId,
+      position.dx.round(),
+      position.dy.round(),
+    ]);
   }
 
   Future<void> _cursorClickUp(Offset position) async {
@@ -234,8 +274,11 @@ class WebViewController extends ValueNotifier<bool> {
       return;
     }
     assert(value);
-    return _pluginChannel.invokeMethod('cursorClickUp',
-        [_browserId, position.dx.round(), position.dy.round()]);
+    return _pluginChannel.invokeMethod('cursorClickUp', [
+      _browserId,
+      position.dx.round(),
+      position.dy.round(),
+    ]);
   }
 
   /// Sets the horizontal and vertical scroll delta.
@@ -244,8 +287,13 @@ class WebViewController extends ValueNotifier<bool> {
       return;
     }
     assert(value);
-    return _pluginChannel.invokeMethod('setScrollDelta',
-        [_browserId, position.dx.round(), position.dy.round(), dx, dy]);
+    return _pluginChannel.invokeMethod('setScrollDelta', [
+      _browserId,
+      position.dx.round(),
+      position.dy.round(),
+      dx,
+      dy,
+    ]);
   }
 
   /// Sets the surface size to the provided [size].
@@ -254,8 +302,12 @@ class WebViewController extends ValueNotifier<bool> {
       return;
     }
     assert(value);
-    return _pluginChannel
-        .invokeMethod('setSize', [_browserId, dpi, size.width, size.height]);
+    return _pluginChannel.invokeMethod('setSize', [
+      _browserId,
+      dpi,
+      size.width,
+      size.height,
+    ]);
   }
 
   Set<String> _extractJavascriptChannelNames(Set<JavascriptChannel> channels) {
@@ -265,23 +317,24 @@ class WebViewController extends ValueNotifier<bool> {
   }
 
   void _assertJavascriptChannelNamesAreUnique(
-      final Set<JavascriptChannel>? channels) {
+    final Set<JavascriptChannel>? channels,
+  ) {
     if (channels == null || channels.isEmpty) {
       return;
     }
     assert(_extractJavascriptChannelNames(channels).length == channels.length);
   }
 
-  Function(String)? _onToolTip;
-  Function(int)? _onCursorChanged;
-  Function(bool editable)? _onFocusedNodeChangeMessage;
-  Function(int, int)? _onImeCompositionRangeChangedMessage;
+  void Function(String)? _onToolTip;
+  void Function(int)? _onCursorChanged;
+  void Function(bool)? _onFocusedNodeChangeMessage;
+  void Function(int, int)? _onImeCompositionRangeChangedMessage;
 }
 
 class WebView extends StatefulWidget {
   final WebViewController controller;
 
-  const WebView(this.controller, {Key? key}) : super(key: key);
+  const WebView(this.controller, {super.key});
 
   @override
   WebViewState createState() => WebViewState();
@@ -294,6 +347,14 @@ class WebViewState extends State<WebView> with WebeViewTextInput {
   bool isPrimaryFocus = false;
   WebviewTooltip? _tooltip;
   MouseCursor _mouseType = SystemMouseCursors.basic;
+  // Cache last reported surface parameters to avoid redundant platform calls.
+  Size? _lastReportedSize;
+  double? _lastReportedDpi;
+  // Coalescing state for high-frequency input events.
+  Offset? _lastHoverPos;
+  Offset? _lastDragPos;
+  _ScrollEvent? _lastScroll;
+  bool _inputFlushScheduled = false;
 
   WebViewController get _controller => widget.controller;
 
@@ -342,7 +403,10 @@ class WebViewState extends State<WebView> with WebeViewTextInput {
     _controller._onImeCompositionRangeChangedMessage = (x, y) {
       final box = _key.currentContext!.findRenderObject() as RenderBox;
       updateIMEComposionPosition(
-          x.toDouble(), y.toDouble(), box.localToGlobal(Offset.zero));
+        x.toDouble(),
+        y.toDouble(),
+        box.localToGlobal(Offset.zero),
+      );
     };
 
     _controller._onToolTip = (final String text) {
@@ -375,8 +439,9 @@ class WebViewState extends State<WebView> with WebeViewTextInput {
     };
 
     // Report initial surface size
-    WidgetsBinding.instance
-        .addPostFrameCallback((_) => _reportSurfaceSize(context));
+    WidgetsBinding.instance.addPostFrameCallback(
+      (_) => _reportSurfaceSize(context),
+    );
   }
 
   @override
@@ -413,7 +478,8 @@ class WebViewState extends State<WebView> with WebeViewTextInput {
       child: SizeChangedLayoutNotifier(
         child: Listener(
           onPointerHover: (ev) {
-            _controller._cursorMove(ev.localPosition);
+            _lastHoverPos = ev.localPosition;
+            _scheduleInputFlush();
             _tooltip?.cursorOffset = ev.position;
           },
           onPointerDown: (ev) {
@@ -432,17 +498,26 @@ class WebViewState extends State<WebView> with WebeViewTextInput {
             _controller._cursorClickUp(ev.localPosition);
           },
           onPointerMove: (ev) {
-            _controller._cursorDragging(ev.localPosition);
+            _lastDragPos = ev.localPosition;
+            _scheduleInputFlush();
           },
           onPointerSignal: (signal) {
             if (signal is PointerScrollEvent) {
-              _controller._setScrollDelta(signal.localPosition,
-                  signal.scrollDelta.dx.round(), signal.scrollDelta.dy.round());
+              _lastScroll = _ScrollEvent(
+                signal.localPosition,
+                signal.scrollDelta.dx.round(),
+                signal.scrollDelta.dy.round(),
+              );
+              _scheduleInputFlush();
             }
           },
           onPointerPanZoomUpdate: (event) {
-            _controller._setScrollDelta(event.localPosition,
-                event.panDelta.dx.round(), event.panDelta.dy.round());
+            _lastScroll = _ScrollEvent(
+              event.localPosition,
+              event.panDelta.dx.round(),
+              event.panDelta.dy.round(),
+            );
+            _scheduleInputFlush();
           },
           child: MouseRegion(
             cursor: _mouseType,
@@ -458,8 +533,39 @@ class WebViewState extends State<WebView> with WebeViewTextInput {
     final box = _key.currentContext?.findRenderObject() as RenderBox?;
     if (box != null) {
       await _controller.ready;
-      unawaited(
-          _controller._setSize(dpi, Size(box.size.width, box.size.height)));
+      final Size sz = Size(box.size.width, box.size.height);
+      // Only notify platform when size or dpi actually changed.
+      if (_lastReportedSize != sz || _lastReportedDpi != dpi) {
+        _lastReportedSize = sz;
+        _lastReportedDpi = dpi;
+        unawaited(_controller._setSize(dpi, sz));
+      }
     }
+  }
+
+  void _scheduleInputFlush() {
+    if (_inputFlushScheduled) return;
+    _inputFlushScheduled = true;
+    WidgetsBinding.instance.addPostFrameCallback((_) {
+      _inputFlushScheduled = false;
+      // Drain latest hover
+      final hover = _lastHoverPos;
+      if (hover != null) {
+        _lastHoverPos = null;
+        _controller._cursorMove(hover);
+      }
+      // Drain latest drag
+      final drag = _lastDragPos;
+      if (drag != null) {
+        _lastDragPos = null;
+        _controller._cursorDragging(drag);
+      }
+      // Drain latest scroll
+      final scroll = _lastScroll;
+      if (scroll != null) {
+        _lastScroll = null;
+        _controller._setScrollDelta(scroll.pos, scroll.dx, scroll.dy);
+      }
+    });
   }
 }

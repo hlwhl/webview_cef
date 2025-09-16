@@ -5,7 +5,7 @@
 .packages
 build/
 # If you're building an application, you may want to check-in your pubspec.lock
-pubspec.lock
+**/*.lock
 
 # Directory created by dartdoc
 # If you don't generate documentation locally you can remove this line.
@@ -70,3 +70,6 @@ app.*.map.json
 
 /macos/third/cef/Chromium Embedded Framework.framework
 /macos/third/cef/libcef_dll_wrapper.a
+
+third/cef/
+linux/prebuilt.tar.bz2
