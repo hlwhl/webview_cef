@@ -63,7 +63,12 @@ class _MyAppState extends State<MyApp> {
 
   // Platform messages are asynchronous, so we initialize in an async method.
   Future<void> initPlatformState() async {
-    await WebviewManager().initialize(userAgent: "test/userAgent");
+    await WebviewManager().initialize(
+        userAgent: "test/userAgent",
+        enableGPU: true,
+        cachePath: "/tmp/webview_cef_cache",
+        persistSessionCookies: true,
+        persistUserPreferences: true);
     String url = "www.baidu.com";
     _textController.text = url;
     //unified interface for all platforms set user agent

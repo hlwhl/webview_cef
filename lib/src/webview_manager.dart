@@ -1,6 +1,5 @@
 import 'dart:async';
 
-import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
 import 'package:flutter/widgets.dart';
 import 'package:webview_cef/src/webview_inject_user_script.dart';
@@ -13,7 +12,8 @@ class WebviewManager extends ValueNotifier<bool> {
 
   factory WebviewManager() => _instance;
 
-  late Completer<void> _creatingCompleter;
+  // Tracks the current initialization operation; null when not started yet.
+  Completer<void>? _creatingCompleter;
 
   final MethodChannel pluginChannel = const MethodChannel("webview_cef");
 
@@ -27,7 +27,7 @@ class WebviewManager extends ValueNotifier<bool> {
 
   int nextIndex = 1;
 
-  Future<void> get ready => _creatingCompleter.future;
+  Future<void> get ready => _creatingCompleter?.future ?? Future.value();
 
   /// Create a WebView and return its controller.
   ///
@@ -74,7 +74,16 @@ class WebviewManager extends ValueNotifier<bool> {
     bool persistSessionCookies = false,
     bool persistUserPreferences = false,
     bool enableGPU = false,
+    Duration initTimeout = const Duration(seconds: 5),
   }) async {
+    // Idempotent: if already initialized, return immediately.
+    if (value) {
+      return Future.value();
+    }
+    // Re-entrant: if an initialization is in-flight, await the same future.
+    if (_creatingCompleter?.isCompleted == false) {
+      return _creatingCompleter!.future;
+    }
     _creatingCompleter = Completer<void>();
     try {
       // Build init options map; keep legacy behavior if only userAgent provided
@@ -95,23 +104,37 @@ class WebviewManager extends ValueNotifier<bool> {
         if (persistSessionCookies) opts['persistSessionCookies'] = true;
         if (persistUserPreferences) opts['persistUserPreferences'] = true;
         if (enableGPU) opts['enableGPU'] = true;
-        await pluginChannel.invokeMethod('init', opts);
+        await pluginChannel.invokeMethod('init', opts).timeout(initTimeout,
+            onTimeout: () {
+          throw PlatformException(
+            code: 'INIT_TIMEOUT',
+            message:
+                'webview_cef init did not respond. Verify CEF binaries and plugin initialization on the platform side.',
+          );
+        });
       } else {
-        await pluginChannel.invokeMethod('init');
+        await pluginChannel.invokeMethod('init').timeout(initTimeout,
+            onTimeout: () {
+          throw PlatformException(
+            code: 'INIT_TIMEOUT',
+            message:
+                'webview_cef init did not respond. Verify CEF binaries and plugin initialization on the platform side.',
+          );
+        });
       }
       pluginChannel.setMethodCallHandler(methodCallhandler);
       // Wait for the platform to complete initialization.
       await Future.delayed(const Duration(milliseconds: 300));
-      _creatingCompleter.complete();
+      _creatingCompleter?.complete();
       value = true;
     } on PlatformException catch (e) {
-      _creatingCompleter.completeError(e);
+      _creatingCompleter?.completeError(e);
     }
-    return _creatingCompleter.future;
+    return _creatingCompleter?.future;
   }
 
   @override
-  Future<void> dispose() async {
+  void dispose() {
     super.dispose();
     pluginChannel.setMethodCallHandler(null);
     _webViews.clear();
@@ -214,11 +237,11 @@ class WebviewManager extends ValueNotifier<bool> {
     List<UserScript> scripts,
   ) async {
     if (scripts.isEmpty) return;
-
-    await _webViews[browserId]?.ready;
-
+    final controller = _webViews[browserId];
+    if (controller == null) return;
+    await controller.ready;
     for (final script in scripts) {
-      await _webViews[browserId]?.executeJavaScript(script.script);
+      await controller.executeJavaScript(script.script);
     }
   }
 

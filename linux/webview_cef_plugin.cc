@@ -247,27 +247,52 @@ static void webview_cef_plugin_handle_method_call(
   const gchar *method = fl_method_call_get_name(method_call);
   WValue *encodeArgs = encode_flvalue_to_wvalue(fl_method_call_get_args(method_call));
   g_object_ref(method_call);
-  self->m_plugin->HandleMethodCall(method, encodeArgs, [=](int ret, WValue *responseArgs)
-                                   {
-    struct ResponseData {
-      FlMethodCall* method_call;
-      int ret;
-      WValue* responseArgs;
+  if (g_strcmp0(method, "init") == 0)
+  {
+    // Respond immediately to avoid blocking Flutter while heavy init runs.
+    fl_method_call_respond_success(method_call, fl_value_new_null(), nullptr);
+    g_object_unref(method_call);
+
+    // Schedule actual initialization on the GTK main loop so the response is flushed first.
+    struct InitData
+    {
+      WebviewCefPlugin *self;
+      WValue *args;
     };
-    ResponseData* data = new ResponseData{method_call, ret, responseArgs ? webview_value_ref(responseArgs) : nullptr};
-    g_main_context_invoke(nullptr, (GSourceFunc)+[](gpointer user_data) -> gboolean {
-      std::unique_ptr<ResponseData> d(static_cast<ResponseData*>(user_data));
-      if (d->ret > 0) {
-        fl_method_call_respond_success(d->method_call, d->responseArgs ? encode_wavlue_to_flvalue(d->responseArgs) : fl_value_new_null(), nullptr);
-      } else if (d->ret < 0) {
-        fl_method_call_respond_error(d->method_call, "error", "error", d->responseArgs ? encode_wavlue_to_flvalue(d->responseArgs) : fl_value_new_null(), nullptr);
-      } else {
-        fl_method_call_respond_not_implemented(d->method_call, nullptr);
-      }
-      if (d->responseArgs) webview_value_unref(d->responseArgs);
-      g_object_unref(d->method_call);
-      return G_SOURCE_REMOVE;
-    }, data); });
+    InitData *data = new InitData{self, webview_value_ref(encodeArgs)};
+    g_main_context_invoke(nullptr, (GSourceFunc) + [](gpointer user_data) -> gboolean
+                          {
+      std::unique_ptr<InitData> d(static_cast<InitData*>(user_data));
+      // Invoke the existing init handler but discard its result since we've already responded.
+      d->self->m_plugin->HandleMethodCall("init", d->args, [](int /*ret*/, WValue* /*responseArgs*/) {});
+      webview_value_unref(d->args);
+      return G_SOURCE_REMOVE; }, data);
+  }
+  else
+  {
+    // For all other calls, marshal response back to GTK main thread.
+    self->m_plugin->HandleMethodCall(method, encodeArgs, [=](int ret, WValue *responseArgs)
+                                     {
+      struct ResponseData {
+        FlMethodCall* method_call;
+        int ret;
+        WValue* responseArgs;
+      };
+      ResponseData* data = new ResponseData{method_call, ret, responseArgs ? webview_value_ref(responseArgs) : nullptr};
+      g_main_context_invoke(nullptr, (GSourceFunc)+[](gpointer user_data) -> gboolean {
+        std::unique_ptr<ResponseData> d(static_cast<ResponseData*>(user_data));
+        if (d->ret > 0) {
+          fl_method_call_respond_success(d->method_call, d->responseArgs ? encode_wavlue_to_flvalue(d->responseArgs) : fl_value_new_null(), nullptr);
+        } else if (d->ret < 0) {
+          fl_method_call_respond_error(d->method_call, "error", "error", d->responseArgs ? encode_wavlue_to_flvalue(d->responseArgs) : fl_value_new_null(), nullptr);
+        } else {
+          fl_method_call_respond_not_implemented(d->method_call, nullptr);
+        }
+        if (d->responseArgs) webview_value_unref(d->responseArgs);
+        g_object_unref(d->method_call);
+        return G_SOURCE_REMOVE;
+      }, data); });
+  }
   webview_value_unref(encodeArgs);
 }
 
