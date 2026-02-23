@@ -334,6 +334,9 @@ class WebViewState extends State<WebView> with WebeViewTextInput {
   void initState() {
     super.initState();
     _controller._onFocusedNodeChangeMessage = (editable) {
+      if (!mounted) {
+        return;
+      }
       _composingText = '';
       editable ? attachTextInputClient() : detachTextInputClient();
       _controller._focusEditable = editable;
@@ -377,6 +380,17 @@ class WebViewState extends State<WebView> with WebeViewTextInput {
     // Report initial surface size
     WidgetsBinding.instance
         .addPostFrameCallback((_) => _reportSurfaceSize(context));
+  }
+
+  @override
+  void dispose() {
+    detachTextInputClient();
+    _controller._onFocusedNodeChangeMessage = null;
+    _controller._onImeCompositionRangeChangedMessage = null;
+    _controller._onToolTip = null;
+    _controller._onCursorChanged = null;
+    _focusNode.dispose();
+    super.dispose();
   }
 
   @override

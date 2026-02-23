@@ -12,17 +12,31 @@ mixin WebeViewTextInput implements DeltaTextInputClient {
   TextInputConnection? _textInputConnection;
 
   attachTextInputClient() {
-    _textInputConnection?.close();
-    _textInputConnection = TextInput.attach(
-        this, const TextInputConfiguration(enableDeltaModel: true));
-    if (!Platform.isWindows) {
-      _textInputConnection?.show();
+    try {
+      _textInputConnection?.close();
+      _textInputConnection = TextInput.attach(
+        this,
+        const TextInputConfiguration(enableDeltaModel: true),
+      );
+      if (!Platform.isWindows) {
+        _textInputConnection?.show();
+      }
+    } on PlatformException {
+      // Flutter desktop text input can reject setClient when viewId is null
+      // during fast focus changes. Ignore and keep browser alive.
+      _textInputConnection?.close();
+      _textInputConnection = null;
     }
-    // _textInputConnection
   }
 
   detachTextInputClient() {
-    _textInputConnection?.close();
+    try {
+      _textInputConnection?.close();
+    } on PlatformException {
+      // Ignore stale connection errors during teardown.
+    } finally {
+      _textInputConnection = null;
+    }
   }
 
   updateIMEComposionPosition(double x, double y, Offset offset) {
