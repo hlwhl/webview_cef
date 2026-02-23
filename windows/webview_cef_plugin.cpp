@@ -93,6 +93,9 @@ namespace webview_cef {
 			{
 				const auto len = webview_value_get_len(args);
 				const auto* values = webview_value_get_uint8_list(args);
+				if (len == 0 || values == nullptr) {
+					return flutter::EncodableValue(std::vector<uint8_t>{});
+				}
 				return flutter::EncodableValue(
 					std::vector<uint8_t>(values, values + len));
 			}
@@ -100,6 +103,9 @@ namespace webview_cef {
 			{
 				const auto len = webview_value_get_len(args);
 				const auto* values = webview_value_get_int32_list(args);
+				if (len == 0 || values == nullptr) {
+					return flutter::EncodableValue(std::vector<int32_t>{});
+				}
 				return flutter::EncodableValue(
 					std::vector<int32_t>(values, values + len));
 			}
@@ -107,6 +113,9 @@ namespace webview_cef {
 			{
 				const auto len = webview_value_get_len(args);
 				const auto* values = webview_value_get_int64_list(args);
+				if (len == 0 || values == nullptr) {
+					return flutter::EncodableValue(std::vector<int64_t>{});
+				}
 				return flutter::EncodableValue(
 					std::vector<int64_t>(values, values + len));
 			}
@@ -114,6 +123,9 @@ namespace webview_cef {
 			{
 				const auto len = webview_value_get_len(args);
 				const auto* values = webview_value_get_float_list(args);
+				if (len == 0 || values == nullptr) {
+					return flutter::EncodableValue(std::vector<float>{});
+				}
 				return flutter::EncodableValue(
 					std::vector<float>(values, values + len));
 			}
@@ -121,6 +133,9 @@ namespace webview_cef {
 			{
 				const auto len = webview_value_get_len(args);
 				const auto* values = webview_value_get_double_list(args);
+				if (len == 0 || values == nullptr) {
+					return flutter::EncodableValue(std::vector<double>{});
+				}
 				return flutter::EncodableValue(
 					std::vector<double>(values, values + len));
 			}

@@ -11,6 +11,14 @@ mixin WebeViewTextInput implements DeltaTextInputClient {
 
   TextInputConnection? _textInputConnection;
 
+  bool _isKnownViewIdRace(PlatformException error) {
+    final message = (error.message ?? '').toLowerCase();
+    final code = error.code.toLowerCase();
+    return message.contains('view id is null') ||
+        message.contains('viewid is null') ||
+        code.contains('bad arguments');
+  }
+
   attachTextInputClient() {
     try {
       _textInputConnection?.close();
@@ -21,19 +29,26 @@ mixin WebeViewTextInput implements DeltaTextInputClient {
       if (!Platform.isWindows) {
         _textInputConnection?.show();
       }
-    } on PlatformException {
+    } on PlatformException catch (error) {
       // Flutter desktop text input can reject setClient when viewId is null
       // during fast focus changes. Ignore and keep browser alive.
-      _textInputConnection?.close();
-      _textInputConnection = null;
+      if (_isKnownViewIdRace(error)) {
+        _textInputConnection?.close();
+        _textInputConnection = null;
+        return;
+      }
+      rethrow;
     }
   }
 
   detachTextInputClient() {
     try {
       _textInputConnection?.close();
-    } on PlatformException {
+    } on PlatformException catch (error) {
       // Ignore stale connection errors during teardown.
+      if (!_isKnownViewIdRace(error)) {
+        rethrow;
+      }
     } finally {
       _textInputConnection = null;
     }
