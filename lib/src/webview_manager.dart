@@ -128,7 +128,7 @@ class WebviewManager extends ValueNotifier<bool> {
       case 'onFocusedNodeChangeMessage':
         int browserId = call.arguments['browserId'] as int;
         bool editable = call.arguments['editable'] as bool;
-        _webViews[browserId]?.onFocusedNodeChangeMessage(editable);
+        _webViews[browserId]?.onFocusedNodeChangeMessage?.call(editable);
         return;
       case 'onImeCompositionRangeChangedMessage':
         int browserId = call.arguments['browserId'] as int;
@@ -140,34 +140,43 @@ class WebviewManager extends ValueNotifier<bool> {
         int browserId = call.arguments["browserId"] as int;
         String urlId = call.arguments["urlId"] as String;
 
-        await _injectUserScriptIfNeeds(browserId, _injectUserScripts[browserId]?.retrieveLoadStartInjectScripts() ?? []);
+        await _injectUserScriptIfNeeds(
+            browserId,
+            _injectUserScripts[browserId]?.retrieveLoadStartInjectScripts() ??
+                []);
 
         WebViewController controller =
-        _webViews[browserId] as WebViewController;
+            _webViews[browserId] as WebViewController;
         _webViews[browserId]?.listener?.onLoadStart?.call(controller, urlId);
         return;
       case 'onLoadEnd':
         int browserId = call.arguments["browserId"] as int;
         String urlId = call.arguments["urlId"] as String;
 
-        await _injectUserScriptIfNeeds(browserId, _injectUserScripts[browserId]?.retrieveLoadEndInjectScripts() ?? []);
+        await _injectUserScriptIfNeeds(
+            browserId,
+            _injectUserScripts[browserId]?.retrieveLoadEndInjectScripts() ??
+                []);
 
         WebViewController controller =
-        _webViews[browserId] as WebViewController;
+            _webViews[browserId] as WebViewController;
         _webViews[browserId]?.listener?.onLoadEnd?.call(controller, urlId);
         return;
       default:
     }
   }
 
-  Future<void> _injectUserScriptIfNeeds(int browserId, List<UserScript> scripts) async {
+  Future<void> _injectUserScriptIfNeeds(
+      int browserId, List<UserScript> scripts) async {
     if (scripts.isEmpty) return;
 
     await _webViews[browserId]?.ready;
 
-    scripts.forEach((script) async {
-      await _webViews[browserId]?.executeJavaScript(script.script);
-    },);
+    scripts.forEach(
+      (script) async {
+        await _webViews[browserId]?.executeJavaScript(script.script);
+      },
+    );
   }
 
   Future<void> setCookie(String domain, String key, String val) async {

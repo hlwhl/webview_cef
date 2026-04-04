@@ -50,7 +50,7 @@ endfunction(download_file)
 function(prepare_prebuilt_files filepath)
     set(need_download FALSE)
     set(has_release_lib FALSE)
-    if(EXISTS ${filepath}/release/libcef.lib OR EXISTS ${filepath}/Release/libcef.lib)
+    if(EXISTS "${filepath}/release/libcef.lib" OR EXISTS "${filepath}/Release/libcef.lib")
         set(has_release_lib TRUE)
     endif()
 
@@ -84,7 +84,7 @@ function(prepare_prebuilt_files filepath)
         file(MAKE_DIRECTORY ${filepath})
         extract_file(${CMAKE_CURRENT_SOURCE_DIR}/prebuilt.zip ${filepath})
 
-        if(NOT EXISTS ${filepath}/release/libcef.lib AND NOT EXISTS ${filepath}/Release/libcef.lib)
+        if(NOT EXISTS "${filepath}/release/libcef.lib" AND NOT EXISTS "${filepath}/Release/libcef.lib")
             message(FATAL_ERROR "CEF prebuilt package extracted but release libraries were not found under ${filepath}.")
         endif()
 

@@ -218,7 +218,7 @@ namespace webview_cef {
 			return ret;
 		}
 		else if (std::holds_alternative<std::monostate>(*args)) {
-			return nullptr;
+			return webview_value_new_null();
 		}
 		else if (std::holds_alternative<std::vector<float>>(*args)) {
 			auto list = *std::get_if<std::vector<float>>(args);
