@@ -293,7 +293,6 @@ class WebViewState extends State<WebView> with WebeViewTextInput {
   late final _focusNode = FocusNode();
   bool isPrimaryFocus = false;
   WebviewTooltip? _tooltip;
-  MouseCursor _mouseType = SystemMouseCursors.basic;
 
   WebViewController get _controller => widget.controller;
 
@@ -334,6 +333,9 @@ class WebViewState extends State<WebView> with WebeViewTextInput {
   void initState() {
     super.initState();
     _controller._onFocusedNodeChangeMessage = (editable) {
+      if (!mounted) {
+        return;
+      }
       _composingText = '';
       editable ? attachTextInputClient() : detachTextInputClient();
       _controller._focusEditable = editable;
@@ -350,33 +352,24 @@ class WebViewState extends State<WebView> with WebeViewTextInput {
       _tooltip?.showToolTip(text);
     };
 
-    _controller._onCursorChanged = (int type) {
-      switch (type) {
-        case 0:
-          _mouseType = SystemMouseCursors.basic;
-          break;
-        case 1:
-          _mouseType = SystemMouseCursors.precise;
-          break;
-        case 2:
-          _mouseType = SystemMouseCursors.click;
-          break;
-        case 3:
-          _mouseType = SystemMouseCursors.text;
-          break;
-        case 4:
-          _mouseType = SystemMouseCursors.wait;
-          break;
-        default:
-          _mouseType = SystemMouseCursors.basic;
-          break;
-      }
-      setState(() {});
-    };
+    // Orbit renders its own cursor globally, so the embedded webview must not
+    // request a separate platform cursor.
+    _controller._onCursorChanged = (_) {};
 
     // Report initial surface size
     WidgetsBinding.instance
         .addPostFrameCallback((_) => _reportSurfaceSize(context));
+  }
+
+  @override
+  void dispose() {
+    detachTextInputClient();
+    _controller._onFocusedNodeChangeMessage = null;
+    _controller._onImeCompositionRangeChangedMessage = null;
+    _controller._onToolTip = null;
+    _controller._onCursorChanged = null;
+    _focusNode.dispose();
+    super.dispose();
   }
 
   @override
@@ -445,7 +438,7 @@ class WebViewState extends State<WebView> with WebeViewTextInput {
                 event.panDelta.dx.round(), event.panDelta.dy.round());
           },
           child: MouseRegion(
-            cursor: _mouseType,
+            cursor: SystemMouseCursors.none,
             child: Texture(textureId: _controller._textureId),
           ),
         ),

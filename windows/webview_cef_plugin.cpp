@@ -80,23 +80,65 @@ namespace webview_cef {
 			case Webview_Value_Type_Bool:
 				return flutter::EncodableValue(webview_value_get_bool(args));
 			case Webview_Value_Type_Int:
-				return flutter::EncodableValue(webview_value_get_int(args));
+				return flutter::EncodableValue(
+					static_cast<int64_t>(webview_value_get_int(args)));
 			case Webview_Value_Type_Float:
 				return flutter::EncodableValue(webview_value_get_float(args));
 			case Webview_Value_Type_Double:
 				return flutter::EncodableValue(webview_value_get_double(args));
 			case Webview_Value_Type_String:
-				return flutter::EncodableValue(webview_value_get_string(args));
+				return flutter::EncodableValue(
+					std::string(webview_value_get_string(args)));
 			case Webview_Value_Type_Uint8_List:
-				return flutter::EncodableValue(webview_value_get_uint8_list(args));
+			{
+				const auto len = webview_value_get_len(args);
+				const auto* values = webview_value_get_uint8_list(args);
+				if (len == 0 || values == nullptr) {
+					return flutter::EncodableValue(std::vector<uint8_t>{});
+				}
+				return flutter::EncodableValue(
+					std::vector<uint8_t>(values, values + len));
+			}
 			case Webview_Value_Type_Int32_List:
-				return flutter::EncodableValue(webview_value_get_int32_list(args));
+			{
+				const auto len = webview_value_get_len(args);
+				const auto* values = webview_value_get_int32_list(args);
+				if (len == 0 || values == nullptr) {
+					return flutter::EncodableValue(std::vector<int32_t>{});
+				}
+				return flutter::EncodableValue(
+					std::vector<int32_t>(values, values + len));
+			}
 			case Webview_Value_Type_Int64_List:
-				return flutter::EncodableValue(webview_value_get_int64_list(args));
+			{
+				const auto len = webview_value_get_len(args);
+				const auto* values = webview_value_get_int64_list(args);
+				if (len == 0 || values == nullptr) {
+					return flutter::EncodableValue(std::vector<int64_t>{});
+				}
+				return flutter::EncodableValue(
+					std::vector<int64_t>(values, values + len));
+			}
 			case Webview_Value_Type_Float_List:
-				return flutter::EncodableValue(webview_value_get_float_list(args));
+			{
+				const auto len = webview_value_get_len(args);
+				const auto* values = webview_value_get_float_list(args);
+				if (len == 0 || values == nullptr) {
+					return flutter::EncodableValue(std::vector<float>{});
+				}
+				return flutter::EncodableValue(
+					std::vector<float>(values, values + len));
+			}
 			case Webview_Value_Type_Double_List:
-				return flutter::EncodableValue(webview_value_get_double_list(args));
+			{
+				const auto len = webview_value_get_len(args);
+				const auto* values = webview_value_get_double_list(args);
+				if (len == 0 || values == nullptr) {
+					return flutter::EncodableValue(std::vector<double>{});
+				}
+				return flutter::EncodableValue(
+					std::vector<double>(values, values + len));
+			}
 			case Webview_Value_Type_List:
 			{
 				flutter::EncodableList ret;
@@ -121,36 +163,38 @@ namespace webview_cef {
 	}
 
 	static WValue *encode_flvalue_to_wvalue(flutter::EncodableValue* args) {
-		size_t index = args->index();
-		if (index == 1) {
+		if (std::holds_alternative<bool>(*args)) {
 			return webview_value_new_bool(*std::get_if<bool>(args));
 		}
-		else if (index == 2 || index == 3) {
+		else if (std::holds_alternative<int32_t>(*args)) {
 			return webview_value_new_int(*std::get_if<int32_t>(args));
 		}
-		else if (index == 4) {
+		else if (std::holds_alternative<int64_t>(*args)) {
+			return webview_value_new_int(*std::get_if<int64_t>(args));
+		}
+		else if (std::holds_alternative<double>(*args)) {
 			return webview_value_new_double(*std::get_if<double>(args));
 		}
-		else if (index == 5) {
+		else if (std::holds_alternative<std::string>(*args)) {
 			return webview_value_new_string((*std::get_if<std::string>(args)).c_str());
 		}
-		else if (index == 6) {
+		else if (std::holds_alternative<std::vector<uint8_t>>(*args)) {
 			auto list = *std::get_if<std::vector<uint8_t>>(args);
 			return webview_value_new_uint8_list(list.data(), list.size());
 		}
-		else if (index == 7) {
+		else if (std::holds_alternative<std::vector<int32_t>>(*args)) {
 			auto list = *std::get_if<std::vector<int32_t>>(args);
 			return webview_value_new_int32_list(list.data(), list.size());
 		}
-		else if (index == 8) {
+		else if (std::holds_alternative<std::vector<int64_t>>(*args)) {
 			auto list = *std::get_if<std::vector<int64_t>>(args);
 			return webview_value_new_int64_list(list.data(), list.size());
 		}
-		else if (index == 9) {
+		else if (std::holds_alternative<std::vector<double>>(*args)) {
 			auto list = *std::get_if<std::vector<double>>(args);
 			return webview_value_new_double_list(list.data(), list.size());
 		}
-		else if (index == 10) {
+		else if (std::holds_alternative<flutter::EncodableList>(*args)) {
 			WValue * ret = webview_value_new_list();
 			flutter::EncodableList list = *std::get_if<flutter::EncodableList>(args);
 			for (size_t i = 0; i < list.size(); i++) {
@@ -160,7 +204,7 @@ namespace webview_cef {
 			}
 			return ret;
 		}
-		else if (index == 11) {
+		else if (std::holds_alternative<flutter::EncodableMap>(*args)) {
 			WValue * ret = webview_value_new_map();
 			flutter::EncodableMap map = *std::get_if<flutter::EncodableMap>(args);
 			for (flutter::EncodableMap::iterator it = map.begin(); it != map.end(); it++)
@@ -173,10 +217,10 @@ namespace webview_cef {
 			}
 			return ret;
 		}
-		else if (index == 12) {
-			return nullptr;
+		else if (std::holds_alternative<std::monostate>(*args)) {
+			return webview_value_new_null();
 		}
-		else if (index == 13) {
+		else if (std::holds_alternative<std::vector<float>>(*args)) {
 			auto list = *std::get_if<std::vector<float>>(args);
 			return webview_value_new_float_list(list.data(), list.size());
 		}

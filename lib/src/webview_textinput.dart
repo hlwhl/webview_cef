@@ -11,18 +11,52 @@ mixin WebeViewTextInput implements DeltaTextInputClient {
 
   TextInputConnection? _textInputConnection;
 
+  bool _isKnownViewIdRace(PlatformException error) {
+    final message = (error.message ?? '').toLowerCase();
+    final isViewIdNull = message.contains('view id is null') ||
+        message.contains('viewid is null');
+    final isBadArguments = error.code == 'Bad Arguments';
+    return isViewIdNull && isBadArguments;
+  }
+
   attachTextInputClient() {
-    _textInputConnection?.close();
-    _textInputConnection = TextInput.attach(
-        this, const TextInputConfiguration(enableDeltaModel: true));
-    if (!Platform.isWindows) {
-      _textInputConnection?.show();
+    try {
+      _textInputConnection?.close();
+      _textInputConnection = TextInput.attach(
+        this,
+        const TextInputConfiguration(enableDeltaModel: true),
+      );
+      if (!Platform.isWindows) {
+        _textInputConnection?.show();
+      }
+    } on PlatformException catch (error) {
+      // Flutter desktop text input can reject setClient when viewId is null
+      // during fast focus changes. Ignore and keep browser alive.
+      if (_isKnownViewIdRace(error)) {
+        try {
+          _textInputConnection?.close();
+        } on PlatformException {
+          // Ignore follow-up teardown errors while handling the same race.
+        } finally {
+          _textInputConnection = null;
+        }
+        return;
+      }
+      rethrow;
     }
-    // _textInputConnection
   }
 
   detachTextInputClient() {
-    _textInputConnection?.close();
+    try {
+      _textInputConnection?.close();
+    } on PlatformException catch (error) {
+      // Ignore stale connection errors during teardown.
+      if (!_isKnownViewIdRace(error)) {
+        rethrow;
+      }
+    } finally {
+      _textInputConnection = null;
+    }
   }
 
   updateIMEComposionPosition(double x, double y, Offset offset) {
