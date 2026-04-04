@@ -8,10 +8,6 @@ cmake_minimum_required(VERSION 3.14)
 set(PROJECT_NAME "webview_cef")
 project(${PROJECT_NAME} LANGUAGES CXX)
 
-if("${CMAKE_BUILD_TYPE}" STREQUAL "Debug")
-message(STATUS "${CMAKE_BUILD_TYPE}")
-endif()
-
 include(${CMAKE_CURRENT_SOURCE_DIR}/../third/download.cmake)
 # wait for unified version cef source code and prebuilt files
 prepare_prebuilt_files(${CMAKE_CURRENT_SOURCE_DIR}/../third/cef)
@@ -88,7 +84,7 @@ if("${CEF_RELEASE_DIR}" STREQUAL "")
 endif()
 
 if("${CEF_DEBUG_DIR}" STREQUAL "")
-  message(WARNING "CEF debug libraries not found. Falling back to release libs for Debug config.")
+  message(STATUS "webview_cef: CEF debug libraries not found, falling back to release libs for Debug config")
   set(CEF_DEBUG_DIR "${CEF_RELEASE_DIR}")
 endif()
 
