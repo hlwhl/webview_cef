@@ -394,6 +394,14 @@ void WebviewHandler::OnImeCompositionRangeChanged(CefRefPtr<CefBrowser> browser,
     }
 }
 
+void WebviewHandler::sendKeyEvent(int browserId, CefKeyEvent& ev)
+{
+    auto it = browser_map_.find(browserId);
+    if (it != browser_map_.end()) {
+        it->second.browser->GetHost()->SendKeyEvent(ev);
+    }
+}
+
 void WebviewHandler::sendKeyEvent(CefKeyEvent& ev)
 {
     auto browser = current_focused_browser_;

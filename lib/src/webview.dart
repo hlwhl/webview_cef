@@ -201,6 +201,30 @@ class WebViewController extends ValueNotifier<bool> {
         .invokeMethod('evaluateJavascript', [_browserId, code]);
   }
 
+  Future<void> sendKeyEvent(
+      int type,
+      int modifiers,
+      int windowsKeyCode,
+      int nativeKeyCode,
+      bool isSystemKey,
+      int character,
+      int unmodifiedCharacter) async {
+    if (_isDisposed) {
+      return;
+    }
+    assert(value);
+    return _pluginChannel.invokeMethod('sendKeyEvent', {
+      'browserId': _browserId,
+      'type': type,
+      'modifiers': modifiers,
+      'windows_key_code': windowsKeyCode,
+      'native_key_code': nativeKeyCode,
+      'is_system_key': isSystemKey,
+      'character': character,
+      'unmodified_character': unmodifiedCharacter,
+    });
+  }
+
   /// Moves the virtual cursor to [position].
   Future<void> _cursorMove(Offset position) async {
     if (_isDisposed) {
@@ -379,6 +403,85 @@ class WebViewState extends State<WebView> with WebeViewTextInput {
         .addPostFrameCallback((_) => _reportSurfaceSize(context));
   }
 
+  KeyEventResult _onKeyEvent(FocusNode node, KeyEvent event) {
+    if (!Platform.isLinux) {
+      return KeyEventResult.ignored;
+    }
+
+    // Map Flutter KeyEvent to CEF CefKeyEvent
+    // CefKeyEvent type:
+    // 0: KEYEVENT_RAWKEYDOWN
+    // 1: KEYEVENT_KEYDOWN
+    // 2: KEYEVENT_KEYUP
+    // 3: KEYEVENT_CHAR
+
+    int type;
+    if (event is KeyDownEvent) {
+      type = 0; // KEYEVENT_RAWKEYDOWN
+    } else if (event is KeyUpEvent) {
+      type = 2; // KEYEVENT_KEYUP
+    } else if (event is KeyRepeatEvent) {
+      type = 0; // KEYEVENT_RAWKEYDOWN
+    } else {
+      return KeyEventResult.ignored;
+    }
+
+    int modifiers = 0;
+    final raw = event.getRawModifierState();
+    // CEF Modifiers (from cef_types.h)
+    // EVENTFLAG_CAPS_LOCK_ON = 1 << 0
+    // EVENTFLAG_SHIFT_DOWN = 1 << 1
+    // EVENTFLAG_CONTROL_DOWN = 1 << 2
+    // EVENTFLAG_ALT_DOWN = 1 << 3
+    // EVENTFLAG_LEFT_MOUSE_BUTTON = 1 << 4
+    // EVENTFLAG_MIDDLE_MOUSE_BUTTON = 1 << 5
+    // EVENTFLAG_RIGHT_MOUSE_BUTTON = 1 << 6
+    // EVENTFLAG_COMMAND_DOWN = 1 << 7
+    // EVENTFLAG_NUM_LOCK_ON = 1 << 8
+    // EVENTFLAG_IS_KEY_PAD = 1 << 9
+    // EVENTFLAG_IS_LEFT = 1 << 10
+    // EVENTFLAG_IS_RIGHT = 1 << 11
+
+    if (HardwareKeyboard.instance.isShiftPressed) modifiers |= (1 << 1);
+    if (HardwareKeyboard.instance.isControlPressed) modifiers |= (1 << 2);
+    if (HardwareKeyboard.instance.isAltPressed) modifiers |= (1 << 3);
+    if (HardwareKeyboard.instance.isMetaPressed) modifiers |= (1 << 7);
+    if (HardwareKeyboard.instance.isCapsLockOn) modifiers |= (1 << 0);
+    if (HardwareKeyboard.instance.isNumLockOn) modifiers |= (1 << 8);
+
+    // Get windows_key_code (Virtual Key Code)
+    int windowsKeyCode = event.logicalKey.keyId & 0x0FFFFFFF;
+    // Map some common logical keys to windows virtual keys if they don't match
+    // Flutter logical key IDs for keys < 0x100000000 match HID usage or are custom.
+    // For many keys, the lower bits are the same as Windows VK codes.
+    if (event.logicalKey == LogicalKeyboardKey.backspace) windowsKeyCode = 0x08;
+    if (event.logicalKey == LogicalKeyboardKey.tab) windowsKeyCode = 0x09;
+    if (event.logicalKey == LogicalKeyboardKey.enter) windowsKeyCode = 0x0D;
+    if (event.logicalKey == LogicalKeyboardKey.escape) windowsKeyCode = 0x1B;
+    if (event.logicalKey == LogicalKeyboardKey.space) windowsKeyCode = 0x20;
+
+    int nativeKeyCode = 0;
+    if (event.physicalKey.usbHidUsage != 0) {
+      nativeKeyCode = event.physicalKey.usbHidUsage;
+    }
+
+    int character = 0;
+    if (event.character != null && event.character!.isNotEmpty) {
+      character = event.character!.codeUnitAt(0);
+    }
+
+    _controller.sendKeyEvent(
+        type, modifiers, windowsKeyCode, nativeKeyCode, false, character, character);
+
+    // If it's a down event and has a character, also send KEYEVENT_CHAR
+    if ((event is KeyDownEvent || event is KeyRepeatEvent) && character != 0) {
+      _controller.sendKeyEvent(
+          3, modifiers, windowsKeyCode, nativeKeyCode, false, character, character);
+    }
+
+    return KeyEventResult.handled;
+  }
+
   @override
   Widget build(BuildContext context) {
     return Focus(
@@ -386,6 +489,7 @@ class WebViewState extends State<WebView> with WebeViewTextInput {
       focusNode: _focusNode,
       canRequestFocus: true,
       debugLabel: "webview_cef",
+      onKeyEvent: _onKeyEvent,
       onFocusChange: (focused) {
         _composingText = '';
         if (focused) {

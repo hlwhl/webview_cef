@@ -482,6 +482,14 @@ namespace webview_cef {
 		}
 	}
 
+	void WebviewPlugin::sendKeyEvent(int browserId, CefKeyEvent& ev)
+	{
+		m_handler->sendKeyEvent(browserId, ev);
+		if(ev.type == KEYEVENT_RAWKEYDOWN && ev.windows_key_code == 0x7B && (ev.modifiers & EVENTFLAG_CONTROL_DOWN) != 0){
+			m_handler->openDevTools(browserId);
+		}
+	}
+
 	void WebviewPlugin::sendKeyEvent(CefKeyEvent& ev)
 	{
 		m_handler->sendKeyEvent(ev);

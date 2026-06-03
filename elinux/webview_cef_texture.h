@@ -40,8 +40,15 @@ static WebviewCefTexture* webview_cef_texture_new() {
     return WEBVIEW_CEF_TEXTURE(g_object_new(webview_cef_texture_get_type(), nullptr));
 }
 
+static void webview_cef_texture_finalize(GObject *obj) {
+    WebviewCefTexture *self = WEBVIEW_CEF_TEXTURE(obj);
+    delete[] self->buffer;
+    G_OBJECT_CLASS(webview_cef_texture_parent_class)->finalize(obj);
+}
+
 static void webview_cef_texture_class_init(WebviewCefTextureClass *klass) {
     FL_PIXEL_BUFFER_TEXTURE_CLASS(klass)->copy_pixels = webview_cef_texture_copy_pixels;
+    G_OBJECT_CLASS(klass)->finalize = webview_cef_texture_finalize;
 }
 
 static void webview_cef_texture_init(WebviewCefTexture *self) {}

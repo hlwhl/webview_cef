@@ -43,11 +43,13 @@ public:
 
   virtual void onFrame(const void *buffer, int32_t width, int32_t height) override
   {
-    texture->width = width;
-    texture->height = height;
-    const auto size = width * height * 4;
-    delete texture->buffer;
-    texture->buffer = new uint8_t[size];
+    if (texture->width != (uint32_t)width || texture->height != (uint32_t)height) {
+      texture->width = width;
+      texture->height = height;
+      const auto size = width * height * 4;
+      delete[] texture->buffer;
+      texture->buffer = new uint8_t[size];
+    }
     webview_cef::SwapBufferFromBgraToRgba((void *)texture->buffer, buffer, width, height);
     fl_texture_registrar_mark_texture_frame_available(register_, FL_TEXTURE(texture));
   }
@@ -218,6 +220,37 @@ static void webview_cef_plugin_handle_method_call(
     }
     else if (ret < 0){
       fl_method_call_respond_error(method_call, "error", "error", encode_wavlue_to_flvalue(responseArgs), nullptr);
+    }
+    else if (strcmp(method, "sendKeyEvent") == 0) {
+      if (webview_value_get_type(encodeArgs) == Webview_Value_Type_Map) {
+          CefKeyEvent key_event;
+          WValue* browser_id_val = webview_value_get_value_string(encodeArgs, "browserId");
+          WValue* type_val = webview_value_get_value_string(encodeArgs, "type");
+          WValue* modifiers_val = webview_value_get_value_string(encodeArgs, "modifiers");
+          WValue* windows_key_code_val = webview_value_get_value_string(encodeArgs, "windows_key_code");
+          WValue* native_key_code_val = webview_value_get_value_string(encodeArgs, "native_key_code");
+          WValue* is_system_key_val = webview_value_get_value_string(encodeArgs, "is_system_key");
+          WValue* character_val = webview_value_get_value_string(encodeArgs, "character");
+          WValue* unmodified_character_val = webview_value_get_value_string(encodeArgs, "unmodified_character");
+
+          if (type_val) key_event.type = (cef_key_event_type_t)webview_value_get_int(type_val);
+          if (modifiers_val) key_event.modifiers = webview_value_get_int(modifiers_val);
+          if (windows_key_code_val) key_event.windows_key_code = webview_value_get_int(windows_key_code_val);
+          if (native_key_code_val) key_event.native_key_code = webview_value_get_int(native_key_code_val);
+          if (is_system_key_val) key_event.is_system_key = webview_value_get_bool(is_system_key_val);
+          if (character_val) key_event.character = webview_value_get_int(character_val);
+          if (unmodified_character_val) key_event.unmodified_character = webview_value_get_int(unmodified_character_val);
+
+          if (browser_id_val) {
+              int browser_id = webview_value_get_int(browser_id_val);
+              self->m_plugin->sendKeyEvent(browser_id, key_event);
+          } else {
+              self->m_plugin->sendKeyEvent(key_event);
+          }
+          fl_method_call_respond_success(method_call, nullptr, nullptr);
+      } else {
+          fl_method_call_respond_error(method_call, "error", "Invalid arguments for sendKeyEvent", nullptr, nullptr);
+      }
     }
     else{
       fl_method_call_respond_not_implemented(method_call, nullptr);
