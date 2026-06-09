@@ -70,3 +70,4 @@ app.*.map.json
 
 /macos/third/cef/Chromium Embedded Framework.framework
 /macos/third/cef/libcef_dll_wrapper.a
+/macos/third/cef/.cef_version

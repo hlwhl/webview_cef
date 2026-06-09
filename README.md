@@ -41,15 +41,35 @@ When building the project for the first time, a prebuilt cef bin package (200MB,
 
 ### macOS <img src="https://seeklogo.com/images/A/apple-logo-52C416BDDD-seeklogo.com.png" width="15">
 
-1. Download prebuilt cef bundles from [arm64](https://github.com/hlwhl/webview_cef/releases/download/prebuilt_cef_bin_mac_arm64/CEFbins-mac103.0.12-arm64.zip) or [intel](https://github.com/hlwhl/webview_cef/releases/download/prebuilt_cef_bin_mac_intel/mac103.0.12-Intel.zip) depends on your target machine arch.
+No manual binary setup is required. The prebuilt CEF framework is downloaded and
+placed into `macos/third/cef` automatically on the first `pod install` (i.e. the
+first time you build or run a macOS app that depends on `webview_cef`).
 
-> Note: You can also download [universal binary](https://github.com/hlwhl/webview_cef/releases/download/prebuilt_cef_bin_mac_universal/mac103.0.12-universal.zip) for build an mac-universal app if you want to build an mac universal app. See [#30](/../../issues/30). Thanks to [@okiabrian123](https://github.com/okiabrian123).
+By default the binary matching your host architecture is fetched (Apple Silicon →
+arm64, Intel → x86_64). To build a **mac-universal** app, force the universal
+binary by exporting an environment variable before building:
 
-2. Unzip the archive and put all files into `macos/third/cef`.
+```sh
+export WEBVIEW_CEF_MACOS_ARCH=universal
+flutter run -d macos
+# or: cd example && flutter run -d macos
+```
 
-3 Run the example app.
+Accepted values for `WEBVIEW_CEF_MACOS_ARCH` are `arm64`, `intel`, and `universal`.
 
-`**[HELP WANTED!]**` Finding a more elegant way to distribute the prebuilt package.
+<details>
+<summary>Manual / offline fallback</summary>
+
+If the automatic download fails (e.g. air-gapped CI), download the prebuilt CEF
+bundle yourself and unzip its contents directly into `macos/third/cef`:
+
+- [arm64](https://github.com/hlwhl/webview_cef/releases/download/prebuilt_cef_bin_mac_arm64/CEFbins-mac103.0.12-arm64.zip)
+- [intel](https://github.com/hlwhl/webview_cef/releases/download/prebuilt_cef_bin_mac_intel/mac103.0.12-Intel.zip)
+- [universal](https://github.com/hlwhl/webview_cef/releases/download/prebuilt_cef_bin_mac_universal/mac103.0.12-universal.zip) (see [#30](/../../issues/30), thanks to [@okiabrian123](https://github.com/okiabrian123))
+
+The download logic lives in [`macos/scripts/download_cef.sh`](macos/scripts/download_cef.sh).
+
+</details>
 
 > Note: Currently the project has not been enabled with multi process support due to debug convenience. If you want to enable multi process support, you may want to enable multi process mode by changing the implementation and build your own helper bundle. (Finding a more elegant way in the future.)
 
@@ -66,7 +86,7 @@ When building the project for the first time, a prebuilt cef bin package (200MB,
 - [ ] JS bridge support
 - [x] Release to pub
 - [x] Trackpad support
-- [ ] Better macOS binary distribution
+- [x] Better macOS binary distribution
 - [ ] Easier way to integrate macOS helper bundles(multi process)
 - [x] devTools support
 
