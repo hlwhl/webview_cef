@@ -5,36 +5,82 @@
 #ifndef CEF_TESTS_CEFSIMPLE_SIMPLE_APP_H_
 #define CEF_TESTS_CEFSIMPLE_SIMPLE_APP_H_
 
-#include "include/cef_app.h"
 #include <functional>
 #include "webview_handler.h"
+#include "webview_js_handler.h"
 
 // Implement application-level callbacks for the browser process.
-class WebviewApp : public CefApp, public CefBrowserProcessHandler {
+class WebviewApp : public CefApp, public CefBrowserProcessHandler, public CefRenderProcessHandler{
 public:
     WebviewApp(CefRefPtr<WebviewHandler> handler);
+
+    WebviewApp(){};
+
+    enum ProcessType{
+        BrowserProcess,
+        RendererProcess,
+        ZygoteProcess,
+        OtherProcess,
+    };
+
+    static ProcessType GetProcessType(CefRefPtr<CefCommandLine> command_line);
     
     // CefApp methods:
     CefRefPtr<CefBrowserProcessHandler> GetBrowserProcessHandler() override {
         return this;
     }
-    void OnBeforeCommandLineProcessing(
-                                       const CefString& process_type,
-                                       CefRefPtr<CefCommandLine> command_line) override {
-                                           command_line->AppendSwitch("disable-gpu");
-                                           command_line->AppendSwitch("disable-gpu-compositing");
-                                           #ifdef __APPLE__
-                                                command_line->AppendSwitch("use-mock-keychain");
-                                                command_line->AppendSwitch("single-process");
-                                           #endif
-                                       }
-    
+
+    CefRefPtr<CefRenderProcessHandler> GetRenderProcessHandler() override { 
+        return this; 
+    }
     // CefBrowserProcessHandler methods:
+    void OnBeforeCommandLineProcessing(
+        const CefString& process_type,
+        CefRefPtr<CefCommandLine> command_line) override;
+    void SetProcessMode(uint32_t uMode);
+    void SetEnableGPU(bool bEnable);
     void OnContextInitialized() override;
-    CefRefPtr<CefClient> GetDefaultClient() override;
+    // CefRefPtr<CefClient> GetDefaultClient() override;
+    void OnBeforeChildProcessLaunch(CefRefPtr<CefCommandLine> command_line) override;
+    void SetUnSafelyTreatInsecureOriginAsSecure(const CefString& strFilterDomain);
+
+    // CefRenderProcessHandler methods.
+    void OnWebKitInitialized() override;
+    void OnBrowserCreated(
+        CefRefPtr<CefBrowser> browser,
+        CefRefPtr<CefDictionaryValue> extra_info) override;
+    void OnBrowserDestroyed(CefRefPtr<CefBrowser> browser) override;
+    void OnContextCreated(
+        CefRefPtr<CefBrowser> browser,
+        CefRefPtr<CefFrame> frame, 
+        CefRefPtr<CefV8Context> context) override;
+    void OnContextReleased(
+        CefRefPtr<CefBrowser> browser, 
+        CefRefPtr<CefFrame> frame,
+        CefRefPtr<CefV8Context> context) override;
+    void OnUncaughtException(
+        CefRefPtr<CefBrowser> browser,
+        CefRefPtr<CefFrame> frame,
+        CefRefPtr<CefV8Context> context,
+        CefRefPtr<CefV8Exception> exception,
+        CefRefPtr<CefV8StackTrace> stackTrace) override;
+    void OnFocusedNodeChanged(
+        CefRefPtr<CefBrowser> browser,
+        CefRefPtr<CefFrame> frame,
+        CefRefPtr<CefDOMNode> node) override;
+    bool OnProcessMessageReceived(
+        CefRefPtr<CefBrowser> browser,
+        CefRefPtr<CefFrame> frame,
+        CefProcessId source_process,
+        CefRefPtr<CefProcessMessage> message) override;
     
 private:
-    CefRefPtr<WebviewHandler> m_handler;
+    uint32_t                        m_uMode = 1;                        //process mode
+    bool                            m_bEnableGPU = false;               //enable gpu
+    CefString                       m_strFilterDomain;                  //insecure domain whitelist       
+
+    CefRefPtr<WebviewHandler>       m_handler;                          //webview handler for main process
+    std::shared_ptr<CefJSBridge>	m_render_js_bridge;                 //js bridge for render process
     // Include the default reference counting implementation.
     IMPLEMENT_REFCOUNTING(WebviewApp);
 };

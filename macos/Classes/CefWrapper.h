@@ -9,37 +9,14 @@
 #define CefWrapper_h
 #import <FlutterMacOS/FlutterMacOS.h>
 
-extern NSObject<FlutterTextureRegistry>* tr;
-extern CGFloat scaleFactor;
-extern int64_t textureId;
+extern NSMapTable* webviewPlugins;
 
-@interface CefWrapper : NSObject<FlutterTexture>
+@interface CefWrapper : NSObject
 
-+ (void) init;
+@property(nonatomic) NSObject<FlutterTextureRegistry>* textureRegistry;
+@property(nonatomic) FlutterMethodChannel* channel;
 
-+ (void) startCef;
-
-+ (void) cursorClickUp: (int)x y:(int)y;
-
-+ (void) cursorClickDown: (int)x y:(int)y;
-
-+ (void) cursorMove: (int)x y:(int)y dragging:(bool)dragging;
-
-+ (void) sendScrollEvent:(int)x y:(int)y deltaX:(int)deltaX deltaY:(int)deltaY;
-
-+ (void) sizeChanged: (float)dpi width:(int)width height:(int)height;
-
-+ (void) loadUrl: (NSString *)url;
-
-+ (void) goForward;
-
-+ (void) goBack;
-
-+ (void) reload;
-
-+ (void) openDevTools;
-
-+ (void) setMethodChannel: (FlutterMethodChannel*)channel;
+- (void)handleMethodCallWrapper: (FlutterMethodCall*)call result:(FlutterResult)result;
 
 @end
 

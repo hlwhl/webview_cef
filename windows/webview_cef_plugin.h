@@ -4,19 +4,17 @@
 #include <flutter/method_channel.h>
 #include <flutter/plugin_registrar_windows.h>
 
+#include <webview_plugin.h>
 #include <memory>
-
-#include "include/cef_app.h"
 
 namespace webview_cef {
 
 class WebviewCefPlugin : public flutter::Plugin {
  public:
-  static void RegisterWithRegistrar(flutter::PluginRegistrarWindows *registrar);
-  static void sendKeyEvent(CefKeyEvent ev);
+  static void RegisterWithRegistrar(FlutterDesktopPluginRegistrarRef registrar);
+  static void handleMessageProc(HWND hwnd, UINT message, WPARAM wparam, LPARAM lparam);
 
   WebviewCefPlugin();
-
   virtual ~WebviewCefPlugin();
 
   // Disallow copy and assign.
@@ -27,7 +25,18 @@ class WebviewCefPlugin : public flutter::Plugin {
   // Called when a method is called on this plugin's channel from Dart.
   void HandleMethodCall(
       const flutter::MethodCall<flutter::EncodableValue> &method_call,
-      std::unique_ptr<flutter::MethodResult<flutter::EncodableValue>> result);
+      std::shared_ptr<flutter::MethodResult<flutter::EncodableValue>> result);
+  std::shared_ptr<WebviewPlugin> m_plugin;
+  
+	FlutterDesktopTextureRegistrarRef m_textureRegistrar;
+
+	std::unique_ptr<
+		flutter::MethodChannel<flutter::EncodableValue>,
+		std::default_delete<flutter::MethodChannel<flutter::EncodableValue>>>
+		m_channel = nullptr;
+
+  DWORD m_mainThreadId;
+  HWND m_hwnd;
 };
 
 }  // namespace webview_cef
