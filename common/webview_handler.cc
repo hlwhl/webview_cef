@@ -166,17 +166,19 @@ void WebviewHandler::OnBeforeClose(CefRefPtr<CefBrowser> browser) {
 }
 
 bool WebviewHandler::OnBeforePopup(CefRefPtr<CefBrowser> browser,
-                                  CefRefPtr<CefFrame> frame,
-                                  const CefString& target_url,
-                                  const CefString& target_frame_name,
-                                  WindowOpenDisposition target_disposition,
-                                  bool user_gesture,
-                                  const CefPopupFeatures& popupFeatures,
-                                  CefWindowInfo& windowInfo,
-                                  CefRefPtr<CefClient>& client,
-                                  CefBrowserSettings& settings,
-                                  CefRefPtr<CefDictionaryValue>& extra_info,
-                                  bool* no_javascript_access) {
+                                   CefRefPtr<CefFrame> frame,
+                                   int popup_id, // Add this parameter
+                                   const CefString &target_url,
+                                   const CefString &target_frame_name,
+                                   WindowOpenDisposition target_disposition,
+                                   bool user_gesture,
+                                   const CefPopupFeatures &popupFeatures,
+                                   CefWindowInfo &windowInfo,
+                                   CefRefPtr<CefClient> &client,
+                                   CefBrowserSettings &settings,
+                                   CefRefPtr<CefDictionaryValue> &extra_info,
+                                   bool *no_javascript_access)
+{
     loadUrl(browser->GetIdentifier(), target_url);
     return true;
 }

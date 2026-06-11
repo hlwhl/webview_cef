@@ -408,6 +408,10 @@ class WebViewState extends State<WebView> with WebeViewTextInput {
       return KeyEventResult.ignored;
     }
 
+  print("KEY EVENT: ${event.runtimeType} logicalKey=${event.logicalKey} "
+          "physicalKey=${event.physicalKey} character=${event.character} "
+          "keyId=${event.logicalKey.keyId.toRadixString(16)}");
+
     // Map Flutter KeyEvent to CEF CefKeyEvent
     // CefKeyEvent type:
     // 0: KEYEVENT_RAWKEYDOWN
@@ -427,7 +431,6 @@ class WebViewState extends State<WebView> with WebeViewTextInput {
     }
 
     int modifiers = 0;
-    final raw = event.getRawModifierState();
     // CEF Modifiers (from cef_types.h)
     // EVENTFLAG_CAPS_LOCK_ON = 1 << 0
     // EVENTFLAG_SHIFT_DOWN = 1 << 1
@@ -446,8 +449,8 @@ class WebViewState extends State<WebView> with WebeViewTextInput {
     if (HardwareKeyboard.instance.isControlPressed) modifiers |= (1 << 2);
     if (HardwareKeyboard.instance.isAltPressed) modifiers |= (1 << 3);
     if (HardwareKeyboard.instance.isMetaPressed) modifiers |= (1 << 7);
-    if (HardwareKeyboard.instance.isCapsLockOn) modifiers |= (1 << 0);
-    if (HardwareKeyboard.instance.isNumLockOn) modifiers |= (1 << 8);
+    if (HardwareKeyboard.instance.lockModesEnabled.contains(KeyboardLockMode.capsLock)) modifiers |= (1 << 0);
+    if (HardwareKeyboard.instance.lockModesEnabled.contains(KeyboardLockMode.numLock)) modifiers |= (1 << 8);
 
     // Get windows_key_code (Virtual Key Code)
     int windowsKeyCode = event.logicalKey.keyId & 0x0FFFFFFF;

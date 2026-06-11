@@ -4,7 +4,7 @@
 
 #include <flutter/dart_project.h>
 #include <flutter/flutter_view_controller.h>
-
+#include <webview_cef/webview_cef_plugin.h>
 #include <iostream>
 #include <memory>
 #include <string>
@@ -13,11 +13,17 @@
 #include "flutter_window.h"
 
 int main(int argc, char** argv) {
+  // 1. Initialize CEF processes. 
+  // If this returns >= 0, it means this is a CEF subprocess and we should exit.
+  int exit_code = initCEFProcesses(argc, argv);
+  if (exit_code >= 0) {
+    return exit_code;
+  }
+
   FlutterEmbedderOptions options;
   if (!options.Parse(argc, argv)) {
     return 0;
   }
-
   // Creates the Flutter project.
   const auto bundle_path = options.BundlePath();
   const std::wstring fl_path(bundle_path.begin(), bundle_path.end());

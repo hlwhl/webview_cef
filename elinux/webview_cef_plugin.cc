@@ -1,326 +1,257 @@
 #include "include/webview_cef/webview_cef_plugin.h"
+#include "include/cef_browser.h"
 
-#include <flutter_elinux/flutter_elinux.h>
-#include <sys/utsname.h>
+#include <flutter_elinux.h>
+#include <flutter/plugin_registrar.h>
+#include <flutter/method_channel.h>
+#include <flutter/standard_method_codec.h>
+#include <flutter/texture_registrar.h>
 
 #include <cstring>
+#include <memory>
 #include <unordered_map>
+
 #include <webview_plugin.h>
 #include "webview_cef_texture.h"
 
-#define WEBVIEW_CEF_PLUGIN(obj)                                     \
-  (G_TYPE_CHECK_INSTANCE_CAST((obj), webview_cef_plugin_get_type(), \
-                              WebviewCefPlugin))
-
-struct _WebviewCefPlugin
-{
-  GObject parent_instance;
-  std::shared_ptr<webview_cef::WebviewPlugin> m_plugin;
-  FlTextureRegistrar *m_textureRegister;
-  int64_t m_window;
-};
-
-G_DEFINE_TYPE(WebviewCefPlugin, webview_cef_plugin, g_object_get_type())
-
 std::unordered_map<int64_t, std::shared_ptr<webview_cef::WebviewPlugin>> webviewPlugins;
 
-class WebviewTextureRenderer : public webview_cef::WebviewTexture
-{
-public:
-  WebviewTextureRenderer(FlTextureRegistrar *texture_register)
-  {
-    register_ = texture_register;
-    texture = webview_cef_texture_new();
-    fl_texture_registrar_register_texture(register_, FL_TEXTURE(texture));
-    textureId = (int64_t)texture;
+class WebviewTextureRenderer : public webview_cef::WebviewTexture {
+ public:
+  WebviewTextureRenderer(flutter::TextureRegistrar* registrar)
+      : registrar_(registrar) {
+    texture_ = std::make_unique<WebviewCefTexture>();
+    texture_->textureId =
+        registrar_->RegisterTexture(texture_->texture_variant.get());
+    textureId = texture_->textureId;
   }
 
-  virtual ~WebviewTextureRenderer()
-  {
-    fl_texture_registrar_unregister_texture(register_, FL_TEXTURE(texture));
-    register_ = nullptr;
+  ~WebviewTextureRenderer() override {
+    registrar_->UnregisterTexture(texture_->textureId);
   }
 
-  virtual void onFrame(const void *buffer, int32_t width, int32_t height) override
-  {
-    if (texture->width != (uint32_t)width || texture->height != (uint32_t)height) {
-      texture->width = width;
-      texture->height = height;
-      const auto size = width * height * 4;
-      delete[] texture->buffer;
-      texture->buffer = new uint8_t[size];
+  void onFrame(const void* buffer, int32_t width, int32_t height) override {
+    std::lock_guard<std::mutex> lock(texture_->mutex);
+    if (texture_->width != (uint32_t)width ||
+        texture_->height != (uint32_t)height) {
+      texture_->width = width;
+      texture_->height = height;
+      delete[] texture_->buffer;
+      texture_->buffer = new uint8_t[width * height * 4];
     }
-    webview_cef::SwapBufferFromBgraToRgba((void *)texture->buffer, buffer, width, height);
-    fl_texture_registrar_mark_texture_frame_available(register_, FL_TEXTURE(texture));
+    webview_cef::SwapBufferFromBgraToRgba(
+        (void*)texture_->buffer, buffer, width, height);
+    registrar_->MarkTextureFrameAvailable(texture_->textureId);
   }
-  FlTextureRegistrar *register_;
-  WebviewCefTexture *texture;
+
+ private:
+  flutter::TextureRegistrar* registrar_;
+  std::unique_ptr<WebviewCefTexture> texture_;
 };
 
-static FlValue *encode_wavlue_to_flvalue(WValue *args)
-{
+// ── Value conversion helpers (unchanged) ────────────────────────────────────
+
+static flutter::EncodableValue encode_wvalue(WValue* args) {
   WValueType type = webview_value_get_type(args);
-  switch (type)
-  {
-  case Webview_Value_Type_Bool:
-    return fl_value_new_bool(webview_value_get_bool(args));
-  case Webview_Value_Type_Int:
-    return fl_value_new_int(webview_value_get_int(args));
-  case Webview_Value_Type_Float:
-    return fl_value_new_float(webview_value_get_float(args));
-  case Webview_Value_Type_Double:
-    return fl_value_new_float(webview_value_get_double(args));
-  case Webview_Value_Type_String:
-    return fl_value_new_string(webview_value_get_string(args));
-  case Webview_Value_Type_Uint8_List:
-  {
-    size_t len = webview_value_get_len(args);
-    const uint8_t *val = webview_value_get_uint8_list(args);
-    return fl_value_new_uint8_list(val, len);
-  }
-  case Webview_Value_Type_Int32_List:
-  {
-    size_t len = webview_value_get_len(args);
-    const int32_t *val = webview_value_get_int32_list(args);
-    return fl_value_new_int32_list(val, len);
-  }
-  case Webview_Value_Type_Int64_List:
-  {
-    size_t len = webview_value_get_len(args);
-    const int64_t *val = webview_value_get_int64_list(args);
-    return fl_value_new_int64_list(val, len);
-  }
-  case Webview_Value_Type_Float_List:
-  {
-    size_t len = webview_value_get_len(args);
-    const float *val = webview_value_get_float_list(args);
-    return fl_value_new_float32_list(val, len);
-  }
-  case Webview_Value_Type_Double_List:
-  {
-    size_t len = webview_value_get_len(args);
-    const double *val = webview_value_get_double_list(args);
-    return fl_value_new_float_list(val, len);
-  }
-  case Webview_Value_Type_List:
-  {
-    FlValue *ret = fl_value_new_list();
-    size_t len = webview_value_get_len(args);
-    for (size_t i = 0; i < len; i++)
-    {
-      FlValue *val = encode_wavlue_to_flvalue(webview_value_get_list_value(args, i));
-      fl_value_append(ret, val);
-      fl_value_unref(val);
+  switch (type) {
+    case Webview_Value_Type_Bool:
+      return flutter::EncodableValue(webview_value_get_bool(args));
+    case Webview_Value_Type_Int:
+      return flutter::EncodableValue((int64_t)webview_value_get_int(args));
+    case Webview_Value_Type_Float:
+      return flutter::EncodableValue(webview_value_get_float(args));
+    case Webview_Value_Type_Double:
+      return flutter::EncodableValue(webview_value_get_double(args));
+    case Webview_Value_Type_String:
+      return flutter::EncodableValue(
+          std::string(webview_value_get_string(args)));
+    case Webview_Value_Type_List: {
+      flutter::EncodableList list;
+      size_t len = webview_value_get_len(args);
+      for (size_t i = 0; i < len; i++)
+        list.push_back(encode_wvalue(webview_value_get_list_value(args, i)));
+      return flutter::EncodableValue(list);
     }
-    return ret;
-  }
-  case Webview_Value_Type_Map:
-  {
-    FlValue *ret = fl_value_new_map();
-    size_t len = webview_value_get_len(args);
-    for (size_t i = 0; i < len; i++)
-    {
-      FlValue *key = encode_wavlue_to_flvalue(webview_value_get_key(args, i));
-      FlValue *val = encode_wavlue_to_flvalue(webview_value_get_value(args, i));
-      fl_value_set(ret, key, val);
-      fl_value_unref(key);
-      fl_value_unref(val);
-    }
-    return ret;
-  }
-  default:
-    return fl_value_new_null();
-  }
-}
-
-static WValue *encode_flvalue_to_wvalue(FlValue *args)
-{
-  FlValueType argsType = fl_value_get_type(args);
-  switch (argsType)
-  {
-  case FL_VALUE_TYPE_BOOL:
-    return webview_value_new_bool(fl_value_get_bool(args));
-  case FL_VALUE_TYPE_INT:
-    return webview_value_new_int(fl_value_get_int(args));
-  case FL_VALUE_TYPE_FLOAT:
-    return webview_value_new_double(fl_value_get_float(args));
-  case FL_VALUE_TYPE_STRING:
-    return webview_value_new_string(fl_value_get_string(args));
-  case FL_VALUE_TYPE_UINT8_LIST:
-  {
-    size_t len = fl_value_get_length(args);
-    const uint8_t *val = fl_value_get_uint8_list(args);
-    return webview_value_new_uint8_list(val, len);
-  }
-  case FL_VALUE_TYPE_INT32_LIST:
-  {
-    size_t len = fl_value_get_length(args);
-    const int32_t *val = fl_value_get_int32_list(args);
-    return webview_value_new_int32_list(val, len);
-  }
-  case FL_VALUE_TYPE_INT64_LIST:
-  {
-    size_t len = fl_value_get_length(args);
-    const int64_t *val = fl_value_get_int64_list(args);
-    return webview_value_new_int64_list(val, len);
-  }
-  case FL_VALUE_TYPE_FLOAT32_LIST:
-  {
-    size_t len = fl_value_get_length(args);
-    const float *val = fl_value_get_float32_list(args);
-    return webview_value_new_float_list(val, len);
-  }
-  case FL_VALUE_TYPE_FLOAT_LIST:
-  {
-    size_t len = fl_value_get_length(args);
-    const double *val = fl_value_get_float_list(args);
-    return webview_value_new_double_list(val, len);
-  }
-  case FL_VALUE_TYPE_LIST:
-  {
-    WValue *ret = webview_value_new_list();
-    size_t len = fl_value_get_length(args);
-    for (size_t i = 0; i < len; i++)
-    {
-      WValue *item = encode_flvalue_to_wvalue(fl_value_get_list_value(args, i));
-      webview_value_append(ret, item);
-      webview_value_unref(item);
-    }
-    return ret;
-  }
-  case FL_VALUE_TYPE_MAP:
-  {
-    WValue *ret = webview_value_new_map();
-    size_t len = fl_value_get_length(args);
-    for (size_t i = 0; i < len; i++)
-    {
-      WValue *key = encode_flvalue_to_wvalue(fl_value_get_map_key(args, i));
-      WValue *val = encode_flvalue_to_wvalue(fl_value_get_map_value(args, i));
-      webview_value_set(ret, key, val);
-      webview_value_unref(key);
-      webview_value_unref(val);
-    }
-    return ret;
-  }
-  default:
-    return webview_value_new_null();
-  }
-}
-
-static void webview_cef_plugin_handle_method_call(
-    WebviewCefPlugin *self,
-    FlMethodCall *method_call)
-{
-  const gchar *method = fl_method_call_get_name(method_call);
-  WValue *encodeArgs = encode_flvalue_to_wvalue(fl_method_call_get_args(method_call));
-  g_object_ref(method_call);
-  self->m_plugin->HandleMethodCall(method, encodeArgs, [=](int ret, WValue *responseArgs){
-    if (ret > 0){
-      fl_method_call_respond_success(method_call, encode_wavlue_to_flvalue(responseArgs), nullptr);
-    }
-    else if (ret < 0){
-      fl_method_call_respond_error(method_call, "error", "error", encode_wavlue_to_flvalue(responseArgs), nullptr);
-    }
-    else if (strcmp(method, "sendKeyEvent") == 0) {
-      if (webview_value_get_type(encodeArgs) == Webview_Value_Type_Map) {
-          CefKeyEvent key_event;
-          WValue* browser_id_val = webview_value_get_value_string(encodeArgs, "browserId");
-          WValue* type_val = webview_value_get_value_string(encodeArgs, "type");
-          WValue* modifiers_val = webview_value_get_value_string(encodeArgs, "modifiers");
-          WValue* windows_key_code_val = webview_value_get_value_string(encodeArgs, "windows_key_code");
-          WValue* native_key_code_val = webview_value_get_value_string(encodeArgs, "native_key_code");
-          WValue* is_system_key_val = webview_value_get_value_string(encodeArgs, "is_system_key");
-          WValue* character_val = webview_value_get_value_string(encodeArgs, "character");
-          WValue* unmodified_character_val = webview_value_get_value_string(encodeArgs, "unmodified_character");
-
-          if (type_val) key_event.type = (cef_key_event_type_t)webview_value_get_int(type_val);
-          if (modifiers_val) key_event.modifiers = webview_value_get_int(modifiers_val);
-          if (windows_key_code_val) key_event.windows_key_code = webview_value_get_int(windows_key_code_val);
-          if (native_key_code_val) key_event.native_key_code = webview_value_get_int(native_key_code_val);
-          if (is_system_key_val) key_event.is_system_key = webview_value_get_bool(is_system_key_val);
-          if (character_val) key_event.character = webview_value_get_int(character_val);
-          if (unmodified_character_val) key_event.unmodified_character = webview_value_get_int(unmodified_character_val);
-
-          if (browser_id_val) {
-              int browser_id = webview_value_get_int(browser_id_val);
-              self->m_plugin->sendKeyEvent(browser_id, key_event);
-          } else {
-              self->m_plugin->sendKeyEvent(key_event);
-          }
-          fl_method_call_respond_success(method_call, nullptr, nullptr);
-      } else {
-          fl_method_call_respond_error(method_call, "error", "Invalid arguments for sendKeyEvent", nullptr, nullptr);
+    case Webview_Value_Type_Map: {
+      flutter::EncodableMap map;
+      size_t len = webview_value_get_len(args);
+      for (size_t i = 0; i < len; i++) {
+        auto key = encode_wvalue(webview_value_get_key(args, i));
+        auto val = encode_wvalue(webview_value_get_value(args, i));
+        map[key] = val;
       }
+      return flutter::EncodableValue(map);
     }
-    else{
-      fl_method_call_respond_not_implemented(method_call, nullptr);
-    }
-    g_object_unref(method_call); 
-  });
-  webview_value_unref(encodeArgs);
-}
-
-static void webview_cef_plugin_dispose(GObject *object)
-{
-  webviewPlugins.erase(WEBVIEW_CEF_PLUGIN(object)->m_window);
-  WEBVIEW_CEF_PLUGIN(object)->m_plugin = nullptr; 
-  if(webviewPlugins.empty()){
-    webview_cef::stopCEF();
+    default:
+      return flutter::EncodableValue();
   }
-  G_OBJECT_CLASS(webview_cef_plugin_parent_class)->dispose(object);
 }
 
-static void webview_cef_plugin_class_init(WebviewCefPluginClass *klass)
-{
-  G_OBJECT_CLASS(klass)->dispose = webview_cef_plugin_dispose;
+static WValue* decode_to_wvalue(const flutter::EncodableValue& val) {
+  if (std::holds_alternative<bool>(val))
+    return webview_value_new_bool(std::get<bool>(val));
+  if (std::holds_alternative<int32_t>(val))
+    return webview_value_new_int(std::get<int32_t>(val));
+  if (std::holds_alternative<int64_t>(val))
+    return webview_value_new_int(std::get<int64_t>(val));
+  if (std::holds_alternative<double>(val))
+    return webview_value_new_double(std::get<double>(val));
+  if (std::holds_alternative<std::string>(val))
+    return webview_value_new_string(std::get<std::string>(val).c_str());
+  if (std::holds_alternative<flutter::EncodableList>(val)) {
+    WValue* list = webview_value_new_list();
+    for (auto& item : std::get<flutter::EncodableList>(val)) {
+      WValue* witem = decode_to_wvalue(item);
+      webview_value_append(list, witem);
+      webview_value_unref(witem);
+    }
+    return list;
+  }
+  if (std::holds_alternative<flutter::EncodableMap>(val)) {
+    WValue* map = webview_value_new_map();
+    for (auto& [k, v] : std::get<flutter::EncodableMap>(val)) {
+      WValue* wk = decode_to_wvalue(k);
+      WValue* wv = decode_to_wvalue(v);
+      webview_value_set(map, wk, wv);
+      webview_value_unref(wk);
+      webview_value_unref(wv);
+    }
+    return map;
+  }
+  return webview_value_new_null();
 }
 
-static void webview_cef_plugin_init(WebviewCefPlugin *self) {
-  self->m_plugin = std::make_shared<webview_cef::WebviewPlugin>();
+// ── Plugin class ─────────────────────────────────────────────────────────────
+
+class WebviewCefPlugin : public flutter::Plugin {
+ public:
+  static void RegisterWithRegistrar(flutter::PluginRegistrar* registrar) {
+    auto channel = std::make_unique<flutter::MethodChannel<flutter::EncodableValue>>(
+        registrar->messenger(), "webview_cef",
+        &flutter::StandardMethodCodec::GetInstance());
+
+    auto plugin = std::make_unique<WebviewCefPlugin>(
+        registrar->texture_registrar(), std::move(channel));
+
+    registrar->AddPlugin(std::move(plugin));
+  }
+
+  WebviewCefPlugin(flutter::TextureRegistrar* texture_registrar,
+                   std::unique_ptr<flutter::MethodChannel<flutter::EncodableValue>> channel)
+      : texture_registrar_(texture_registrar),
+        channel_(std::move(channel)),
+        plugin_(std::make_shared<webview_cef::WebviewPlugin>()) {
+
+    channel_->SetMethodCallHandler(
+        [this](const flutter::MethodCall<flutter::EncodableValue>& call,
+               std::unique_ptr<flutter::MethodResult<flutter::EncodableValue>> result) {
+          HandleMethodCall(call, std::move(result));
+        });
+
+    plugin_->setInvokeMethodFunc([this](std::string method, WValue* arguments) {
+      flutter::EncodableValue args = encode_wvalue(arguments);
+      channel_->InvokeMethod(method,
+          std::make_unique<flutter::EncodableValue>(args));
+    });
+
+    plugin_->setCreateTextureFunc([this]() {
+      auto renderer = std::make_shared<WebviewTextureRenderer>(texture_registrar_);
+      return std::dynamic_pointer_cast<webview_cef::WebviewTexture>(renderer);
+    });
+  }
+
+  ~WebviewCefPlugin() override {
+    webviewPlugins.erase(window_id_);
+    plugin_ = nullptr;
+    if (webviewPlugins.empty()) {
+      webview_cef::stopCEF();
+    }
+  }
+
+  void SetWindowId(int64_t id) {
+    window_id_ = id;
+    webviewPlugins.emplace(id, plugin_);
+  }
+
+ private:
+ void HandleMethodCall(
+         const flutter::MethodCall<flutter::EncodableValue>& call,
+         std::unique_ptr<flutter::MethodResult<flutter::EncodableValue>> result) {
+
+       const std::string& method = call.method_name();
+       WValue* args = decode_to_wvalue(
+           call.arguments() ? *call.arguments() : flutter::EncodableValue());
+
+       auto result_ptr = result.release();
+       plugin_->HandleMethodCall(
+           method.c_str(), args,
+           [this, result_ptr, method, args](int ret, WValue* responseArgs) {
+             if (ret > 0) {
+               auto val = encode_wvalue(responseArgs);
+               result_ptr->Success(val);
+             } else if (ret < 0) {
+               result_ptr->Error("error", "error");
+             } else if (method == "sendKeyEvent") {
+               if (webview_value_get_type(args) == Webview_Value_Type_Map) {
+                 CefKeyEvent key_event;
+                 // Use webview_value_get_by_string as defined in common/webview_value.h
+                 WValue* type_val = webview_value_get_by_string(args, "type");
+                 WValue* modifiers_val = webview_value_get_by_string(args, "modifiers");
+                 WValue* windows_key_code_val = webview_value_get_by_string(args, "windows_key_code");
+                 WValue* native_key_code_val = webview_value_get_by_string(args, "native_key_code");
+                 WValue* is_system_key_val = webview_value_get_by_string(args, "is_system_key");
+                 WValue* character_val = webview_value_get_by_string(args, "character");
+                 WValue* unmodified_character_val = webview_value_get_by_string(args, "unmodified_character");
+
+                 if (type_val) key_event.type = (cef_key_event_type_t)webview_value_get_int(type_val);
+                 if (modifiers_val) key_event.modifiers = webview_value_get_int(modifiers_val);
+                 if (windows_key_code_val) key_event.windows_key_code = webview_value_get_int(windows_key_code_val);
+                 if (native_key_code_val) key_event.native_key_code = webview_value_get_int(native_key_code_val);
+                 if (is_system_key_val) key_event.is_system_key = webview_value_get_bool(is_system_key_val);
+                 if (character_val) key_event.character = webview_value_get_int(character_val);
+                 if (unmodified_character_val) key_event.unmodified_character = webview_value_get_int(unmodified_character_val);
+
+                 WValue* browser_id_val = webview_value_get_by_string(args, "browserId");
+                 if (browser_id_val) {
+                   plugin_->sendKeyEvent(webview_value_get_int(browser_id_val), key_event);
+                 } else {
+                   plugin_->sendKeyEvent(key_event);
+                 }
+                 result_ptr->Success();
+               } else {
+                 fprintf(stderr, "ELINUX: sendKeyEvent failed - arguments not a map\n");
+                 result_ptr->Error("error", "Invalid arguments for sendKeyEvent");
+               }
+             } else {
+               result_ptr->NotImplemented();
+             }
+             delete result_ptr;
+             webview_value_unref(args);
+           });
+     }
+
+  flutter::TextureRegistrar* texture_registrar_;
+  std::unique_ptr<flutter::MethodChannel<flutter::EncodableValue>> channel_;
+  std::shared_ptr<webview_cef::WebviewPlugin> plugin_;
+  int64_t window_id_ = 0;
+};
+
+// ── C entry points ───────────────────────────────────────────────────────────
+
+void webview_cef_plugin_register_with_registrar(
+    FlutterDesktopPluginRegistrarRef registrar) {
+  WebviewCefPlugin::RegisterWithRegistrar(
+      flutter::PluginRegistrarManager::GetInstance()
+          ->GetRegistrar<flutter::PluginRegistrar>(registrar));
 }
 
-static void method_call_cb(FlMethodChannel *channel, FlMethodCall *method_call,
-                           gpointer user_data)
-{
-  WebviewCefPlugin *plugin = WEBVIEW_CEF_PLUGIN(user_data);
-  webview_cef_plugin_handle_method_call(plugin, method_call);
-}
-
-void webview_cef_plugin_register_with_registrar(FlPluginRegistrar *registrar)
-{
-  WebviewCefPlugin *plugin = WEBVIEW_CEF_PLUGIN(
-      g_object_new(webview_cef_plugin_get_type(), nullptr));
-
-  plugin->m_window = int64_t(fl_plugin_registrar_get_view(registrar));
-  webviewPlugins.emplace(plugin->m_window, plugin->m_plugin);
-
-  plugin->m_textureRegister = fl_plugin_registrar_get_texture_registrar(registrar);
-
-  g_autoptr(FlStandardMethodCodec) codec = fl_standard_method_codec_new();
-  g_autoptr(FlMethodChannel) channel =
-      fl_method_channel_new(fl_plugin_registrar_get_messenger(registrar),
-                            "webview_cef",
-                            FL_METHOD_CODEC(codec));
-  fl_method_channel_set_method_call_handler(channel, method_call_cb,
-                                            g_object_ref(plugin),
-                                            g_object_unref);
-
-  plugin->m_plugin->setInvokeMethodFunc([=](std::string method, WValue *arguments) {
-    FlValue *args = encode_wavlue_to_flvalue(arguments);
-    fl_method_channel_invoke_method(channel, method.c_str(), args, NULL, NULL, NULL);
-    fl_value_unref(args);
-  });
-
-  plugin->m_plugin->setCreateTextureFunc([=](){
-    std::shared_ptr<WebviewTextureRenderer> renderer = std::make_shared<WebviewTextureRenderer>(plugin->m_textureRegister);
-    return std::dynamic_pointer_cast<webview_cef::WebviewTexture>(renderer);
-  });
-
-  g_object_unref(plugin);
-}
-
-FLUTTER_PLUGIN_EXPORT int initCEFProcesses(int argc, char **argv)
-{
+FLUTTER_PLUGIN_EXPORT int initCEFProcesses(int argc, char** argv) {
   CefMainArgs main_args(argc, argv);
   return webview_cef::initCEFProcesses(main_args);
+}
+
+// Alias expected by generated_plugin_registrant.cc
+FLUTTER_PLUGIN_EXPORT void WebviewCefPluginRegisterWithRegistrar(
+    FlutterDesktopPluginRegistrarRef registrar) {
+  webview_cef_plugin_register_with_registrar(registrar);
 }

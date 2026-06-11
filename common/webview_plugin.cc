@@ -1,3 +1,6 @@
+#include <unistd.h>
+#include <libgen.h>
+#include <limits.h>
 #include "webview_plugin.h"
 
 #ifdef OS_MAC
@@ -32,13 +35,13 @@ namespace webview_cef {
 	void WebviewPlugin::initCallback() {
 		if (!m_init)
 		{
-			m_handler->onPaintCallback = [=](int browserId, const void* buffer, int32_t width, int32_t height) {
+			m_handler->onPaintCallback = [=, this](int browserId, const void* buffer, int32_t width, int32_t height) {
 				if (m_renderers.find(browserId) != m_renderers.end() && m_renderers[browserId] != nullptr) {
 					m_renderers[browserId]->onFrame(buffer, width, height);
 				}
 			};
 
-			m_handler->onTooltipEvent = [=](int browserId, std::string text) {
+			m_handler->onTooltipEvent = [=, this](int browserId, std::string text) {
 				if (m_invokeFunc) {
 					WValue* bId = webview_value_new_int(browserId);
 					WValue* wText = webview_value_new_string(const_cast<char*>(text.c_str()));
@@ -52,7 +55,7 @@ namespace webview_cef {
 				}
 			};
 
-			m_handler->onCursorChangedEvent = [=](int browserId, int type) {
+			m_handler->onCursorChangedEvent = [=, this](int browserId, int type) {
 				if(m_invokeFunc){
 					WValue* bId = webview_value_new_int(browserId);
 					WValue* wType = webview_value_new_int(type);
@@ -66,7 +69,7 @@ namespace webview_cef {
 				}
 			};
 
-			m_handler->onConsoleMessageEvent = [=](int browserId, int level, std::string message, std::string source, int line){
+			m_handler->onConsoleMessageEvent = [=, this](int browserId, int level, std::string message, std::string source, int line){
 				if(m_invokeFunc){
 					WValue* bId = webview_value_new_int(browserId);
 					WValue* wLevel = webview_value_new_int(level);
@@ -89,7 +92,7 @@ namespace webview_cef {
 				}
 			};
 
-			m_handler->onUrlChangedEvent = [=](int browserId, std::string url)
+			m_handler->onUrlChangedEvent = [=, this](int browserId, std::string url)
 			{
 				if (m_invokeFunc)
 				{
@@ -105,7 +108,7 @@ namespace webview_cef {
 				}
 			};
 
-			m_handler->onTitleChangedEvent = [=](int browserId, std::string title)
+			m_handler->onTitleChangedEvent = [=, this](int browserId, std::string title)
 			{
 				if (m_invokeFunc)
 				{
@@ -121,7 +124,7 @@ namespace webview_cef {
 				}
 			};
 
-			m_handler->onJavaScriptChannelMessage = [=](std::string channelName, std::string message, std::string callbackId, int browserId, std::string frameId)
+			m_handler->onJavaScriptChannelMessage = [=, this](std::string channelName, std::string message, std::string callbackId, int browserId, std::string frameId)
 			{
 				if (m_invokeFunc)
 				{
@@ -146,7 +149,7 @@ namespace webview_cef {
 				}
 			};
 
-			m_handler->onFocusedNodeChangeMessage = [=](int nBrowserId, bool bEditable)
+			m_handler->onFocusedNodeChangeMessage = [=, this](int nBrowserId, bool bEditable)
 			{
 				if (m_invokeFunc)
 				{
@@ -162,7 +165,7 @@ namespace webview_cef {
 				}
 			};
 
-			m_handler->onImeCompositionRangeChangedMessage = [=](int nBrowserId, int32_t x, int32_t y)
+			m_handler->onImeCompositionRangeChangedMessage = [=, this](int nBrowserId, int32_t x, int32_t y)
 			{
 				if (m_invokeFunc)
 				{
@@ -182,7 +185,7 @@ namespace webview_cef {
 			};
 
 
-            m_handler->onLoadStart = [=](int nBrowserId, std::string urlId)
+            m_handler->onLoadStart = [=, this](int nBrowserId, std::string urlId)
             {
                 if (m_invokeFunc)
                 {
@@ -198,7 +201,7 @@ namespace webview_cef {
                 }
             };
 
-            m_handler->onLoadEnd = [=](int nBrowserId, std::string urlId)
+            m_handler->onLoadEnd = [=, this](int nBrowserId, std::string urlId)
             {
                 if (m_invokeFunc)
                 {
@@ -250,7 +253,7 @@ namespace webview_cef {
 		}
 		else if (name.compare("create") == 0) {
 			std::string url = webview_value_get_string(values);
-			m_handler->createBrowser(url, [=](int browserId) {
+			m_handler->createBrowser(url, [=, this](int browserId) {
 				std::shared_ptr<WebviewTexture> renderer = m_createTextureFunc();
 				m_renderers[browserId] = renderer;
 				WValue	*response = webview_value_new_list();
@@ -477,8 +480,54 @@ namespace webview_cef {
 				webview_value_unref(retValue);
 			});
 		}
-		else {
-			result = 0;
+		else if (name.compare("sendKeyEvent") == 0)
+		{
+			if (webview_value_get_type(values) == Webview_Value_Type_Map)
+			{
+				CefKeyEvent key_event;
+				WValue *type_val = webview_value_get_by_string(values, "type");
+				WValue *modifiers_val = webview_value_get_by_string(values, "modifiers");
+				WValue *windows_key_code_val = webview_value_get_by_string(values, "windows_key_code");
+				WValue *native_key_code_val = webview_value_get_by_string(values, "native_key_code");
+				WValue *is_system_key_val = webview_value_get_by_string(values, "is_system_key");
+				WValue *character_val = webview_value_get_by_string(values, "character");
+				WValue *unmodified_character_val = webview_value_get_by_string(values, "unmodified_character");
+
+				if (type_val)
+					key_event.type = (cef_key_event_type_t)webview_value_get_int(type_val);
+				if (modifiers_val)
+					key_event.modifiers = webview_value_get_int(modifiers_val);
+				if (windows_key_code_val)
+					key_event.windows_key_code = webview_value_get_int(windows_key_code_val);
+				if (native_key_code_val)
+					key_event.native_key_code = webview_value_get_int(native_key_code_val);
+				if (is_system_key_val)
+					key_event.is_system_key = webview_value_get_bool(is_system_key_val);
+				if (character_val)
+					key_event.character = webview_value_get_int(character_val);
+				if (unmodified_character_val)
+					key_event.unmodified_character = webview_value_get_int(unmodified_character_val);
+
+				WValue *browser_id_val = webview_value_get_by_string(values, "browserId");
+				if (browser_id_val)
+				{
+					sendKeyEvent(webview_value_get_int(browser_id_val), key_event);
+				}
+				else
+				{
+					sendKeyEvent(key_event);
+				}
+				result(1, nullptr);
+			}
+			else
+			{
+				result(0, nullptr);
+			}
+		}
+		else
+		{
+			// CRITICAL: Call the callback with 0 so the platform plugin knows it's unhandled
+			result(0, nullptr);
 		}
 	}
 
@@ -569,7 +618,39 @@ namespace webview_cef {
 		CefSettings cefs;
 		cefs.windowless_rendering_enabled = true;
 		cefs.no_sandbox = true;
-		if(!userAgent.empty()){
+		cefs.multi_threaded_message_loop = true;
+		cefs.remote_debugging_port = 0;		   // disable remote debugger
+		cefs.log_severity = LOGSEVERITY_ERROR; // only log errors, reduces I/O
+		CefString(&cefs.user_agent) =
+			"Mozilla/5.0 (Linux; arm64) AppleWebKit/537.36 Chrome/130.0 Safari/537.36";
+
+		// Get the absolute path of the current executable
+		char result[PATH_MAX];
+		ssize_t count = readlink("/proc/self/exe", result, PATH_MAX);
+		std::string exe_path;
+		if (count != -1)
+		{
+			exe_path = std::string(dirname(result));
+		}
+		else
+		{
+			exe_path = "."; // Fallback
+		}
+
+		// Construct absolute paths for resources and locales
+		// Assuming the structure: bundle/webview_cef_example and bundle/lib/
+		std::string lib_path = exe_path + "/lib";
+		std::string locales_path = lib_path + "/locales";
+
+		CefString(&cefs.resources_dir_path) = lib_path;
+		CefString(&cefs.locales_dir_path) = locales_path;
+
+		// Use an absolute path for the cache as well
+		CefString(&cefs.root_cache_path) = "/tmp/webview_cef_cache";
+		CefString(&cefs.browser_subprocess_path) = exe_path + "/webview_cef_example";
+
+		if (!userAgent.empty())
+		{
 			CefString(&cefs.user_agent_product) = userAgent;
 		}
 		//locale language setting

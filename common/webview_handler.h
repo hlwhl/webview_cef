@@ -98,17 +98,18 @@ public:
     virtual void OnBeforeClose(CefRefPtr<CefBrowser> browser) override;
     virtual bool OnBeforePopup(CefRefPtr<CefBrowser> browser,
                                CefRefPtr<CefFrame> frame,
-                               const CefString& target_url,
-                               const CefString& target_frame_name,
+                               int popup_id, // Add this parameter
+                               const CefString &target_url,
+                               const CefString &target_frame_name,
                                WindowOpenDisposition target_disposition,
                                bool user_gesture,
-                               const CefPopupFeatures& popupFeatures,
-                               CefWindowInfo& windowInfo,
-                               CefRefPtr<CefClient>& client,
-                               CefBrowserSettings& settings,
-                               CefRefPtr<CefDictionaryValue>& extra_info,
-                               bool* no_javascript_access) override;
-    
+                               const CefPopupFeatures &popupFeatures,
+                               CefWindowInfo &windowInfo,
+                               CefRefPtr<CefClient> &client,
+                               CefBrowserSettings &settings,
+                               CefRefPtr<CefDictionaryValue> &extra_info,
+                               bool *no_javascript_access) override;
+
     virtual void OnTakeFocus(CefRefPtr<CefBrowser> browser, bool next) override;
     virtual bool OnSetFocus(CefRefPtr<CefBrowser> browser, FocusSource source) override;
     virtual void OnGotFocus(CefRefPtr<CefBrowser> browser) override;
