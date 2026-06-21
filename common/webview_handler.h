@@ -98,6 +98,7 @@ public:
     virtual void OnBeforeClose(CefRefPtr<CefBrowser> browser) override;
     virtual bool OnBeforePopup(CefRefPtr<CefBrowser> browser,
                                CefRefPtr<CefFrame> frame,
+                               int popup_id,
                                const CefString& target_url,
                                const CefString& target_frame_name,
                                WindowOpenDisposition target_disposition,
@@ -139,9 +140,6 @@ public:
 
     // Request that all existing browser windows close.
     void CloseAllBrowsers(bool force_close);
-    
-    // Returns true if the Chrome runtime is enabled.
-    static bool IsChromeRuntimeEnabled();
 
     void closeBrowser(int browserId);
     void createBrowser(std::string url, std::function<void(int)> callback);

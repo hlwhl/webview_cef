@@ -2,14 +2,13 @@ import 'dart:async';
 
 import 'package:flutter/material.dart';
 import 'package:webview_cef/webview_cef.dart';
-import 'package:webview_cef/src/webview_inject_user_script.dart';
 
 void main() {
   runApp(const MyApp());
 }
 
 class MyApp extends StatefulWidget {
-  const MyApp({Key? key}) : super(key: key);
+  const MyApp({super.key});
 
   @override
   State<MyApp> createState() => _MyAppState();
@@ -17,8 +16,6 @@ class MyApp extends StatefulWidget {
 
 class _MyAppState extends State<MyApp> {
   late WebViewController _controller;
-
-  // late WebViewController _controller2;
   final _textController = TextEditingController();
   String title = "";
   Map allCookies = {};
@@ -49,8 +46,6 @@ class _MyAppState extends State<MyApp> {
     _controller = WebviewManager().createWebView(
         loading: const Text("not initialized"),
         injectUserScripts: injectUserScripts);
-    // _controller2 =
-    //     WebviewManager().createWebView(loading: const Text("not initialized"));
     super.initState();
     initPlatformState();
   }
@@ -80,7 +75,7 @@ class _MyAppState extends State<MyApp> {
           JavascriptChannel(
               name: 'Print',
               onMessageReceived: (JavascriptMessage message) {
-                print(message.message);
+                debugPrint(message.message);
                 _controller.sendJavaScriptChannelCallBack(
                     false,
                     "{'code':'200','message':'print succeed!'}",
@@ -94,38 +89,17 @@ class _MyAppState extends State<MyApp> {
         _controller.executeJavaScript("function abc(e){return 'abc:'+ e}");
         _controller
             .evaluateJavascript("abc('test')")
-            .then((value) => print(value));
+            .then((value) => debugPrint(value));
       },
       onLoadStart: (controller, url) {
-        print("onLoadStart => $url");
+        debugPrint("onLoadStart => $url");
       },
       onLoadEnd: (controller, url) {
-        print("onLoadEnd => $url");
+        debugPrint("onLoadEnd => $url");
       },
     ));
 
     await _controller.initialize(_textController.text);
-
-    // _controller2.setWebviewListener(WebviewEventsListener(
-    //   onTitleChanged: (t) {},
-    //   onUrlChanged: (url) {
-    //     final Set<JavascriptChannel> jsChannels = {
-    //       JavascriptChannel(
-    //           name: 'Print',
-    //           onMessageReceived: (JavascriptMessage message) {
-    //             print(message.message);
-    //             _controller.sendJavaScriptChannelCallBack(
-    //                 false,
-    //                 "{'code':'200','message':'print succeed!'}",
-    //                 message.callbackId,
-    //                 message.frameId);
-    //           }),
-    //     };
-    //     //normal JavaScriptChannels
-    //     _controller2.setJavaScriptChannels(jsChannels);
-    //   },
-    // ));
-    // await _controller2.initialize("baidu.com");
 
     // If the widget was removed from the tree while the asynchronous platform
     // message was in flight, we want to discard the reply rather than calling
@@ -215,14 +189,6 @@ class _MyAppState extends State<MyApp> {
                       : _controller.loadingWidget;
                 },
               ),
-              // ValueListenableBuilder(
-              //   valueListenable: _controller2,
-              //   builder: (context, value, child) {
-              //     return _controller2.value
-              //         ? Expanded(child: _controller2.webviewWidget)
-              //         : _controller2.loadingWidget;
-              //   },
-              // )
             ],
           ))
         ],

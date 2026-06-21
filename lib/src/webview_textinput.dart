@@ -1,5 +1,6 @@
 import 'dart:io';
 
+import 'package:flutter/foundation.dart';
 import 'package:flutter/services.dart';
 
 mixin WebeViewTextInput implements DeltaTextInputClient {
@@ -36,11 +37,14 @@ mixin WebeViewTextInput implements DeltaTextInputClient {
   @override
   didChangeInputControl(
       TextInputControl? oldControl, TextInputControl? newControl) {
-    print("changed");
+    debugPrint("changed");
   }
 
   @override
   connectionClosed() {}
+
+  @override
+  bool onFocusReceived() => false;
 
   @override
   insertTextPlaceholder(Size size) {}

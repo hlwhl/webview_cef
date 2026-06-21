@@ -4,7 +4,7 @@
 #
 Pod::Spec.new do |s|
   s.name             = 'webview_cef'
-  s.version          = '0.0.1'
+  s.version          = '0.2.3'
   s.summary          = 'Flutter webview backed by CEF (Chromium Embedded Framework)'
   s.description      = <<-DESC
 Flutter webview backed by CEF (Chromium Embedded Framework)
@@ -24,7 +24,8 @@ Flutter webview backed by CEF (Chromium Embedded Framework)
   s.xcconfig = { "HEADER_SEARCH_PATHS" => $dir}
   # s.private_header_files = '../common/simple_app.h', '../common/simple_handler.h'
 
-  s.platform = :osx, '10.11'
-  s.pod_target_xcconfig = { 'DEFINES_MODULE' => 'YES' }
+  s.platform = :osx, '10.15'
+  # CEF 149 public headers require C++20.
+  s.pod_target_xcconfig = { 'DEFINES_MODULE' => 'YES', 'CLANG_CXX_LANGUAGE_STANDARD' => 'c++20' }
   s.swift_version = '5.0'
 end

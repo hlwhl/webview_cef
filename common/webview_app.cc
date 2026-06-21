@@ -113,13 +113,13 @@ void WebviewApp::OnBeforeCommandLineProcessing(const CefString &process_type, Ce
 		command_line->AppendSwitch("allow-running-insecure-content");                           //allow running insecure content in secure pages
 		// Don't create a "GPUCache" directory when cache-path is unspecified.
 		command_line->AppendSwitch("disable-gpu-shader-disk-cache");                            //disable gpu shader disk cache
-        command_line->AppendSwitch("no-sanbox");                       
+        command_line->AppendSwitch("no-sandbox");
 
 		//http://www.chromium.org/developers/design-documents/process-models
 		if (m_uMode == 1)
 		{
 			command_line->AppendSwitch("process-per-site");                                     //each site in its own process
-			command_line->AppendSwitchWithValue("renderer-process-limit ", "8");              //limit renderer process count to decrease memory usage
+			command_line->AppendSwitchWithValue("renderer-process-limit", "8");              //limit renderer process count to decrease memory usage
 		}
 		else if (m_uMode == 2)
 		{

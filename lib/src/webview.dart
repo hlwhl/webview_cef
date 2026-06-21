@@ -4,7 +4,6 @@ import 'dart:io';
 import 'package:flutter/gestures.dart';
 import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
-import 'package:webview_cef/src/webview_inject_user_script.dart';
 
 import 'webview_manager.dart';
 import 'webview_events_listener.dart';
@@ -44,7 +43,7 @@ class WebViewController extends ValueNotifier<bool> {
           _javascriptChannels[channelName]!.onMessageReceived(
               JavascriptMessage(message, callbackId, frameId));
         } else {
-          print('Channel "$channelName" is not exstis');
+          debugPrint('Channel "$channelName" is not exists');
         }
       };
 
@@ -281,7 +280,7 @@ class WebViewController extends ValueNotifier<bool> {
 class WebView extends StatefulWidget {
   final WebViewController controller;
 
-  const WebView(this.controller, {Key? key}) : super(key: key);
+  const WebView(this.controller, {super.key});
 
   @override
   WebViewState createState() => WebViewState();

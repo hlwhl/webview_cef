@@ -163,9 +163,9 @@ class WebviewManager extends ValueNotifier<bool> {
 
     await _webViews[browserId]?.ready;
 
-    scripts.forEach((script) async {
+    for (final script in scripts) {
       await _webViews[browserId]?.executeJavaScript(script.script);
-    },);
+    }
   }
 
   Future<void> setCookie(String domain, String key, String val) async {

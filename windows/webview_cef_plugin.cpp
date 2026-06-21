@@ -75,6 +75,12 @@ namespace webview_cef {
 	};
 
 	static flutter::EncodableValue encode_wvalue_to_flvalue(WValue* args) {
+		// A null value (or a Null-typed WValue) maps to a null EncodableValue.
+		// Note: EncodableValue(nullptr) must NOT be used — under C++20 it resolves
+		// to std::string(const char*=nullptr) and crashes in strlen.
+		if (args == nullptr) {
+			return flutter::EncodableValue();
+		}
 		WValueType type = webview_value_get_type(args);
 		switch(type){
 			case Webview_Value_Type_Bool:
@@ -82,21 +88,33 @@ namespace webview_cef {
 			case Webview_Value_Type_Int:
 				return flutter::EncodableValue(webview_value_get_int(args));
 			case Webview_Value_Type_Float:
-				return flutter::EncodableValue(webview_value_get_float(args));
+				// flutter::EncodableValue has no scalar float alternative; C++20's
+				// stricter std::variant rules no longer auto-promote float to double.
+				return flutter::EncodableValue(static_cast<double>(webview_value_get_float(args)));
 			case Webview_Value_Type_Double:
 				return flutter::EncodableValue(webview_value_get_double(args));
 			case Webview_Value_Type_String:
 				return flutter::EncodableValue(webview_value_get_string(args));
-			case Webview_Value_Type_Uint8_List:
-				return flutter::EncodableValue(webview_value_get_uint8_list(args));
-			case Webview_Value_Type_Int32_List:
-				return flutter::EncodableValue(webview_value_get_int32_list(args));
-			case Webview_Value_Type_Int64_List:
-				return flutter::EncodableValue(webview_value_get_int64_list(args));
-			case Webview_Value_Type_Float_List:
-				return flutter::EncodableValue(webview_value_get_float_list(args));
-			case Webview_Value_Type_Double_List:
-				return flutter::EncodableValue(webview_value_get_double_list(args));
+			case Webview_Value_Type_Uint8_List: {
+				const uint8_t* data = webview_value_get_uint8_list(args);
+				return flutter::EncodableValue(std::vector<uint8_t>(data, data + webview_value_get_len(args)));
+			}
+			case Webview_Value_Type_Int32_List: {
+				const int32_t* data = webview_value_get_int32_list(args);
+				return flutter::EncodableValue(std::vector<int32_t>(data, data + webview_value_get_len(args)));
+			}
+			case Webview_Value_Type_Int64_List: {
+				const int64_t* data = webview_value_get_int64_list(args);
+				return flutter::EncodableValue(std::vector<int64_t>(data, data + webview_value_get_len(args)));
+			}
+			case Webview_Value_Type_Float_List: {
+				const float* data = webview_value_get_float_list(args);
+				return flutter::EncodableValue(std::vector<float>(data, data + webview_value_get_len(args)));
+			}
+			case Webview_Value_Type_Double_List: {
+				const double* data = webview_value_get_double_list(args);
+				return flutter::EncodableValue(std::vector<double>(data, data + webview_value_get_len(args)));
+			}
 			case Webview_Value_Type_List:
 			{
 				flutter::EncodableList ret;
@@ -116,7 +134,7 @@ namespace webview_cef {
 				return ret;
 			}
 			default:
-				return flutter::EncodableValue(nullptr);
+				return flutter::EncodableValue();
 		}
 	}
 
@@ -257,11 +275,15 @@ namespace webview_cef {
 		switch (message) {
 		case WM_USER + 1:
 		{
+			// These were heap-allocated in setInvokeMethodFunc; take ownership and
+			// free them after dispatch (InvokeMethod copies the arguments).
+			flutter::EncodableValue *method = (flutter::EncodableValue *)wparam;
+			flutter::EncodableValue *args = (flutter::EncodableValue *)lparam;
 			if (webviewPlugins.find(hwnd) != webviewPlugins.end()) {
-				flutter::EncodableValue *method = (flutter::EncodableValue *)wparam;
-				flutter::EncodableValue *args = (flutter::EncodableValue *)lparam;
 				webviewChannels[hwnd]((*std::get_if<std::string>(method)), args);
 			}
+			delete method;
+			delete args;
 			break;
 		}
 		case WM_SYSCHAR:

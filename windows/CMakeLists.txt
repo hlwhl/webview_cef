@@ -12,13 +12,29 @@ if("${CMAKE_BUILD_TYPE}" STREQUAL "Debug")
 message(STATUS "${CMAKE_BUILD_TYPE}")
 endif()
 
+# Download the official CEF "Standard Distribution" into ../third/cef. The
+# wrapper (libcef_dll_wrapper) is built from source below, so there is no
+# dependency on any custom-packaged prebuilt binaries.
 include(${CMAKE_CURRENT_SOURCE_DIR}/../third/download.cmake)
-# wait for unified version cef source code and prebuilt files
 prepare_prebuilt_files(${CMAKE_CURRENT_SOURCE_DIR}/../third/cef)
+
+# Build the CEF C++ wrapper with the dynamic CRT (/MD) that Flutter uses, and
+# without the CEF sandbox (the plugin initializes CEF with no_sandbox = true).
+# These must be set before find_package(CEF).
+set(USE_SANDBOX OFF CACHE BOOL "" FORCE)
+set(CEF_RUNTIME_LIBRARY_FLAG "/MD" CACHE STRING "" FORCE)
+
+# Configure the CEF build environment from the standard distribution.
+set(CEF_ROOT "${CMAKE_CURRENT_SOURCE_DIR}/../third/cef")
+set(CMAKE_MODULE_PATH ${CMAKE_MODULE_PATH} "${CEF_ROOT}/cmake")
+find_package(CEF REQUIRED)
 
 # This value is used when generating builds using this plugin, so it must
 # not be changed
 set(PLUGIN_NAME "webview_cef_plugin")
+
+# Build the CEF C++ wrapper library from source.
+add_subdirectory(${CEF_LIBCEF_DLL_WRAPPER_PATH} libcef_dll_wrapper)
 
 # Any new source files that you add to the plugin should be added here.
 list(APPEND PLUGIN_SOURCES
@@ -52,64 +68,58 @@ add_library(${PLUGIN_NAME} SHARED
 # full control over build settings.
 apply_standard_settings(${PLUGIN_NAME})
 
+# CEF 149 public headers (e.g. base/cef_scoped_refptr.h) require C++20. Raise
+# the standard for the plugin and anything that links it (the runner includes
+# CEF headers transitively through the C API header).
+target_compile_features(${PLUGIN_NAME} PUBLIC cxx_std_20)
+
 # Symbols are hidden by default to reduce the chance of accidental conflicts
 # between plugins. This should not be removed; any symbols that should be
 # exported should be explicitly exported with the FLUTTER_PLUGIN_EXPORT macro.
 set_target_properties(${PLUGIN_NAME} PROPERTIES
   CXX_VISIBILITY_PRESET hidden)
 target_compile_definitions(${PLUGIN_NAME} PRIVATE FLUTTER_PLUGIN_IMPL)
+# CEF/Chromium headers use std::min/std::max and numeric_limits::max(), which
+# collide with the min/max macros from <windows.h>. Disable those macros.
+target_compile_definitions(${PLUGIN_NAME} PRIVATE NOMINMAX)
 
 # Source include directories and library dependencies. Add any plugin-specific
 # dependencies here.
 target_include_directories(${PLUGIN_NAME} INTERFACE
   "${CMAKE_CURRENT_SOURCE_DIR}/include")
-include_directories(${CMAKE_CURRENT_SOURCE_DIR}/third/cef)
-include_directories(${CMAKE_CURRENT_SOURCE_DIR}/../common)
+target_include_directories(${PLUGIN_NAME} PRIVATE
+  "${CEF_ROOT}"
+  "${CMAKE_CURRENT_SOURCE_DIR}/../common")
 
-target_link_libraries(${PLUGIN_NAME} PRIVATE flutter flutter_wrapper_plugin
-debug ${CMAKE_CURRENT_SOURCE_DIR}/../third/cef/debug/libcef.lib
-debug ${CMAKE_CURRENT_SOURCE_DIR}/../third/cef/debug/libcef_dll_wrapper.lib
-optimized ${CMAKE_CURRENT_SOURCE_DIR}/../third/cef/release/libcef.lib
-optimized ${CMAKE_CURRENT_SOURCE_DIR}/../third/cef/release/libcef_dll_wrapper.lib)
+# Add the CEF library as a logical target (handles Debug/Release selection).
+ADD_LOGICAL_TARGET("libcef_lib" "${CEF_LIB_DEBUG}" "${CEF_LIB_RELEASE}")
+# Flutter's "Profile" configuration maps onto CEF's Release binaries.
+set_target_properties(libcef_lib PROPERTIES MAP_IMPORTED_CONFIG_PROFILE Release)
+
+target_link_libraries(${PLUGIN_NAME} PRIVATE
+  flutter
+  flutter_wrapper_plugin
+  libcef_lib
+  libcef_dll_wrapper)
+
+# === Bundle the CEF runtime next to the application executable. ===
+# Binaries are configuration-specific (Debug vs Release); every non-Debug
+# configuration (including Flutter's Profile) uses the Release binaries.
+set(_cef_bin_dir "$<IF:$<CONFIG:Debug>,${CEF_BINARY_DIR_DEBUG},${CEF_BINARY_DIR_RELEASE}>")
+
+set(webview_cef_bundled_libraries "")
+foreach(_cef_file ${CEF_BINARY_FILES})
+  list(APPEND webview_cef_bundled_libraries "${_cef_bin_dir}/${_cef_file}")
+endforeach()
+# Resource .pak / .dat files are configuration-independent. "locales" is a
+# directory; the Flutter install(FILES ...) step copies it recursively (CMake's
+# file(INSTALL) handles directory entries), preserving the locales/ subfolder.
+foreach(_cef_file ${CEF_RESOURCE_FILES})
+  list(APPEND webview_cef_bundled_libraries "${CEF_RESOURCE_DIR}/${_cef_file}")
+endforeach()
 
 # List of absolute paths to libraries that should be bundled with the plugin.
-# This list could contain prebuilt libraries, or libraries created by an
-# external build triggered from this build file.
 set(webview_cef_bundled_libraries
-    "${CMAKE_CURRENT_SOURCE_DIR}/../third/cef/resources/locales"
-    "${CMAKE_CURRENT_SOURCE_DIR}/../third/cef/resources/icudtl.dat"
-    "${CMAKE_CURRENT_SOURCE_DIR}/../third/cef/resources/resources.pak"
-    "${CMAKE_CURRENT_SOURCE_DIR}/../third/cef/resources/chrome_100_percent.pak"
-    "${CMAKE_CURRENT_SOURCE_DIR}/../third/cef/resources/chrome_200_percent.pak"
-    $<$<CONFIG:Debug>:${CMAKE_CURRENT_SOURCE_DIR}/../third/cef/debug/bin/chrome_elf.dll>
-    $<$<CONFIG:Debug>:${CMAKE_CURRENT_SOURCE_DIR}/../third/cef/debug/bin/libcef.dll>
-    $<$<CONFIG:Debug>:${CMAKE_CURRENT_SOURCE_DIR}/../third/cef/debug/bin/v8_context_snapshot.bin>
-    $<$<CONFIG:Debug>:${CMAKE_CURRENT_SOURCE_DIR}/../third/cef/debug/bin/swiftshader>
-    $<$<CONFIG:Debug>:${CMAKE_CURRENT_SOURCE_DIR}/../third/cef/debug/bin/d3dcompiler_47.dll>
-    $<$<CONFIG:Debug>:${CMAKE_CURRENT_SOURCE_DIR}/../third/cef/debug/bin/libEGL.dll>
-    $<$<CONFIG:Debug>:${CMAKE_CURRENT_SOURCE_DIR}/../third/cef/debug/bin/libGLESv2.dll>
-    $<$<CONFIG:Debug>:${CMAKE_CURRENT_SOURCE_DIR}/../third/cef/debug/bin/vulkan-1.dll>
-    $<$<CONFIG:Debug>:${CMAKE_CURRENT_SOURCE_DIR}/../third/cef/debug/bin/vk_swiftshader.dll>
-    $<$<CONFIG:Debug>:${CMAKE_CURRENT_SOURCE_DIR}/../third/cef/debug/bin/vk_swiftshader_icd.json>
-    $<$<CONFIG:Release>:${CMAKE_CURRENT_SOURCE_DIR}/../third/cef/release/bin/chrome_elf.dll>
-    $<$<CONFIG:Release>:${CMAKE_CURRENT_SOURCE_DIR}/../third/cef/release/bin/libcef.dll>
-    $<$<CONFIG:Release>:${CMAKE_CURRENT_SOURCE_DIR}/../third/cef/release/bin/v8_context_snapshot.bin>
-    $<$<CONFIG:Release>:${CMAKE_CURRENT_SOURCE_DIR}/../third/cef/release/bin/swiftshader>
-    $<$<CONFIG:Release>:${CMAKE_CURRENT_SOURCE_DIR}/../third/cef/release/bin/d3dcompiler_47.dll>
-    $<$<CONFIG:Release>:${CMAKE_CURRENT_SOURCE_DIR}/../third/cef/release/bin/libEGL.dll>
-    $<$<CONFIG:Release>:${CMAKE_CURRENT_SOURCE_DIR}/../third/cef/release/bin/libGLESv2.dll>
-    $<$<CONFIG:Release>:${CMAKE_CURRENT_SOURCE_DIR}/../third/cef/release/bin/vulkan-1.dll>
-    $<$<CONFIG:Release>:${CMAKE_CURRENT_SOURCE_DIR}/../third/cef/release/bin/vk_swiftshader.dll>
-    $<$<CONFIG:Release>:${CMAKE_CURRENT_SOURCE_DIR}/../third/cef/release/bin/vk_swiftshader_icd.json>
-    $<$<CONFIG:Profile>:${CMAKE_CURRENT_SOURCE_DIR}/../third/cef/release/bin/chrome_elf.dll>
-    $<$<CONFIG:Profile>:${CMAKE_CURRENT_SOURCE_DIR}/../third/cef/release/bin/libcef.dll>
-    $<$<CONFIG:Profile>:${CMAKE_CURRENT_SOURCE_DIR}/../third/cef/release/bin/v8_context_snapshot.bin>
-    $<$<CONFIG:Profile>:${CMAKE_CURRENT_SOURCE_DIR}/../third/cef/release/bin/swiftshader>
-    $<$<CONFIG:Profile>:${CMAKE_CURRENT_SOURCE_DIR}/../third/cef/release/bin/d3dcompiler_47.dll>
-    $<$<CONFIG:Profile>:${CMAKE_CURRENT_SOURCE_DIR}/../third/cef/release/bin/libEGL.dll>
-    $<$<CONFIG:Profile>:${CMAKE_CURRENT_SOURCE_DIR}/../third/cef/release/bin/libGLESv2.dll>
-    $<$<CONFIG:Profile>:${CMAKE_CURRENT_SOURCE_DIR}/../third/cef/release/bin/vulkan-1.dll>
-    $<$<CONFIG:Profile>:${CMAKE_CURRENT_SOURCE_DIR}/../third/cef/release/bin/vk_swiftshader.dll>
-    $<$<CONFIG:Profile>:${CMAKE_CURRENT_SOURCE_DIR}/../third/cef/release/bin/vk_swiftshader_icd.json>
-    PARENT_SCOPE)
-
+  ${webview_cef_bundled_libraries}
+  PARENT_SCOPE
+)

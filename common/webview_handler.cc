@@ -83,7 +83,7 @@ bool WebviewHandler::OnProcessMessageReceived(
 	    }
 
         onJavaScriptChannelMessage(
-            fun_name,param,stringpatch::to_string(js_callback_id), browser->GetIdentifier(), stringpatch::to_string(frame->GetIdentifier()));
+            fun_name,param,stringpatch::to_string(js_callback_id), browser->GetIdentifier(), frame->GetIdentifier().ToString());
     }
     else if(message_name == kEvaluateCallbackMessage){
         CefString callbackId = message->GetArgumentList()->GetString(0);
@@ -167,6 +167,7 @@ void WebviewHandler::OnBeforeClose(CefRefPtr<CefBrowser> browser) {
 
 bool WebviewHandler::OnBeforePopup(CefRefPtr<CefBrowser> browser,
                                   CefRefPtr<CefFrame> frame,
+                                  int popup_id,
                                   const CefString& target_url,
                                   const CefString& target_frame_name,
                                   WindowOpenDisposition target_disposition,
@@ -201,11 +202,7 @@ void WebviewHandler::OnLoadError(CefRefPtr<CefBrowser> browser,
                                 const CefString& errorText,
                                 const CefString& failedUrl) {
     CEF_REQUIRE_UI_THREAD();
-    
-    // Allow Chrome to show the error page.
-    if (IsChromeRuntimeEnabled())
-        return;
-    
+
     // Don't display an error for downloaded files.
     if (errorCode == ERR_ABORTED)
         return;
@@ -246,17 +243,6 @@ void WebviewHandler::CloseAllBrowsers(bool force_close) {
         it.second.browser = nullptr;
     }
     browser_map_.clear();
-}
-
-// static
-bool WebviewHandler::IsChromeRuntimeEnabled() {
-    static int value = -1;
-    if (value == -1) {
-        CefRefPtr<CefCommandLine> command_line =
-        CefCommandLine::GetGlobalCommandLine();
-        value = command_line->HasSwitch("enable-chrome-runtime") ? 1 : 0;
-    }
-    return value == 1;
 }
 
 void WebviewHandler::closeBrowser(int browserId)
@@ -580,13 +566,9 @@ void WebviewHandler::sendJavaScriptChannelCallBack(const bool error, const std::
 
         CefRefPtr<CefFrame> frame = bit->second.browser->GetMainFrame();
 
-        // Return types for frame->GetIdentifier() changed, use the Linux way when updating MacOS or Windows
-        // versions in download.cmake
-#if __linux__
+        // CefFrame::GetIdentifier() returns a string identifier in current CEF
+        // (since CEF 122) on every platform.
         bool identifierMatch = std::stoll(frame->GetIdentifier().ToString()) == frameIdInt;
-#else
-        bool identifierMatch = frame->GetIdentifier() == frameIdInt;
-#endif
         if (identifierMatch)
         {
             frame->SendProcessMessage(PID_RENDERER, message);

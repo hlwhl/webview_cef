@@ -1,3 +1,16 @@
+## 0.2.3
+- Adapted to the latest stable Flutter (tested on 3.44.x).
+- Raised minimum supported Flutter to 3.27.0 / Dart 3.6.0.
+- Migrated deprecated APIs (`Color.withOpacity` -> `withValues`, `Overlay.of` non-null, generic typedef, `print` -> `debugPrint`, `TextInputClient.onFocusReceived`) and bumped `flutter_lints` to ^5.
+- Raised minimum Windows to 10 and minimum macOS deployment target to 10.15; refreshed example desktop runner templates.
+- Upgraded CEF to 149 (Chromium 149) on all platforms, unified in `third/download.cmake`.
+- Windows now consumes the official CEF Standard Distribution and builds `libcef_dll_wrapper` from source (no more custom prebuilt package); plugin builds as C++20 (required by CEF 149).
+- Fixed CEF API drift: `OnBeforePopup` popup_id, `CefFrame::GetIdentifier()` -> string, and a C++20 `EncodableValue(nullptr)`/variant crash on Windows.
+- Fixed a per-event memory leak in the Windows native→Dart message dispatch.
+- Fixed command-line switch typos (`no-sanbox` -> `no-sandbox`, stray space in `renderer-process-limit`).
+- Removed the unused federated platform-interface scaffolding (`WebviewCefPlatform` / `MethodChannelWebviewCef` / `getPlatformVersion`) and the `plugin_platform_interface` dependency; the public API is `WebviewManager` / `WebViewController`.
+- Housekeeping: stopped tracking the downloaded CEF headers in git, added Windows/macOS CI, and cleaned up dead example code.
+
 ## 0.2.0
 - Linux support!
 - Multiple instances support.

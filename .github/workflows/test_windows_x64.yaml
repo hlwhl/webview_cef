@@ -1,0 +1,36 @@
+name: Test if the example app still builds on Windows x64
+on:
+  push:
+    branches: ["main"]
+    paths:
+      - "common/**"
+      - "example/**"
+      - "lib/**"
+      - "windows/**"
+      - "third/**"
+      - "pubspec.yaml"
+      - ".github/workflows/test_windows_x64.yaml"
+  pull_request:
+    paths:
+      - "common/**"
+      - "example/**"
+      - "lib/**"
+      - "windows/**"
+      - "third/**"
+      - "pubspec.yaml"
+      - ".github/workflows/test_windows_x64.yaml"
+
+jobs:
+  main:
+    runs-on: windows-latest
+    steps:
+      - name: Clone repository
+        uses: actions/checkout@v4
+      - name: Set up Flutter
+        uses: subosito/flutter-action@v2
+        with:
+          channel: stable
+      - run: flutter --version
+      # The official CEF distribution is downloaded by third/download.cmake and
+      # libcef_dll_wrapper is built from source during the CMake configure step.
+      - run: cd example; flutter build windows

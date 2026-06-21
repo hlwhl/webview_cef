@@ -19,9 +19,16 @@ This project is under heavy development, and the APIs are not stable yet.
 
 ## Supported OSs
 
-- [x] Windows 7+ <img align="center" src="https://upload.wikimedia.org/wikipedia/commons/thumb/8/87/Windows_logo_-_2021.svg/1200px-Windows_logo_-_2021.svg.png" width="12">
-- [x] macOS 10.12+ <img align="center" src="https://seeklogo.com/images/A/apple-logo-52C416BDDD-seeklogo.com.png" width="12">
+- [x] Windows 10+ <img align="center" src="https://upload.wikimedia.org/wikipedia/commons/thumb/8/87/Windows_logo_-_2021.svg/1200px-Windows_logo_-_2021.svg.png" width="12">
+- [x] macOS 10.15+ <img align="center" src="https://seeklogo.com/images/A/apple-logo-52C416BDDD-seeklogo.com.png" width="12">
 - [x] Linux (x64 and arm64) <img align="center" src="https://1000logos.net/wp-content/uploads/2017/03/LINUX-LOGO.png" width="14">
+
+## Requirements
+
+- Flutter >= 3.27.0
+- Dart >= 3.6.0
+
+Tested against the latest stable Flutter (3.44.x).
 
 ## Setting Up
 
@@ -53,7 +60,7 @@ int APIENTRY wWinMain(_In_ HINSTANCE instance, _In_opt_ HINSTANCE prev,
   }
 ```
 
-When building the project for the first time, a prebuilt cef bin package (200MB, link in release) will be downloaded automatically, so you may wait for a longer time if you are building the project for the first time.
+When building the project for the first time, the official CEF "Standard Distribution" (~330MB, from https://cef-builds.spotifycdn.com) is downloaded automatically into `third/cef`, and `libcef_dll_wrapper` is compiled from source. The first build therefore takes noticeably longer. The CEF version is pinned in [`third/download.cmake`](third/download.cmake) (`CEF_VERSION`); bump it there to update CEF.
 
 ### macOS <img src="https://seeklogo.com/images/A/apple-logo-52C416BDDD-seeklogo.com.png" width="15">
 
@@ -73,13 +80,23 @@ dependencies:
 
 Then follow the below steps inside the `macos/` folder <b>of the cloned repository</b>.<br/><br/>
 
-1. Download prebuilt cef bundles from [arm64](https://github.com/hlwhl/webview_cef/releases/download/prebuilt_cef_bin_mac_arm64/CEFbins-mac103.0.12-arm64.zip) or [intel](https://github.com/hlwhl/webview_cef/releases/download/prebuilt_cef_bin_mac_intel/mac103.0.12-Intel.zip) depends on your target machine arch.
+macOS uses CocoaPods (not the CMake `download.cmake` path), so the CEF binaries must be placed into `macos/third/cef` manually. The plugin is pinned to CEF **149** (Chromium 149); use the same version on every platform.
 
-> Note: You can also download [universal binary](https://github.com/hlwhl/webview_cef/releases/download/prebuilt_cef_bin_mac_universal/mac103.0.12-universal.zip) for build an mac-universal app if you want to build an mac universal app. See [#30](/../../issues/30). Thanks to [@okiabrian123](https://github.com/okiabrian123).
+1. Download the official CEF "Standard Distribution" matching your target arch from <https://cef-builds.spotifycdn.com> (`...macosarm64.tar.bz2` for Apple Silicon, `...macosx64.tar.bz2` for Intel). The exact version string is `CEF_VERSION` in [`third/download.cmake`](third/download.cmake).
 
-2. Unzip the archive and put all files into `macos/third/cef`. (Inside the cloned repository, not your project)
+2. Build `libcef_dll_wrapper` from the downloaded distribution (it is not shipped prebuilt):
+   ```bash
+   cd cef_binary_<version>_macos<arch>
+   mkdir build && cd build
+   cmake -G Ninja -DPROJECT_ARCH=<arm64|x86_64> -DCMAKE_BUILD_TYPE=Release ..
+   ninja libcef_dll_wrapper
+   ```
 
-3. Run the example app.
+3. Copy `Release/Chromium Embedded Framework.framework` and the built `libcef_dll_wrapper.a` into `macos/third/cef/` (inside the cloned repository, not your project).
+
+4. Run the example app.
+
+> Note: For a Universal (arm64 + x86_64) app, lipo the wrapper and use a universal framework. See [#30](/../../issues/30).
 
 <br/><br/>
 
