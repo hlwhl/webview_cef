@@ -153,12 +153,55 @@ private:
     }
 }
 
+// Keys that carry text (and must reach the OS input method for composition)
+// versus navigation/control keys and shortcuts (which CEF handles as raw key
+// events). Returning YES means "let the IME have it"; NO means "send to CEF".
++ (BOOL)isImeRoutableKeyEvent:(NSEvent*)event {
+    NSEventModifierFlags flags = [event modifierFlags];
+    // Shortcuts / control sequences (⌘/⌃ chords) go straight to CEF.
+    if (flags & (NSEventModifierFlagCommand | NSEventModifierFlagControl)) {
+        return NO;
+    }
+    switch ([event keyCode]) {
+        case 36:  // Return
+        case 76:  // Enter (keypad)
+        case 48:  // Tab
+        case 51:  // Delete (Backspace)
+        case 53:  // Escape
+        case 117: // Forward Delete
+        case 115: // Home
+        case 116: // Page Up
+        case 119: // End
+        case 121: // Page Down
+        case 123: case 124: case 125: case 126: // arrows: left/right/down/up
+        // Function keys F1–F12
+        case 122: case 120: case 99:  case 118: case 96:  case 97:
+        case 98:  case 100: case 101: case 109: case 103: case 111:
+            return NO;
+    }
+    // Anything that produces a character is text input → route to the IME.
+    return [[event charactersIgnoringModifiers] length] > 0;
+}
+
 + (BOOL)processKeyboardEvent: (NSEvent*) event {
     CefWrapper *currentPlugin = [webviewPlugins objectForKey:event.window.contentView];
     if(currentPlugin == nil || !currentPlugin->_plugin->getAnyBrowserFocused()){
         return false;
     }
-    
+
+    // While a web input is focused, hand text/composition keys to the OS input
+    // method instead of forwarding them to CEF as raw key events. The Flutter
+    // text-input connection then delivers committed and composing text back to
+    // CEF (imeCommitText / imeSetComposition). Forwarding raw here would bypass
+    // the IME, so CJK composition could never form. While a composition is
+    // active every key is left to the IME (preedit editing / candidate pick);
+    // otherwise navigation and control keys still go to CEF so they work inside
+    // the input.
+    if (currentPlugin->_plugin->isEditableFocused() &&
+        (currentPlugin->_plugin->isComposing() || [CefWrapper isImeRoutableKeyEvent:event])) {
+        return false;
+    }
+
     CefKeyEvent keyEvent;
     
     NSString* s = [event characters];

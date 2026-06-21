@@ -33,6 +33,10 @@ namespace webview_cef {
         // True while a web editable node is focused (so the platform layer can
         // avoid double-forwarding raw character keys during IME input).
         bool isEditableFocused() const { return m_editableFocused; }
+        // True while the OS IME has an active (marked) composition. While
+        // composing, the platform layer routes every key to the IME so preedit
+        // editing and candidate selection work instead of hitting CEF raw.
+        bool isComposing() const { return m_composing; }
 
         // Native IME pipeline forwarders (driven by the Windows WM_IME_* handler).
         void imeSetCompositionNative(const std::wstring& text, int cursor);
@@ -41,6 +45,7 @@ namespace webview_cef {
 
     private :
         bool m_editableFocused = false;
+        bool m_composing = false;
         int cursorAction(WValue *args, std::string name);
     	std::function<void(std::string, WValue*)> m_invokeFunc;
 	    std::function<std::shared_ptr<WebviewTexture>()> m_createTextureFunc;

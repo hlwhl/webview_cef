@@ -32,12 +32,24 @@ mixin WebeViewTextInput implements DeltaTextInputClient {
   }
 
   updateIMEComposionPosition(double x, double y, double height, Offset offset) {
-    // Report a non-zero caret rectangle (height comes from the focused node /
-    // composition bounds on the native side). A zero-area rect makes the engine
-    // treat the region as non-composing and mis-positions the candidate window.
+    // x/y are the caret position inside the webview (logical px), with y at the
+    // caret's bottom (the native side reports the element/character bottom);
+    // height is the line height. offset is the webview widget's global origin.
     final caretHeight = height > 0 ? height : 20.0;
-    _textInputConnection?.setEditableSizeAndTransform(Size(1, caretHeight),
-        Matrix4.translationValues(offset.dx + x, offset.dy + y, 0));
+    // Place a transform whose origin is the caret's TOP in global coordinates,
+    // so a local-space caret rect maps back onto the input line.
+    final transform = Matrix4.translationValues(
+        offset.dx + x, offset.dy + y - caretHeight, 0);
+    _textInputConnection?.setEditableSizeAndTransform(
+        Size(1, caretHeight), transform);
+    // macOS derives the IME candidate-window position from the composing/caret
+    // rect transformed by the editable transform above. Without a marked rect
+    // the engine has nothing to anchor to and parks the candidate window at the
+    // screen's bottom-left corner. Report the caret rect (in editable-local
+    // space) so the candidate window tracks the actual caret.
+    final caretRect = Rect.fromLTWH(0, 0, 1, caretHeight);
+    _textInputConnection?.setComposingRect(caretRect);
+    _textInputConnection?.setCaretRect(caretRect);
   }
 
   @override

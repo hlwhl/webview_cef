@@ -171,6 +171,10 @@ namespace webview_cef {
 				// raw character keys while a web input is focused (the IME/delta
 				// path handles text and would otherwise double-input).
 				m_editableFocused = bEditable;
+				// Focus moved to a different node → any prior IME composition is
+				// gone. Reset so the platform layer doesn't keep routing keys to
+				// a stale composition.
+				m_composing = false;
 				if (m_invokeFunc)
 				{
 					WValue* bId = webview_value_new_int(int64_t(nBrowserId));
@@ -349,12 +353,17 @@ namespace webview_cef {
 		else if (name.compare("imeSetComposition") == 0) {
 			int browserId = int(webview_value_get_int(webview_value_get_list_value(values, 0)));
 			const auto text = webview_value_get_string(webview_value_get_list_value(values, 1));
+			// Non-empty preedit → composition active; empty preedit means the IME
+			// cleared it (e.g. the user deleted the last composing letter).
+			m_composing = (text != nullptr && text[0] != '\0');
 			m_handler->imeSetComposition(browserId, text);
 			result(1, nullptr);
 		} 
 		else if (name.compare("imeCommitText") == 0) {
 			int browserId = int(webview_value_get_int(webview_value_get_list_value(values, 0)));
 			const auto text = webview_value_get_string(webview_value_get_list_value(values, 1));
+			// Commit ends the active composition.
+			m_composing = false;
 			m_handler->imeCommitText(browserId, text);
 			result(1, nullptr);
 		} 
