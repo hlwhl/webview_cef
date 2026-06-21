@@ -11,6 +11,7 @@
 - Removed the unused federated platform-interface scaffolding (`WebviewCefPlatform` / `MethodChannelWebviewCef` / `getPlatformVersion`) and the `plugin_platform_interface` dependency; the public API is `WebviewManager` / `WebViewController`.
 - Housekeeping: stopped tracking the downloaded CEF headers in git, added Windows/macOS CI, and cleaned up dead example code.
 - Fixed real-time CJK IME composition ("上屏") in the off-screen webview. Windows now uses a native WM_IME pipeline (a window subclass that intercepts WM_IME_* before DefWindowProc and drives CefBrowserHost ImeSetComposition/ImeCommitText on the CEF UI thread), fixing live pinyin preedit and candidate commit. macOS/Linux: the Flutter text-input connection is now shown, the composing caret rect carries a real height, committed/replacement text is delivered, and the composition selection range is corrected.
+- Windows: link and bundle the CEF *Release* binaries for every Flutter configuration (including Debug). CEF's Debug binaries enable DCHECKs that crash OSR during IME (NOTIMPLEMENTED GetNativeView), so `flutter run` (Debug) builds previously crashed on CJK input; they now work. Set `WEBVIEW_CEF_USE_DEBUG_CEF=ON` to opt back into the Debug CEF binaries for stepping into CEF itself.
 
 ## 0.2.0
 - Linux support!

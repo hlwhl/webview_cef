@@ -91,8 +91,21 @@ target_include_directories(${PLUGIN_NAME} PRIVATE
   "${CEF_ROOT}"
   "${CMAKE_CURRENT_SOURCE_DIR}/../common")
 
-# Add the CEF library as a logical target (handles Debug/Release selection).
-ADD_LOGICAL_TARGET("libcef_lib" "${CEF_LIB_DEBUG}" "${CEF_LIB_RELEASE}")
+# Add the CEF library as a logical target.
+#
+# By default we link the CEF *Release* import library for EVERY Flutter build
+# configuration, including Debug. CEF's Debug binaries enable DCHECKs that fire
+# for off-screen rendering -- notably a NOTIMPLEMENTED GetNativeView during IME
+# composition -- which crashes the app the moment CJK/IME input starts. Using
+# the Release binaries keeps Chinese/Japanese/Korean input working in
+# `flutter run` (Debug) builds. Turn WEBVIEW_CEF_USE_DEBUG_CEF ON only if you
+# specifically need to step into CEF/Chromium itself.
+option(WEBVIEW_CEF_USE_DEBUG_CEF "Link/bundle the CEF Debug binaries for Debug builds" OFF)
+if(WEBVIEW_CEF_USE_DEBUG_CEF)
+  ADD_LOGICAL_TARGET("libcef_lib" "${CEF_LIB_DEBUG}" "${CEF_LIB_RELEASE}")
+else()
+  ADD_LOGICAL_TARGET("libcef_lib" "${CEF_LIB_RELEASE}" "${CEF_LIB_RELEASE}")
+endif()
 # Flutter's "Profile" configuration maps onto CEF's Release binaries.
 set_target_properties(libcef_lib PROPERTIES MAP_IMPORTED_CONFIG_PROFILE Release)
 
@@ -105,9 +118,14 @@ target_link_libraries(${PLUGIN_NAME} PRIVATE
   comctl32)
 
 # === Bundle the CEF runtime next to the application executable. ===
-# Binaries are configuration-specific (Debug vs Release); every non-Debug
-# configuration (including Flutter's Profile) uses the Release binaries.
-set(_cef_bin_dir "$<IF:$<CONFIG:Debug>,${CEF_BINARY_DIR_DEBUG},${CEF_BINARY_DIR_RELEASE}>")
+# Bundle the same runtime we linked against. By default that is the Release CEF
+# runtime for every configuration (see WEBVIEW_CEF_USE_DEBUG_CEF above); the
+# Debug runtime is only bundled when that option is explicitly enabled.
+if(WEBVIEW_CEF_USE_DEBUG_CEF)
+  set(_cef_bin_dir "$<IF:$<CONFIG:Debug>,${CEF_BINARY_DIR_DEBUG},${CEF_BINARY_DIR_RELEASE}>")
+else()
+  set(_cef_bin_dir "${CEF_BINARY_DIR_RELEASE}")
+endif()
 
 set(webview_cef_bundled_libraries "")
 foreach(_cef_file ${CEF_BINARY_FILES})
