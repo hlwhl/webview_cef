@@ -69,7 +69,7 @@ bool WebviewHandler::OnProcessMessageReceived(
         bool editable = message->GetArgumentList()->GetBool(0);
         onFocusedNodeChangeMessage(browser->GetIdentifier(), editable);
         if (editable) {
-            onImeCompositionRangeChangedMessage(browser->GetIdentifier(), message->GetArgumentList()->GetInt(1), message->GetArgumentList()->GetInt(2));
+            onImeCompositionRangeChangedMessage(browser->GetIdentifier(), message->GetArgumentList()->GetInt(1), message->GetArgumentList()->GetInt(2), message->GetArgumentList()->GetInt(3));
         }
     }
     else if(message_name == kJSCallCppFunctionMessage)
@@ -366,7 +366,7 @@ void WebviewHandler::OnImeCompositionRangeChanged(CefRefPtr<CefBrowser> browser,
         if (it->second.is_ime_commit) {
             auto lastCharacter = character_bounds.back();
             it->second.prev_ime_position = lastCharacter;
-            onImeCompositionRangeChangedMessage(browser->GetIdentifier(), lastCharacter.x + lastCharacter.width, lastCharacter.y + lastCharacter.height);
+            onImeCompositionRangeChangedMessage(browser->GetIdentifier(), lastCharacter.x + lastCharacter.width, lastCharacter.y + lastCharacter.height, lastCharacter.height);
             it->second.is_ime_commit = false;
         }
         else
@@ -374,7 +374,7 @@ void WebviewHandler::OnImeCompositionRangeChanged(CefRefPtr<CefBrowser> browser,
             auto firstCharacter = character_bounds.front();
             if (firstCharacter != it->second.prev_ime_position) {
                 it->second.prev_ime_position = firstCharacter;
-                onImeCompositionRangeChangedMessage(browser->GetIdentifier(), firstCharacter.x, firstCharacter.y + firstCharacter.height);
+                onImeCompositionRangeChangedMessage(browser->GetIdentifier(), firstCharacter.x, firstCharacter.y + firstCharacter.height, firstCharacter.height);
             }
         }
     }
@@ -450,7 +450,8 @@ void WebviewHandler::imeSetComposition(int browserId, std::string text)
 
     // Keeps the caret at the end of the composition
     auto selection_range_end = static_cast<int>(0 + cTextStr.length());
-    CefRange selection_range = CefRange(0, selection_range_end);
+    // Keep the caret at the end of the composition (matches cefclient).
+    CefRange selection_range = CefRange(selection_range_end, selection_range_end);
     it->second.browser->GetHost()->ImeSetComposition(cTextStr, underlines, CefRange(UINT32_MAX, UINT32_MAX), selection_range);
 }
 
@@ -467,9 +468,9 @@ void WebviewHandler::imeCommitText(int browserId, std::string text)
     std::vector<CefCompositionUnderline> underlines;
     auto selection_range_end = static_cast<int>(0 + cTextStr.length());
     CefRange selection_range = CefRange(selection_range_end, selection_range_end);
-#ifndef _WIN32
-        it->second.browser->GetHost()->ImeSetComposition(cTextStr, underlines, CefRange(UINT32_MAX, UINT32_MAX), selection_range);
-#endif
+    // Establish the composition on all platforms before committing so the commit
+    // has a live composition to replace (previously skipped on Windows).
+    it->second.browser->GetHost()->ImeSetComposition(cTextStr, underlines, CefRange(UINT32_MAX, UINT32_MAX), selection_range);
     it->second.browser->GetHost()->ImeCommitText(cTextStr, CefRange(UINT32_MAX, UINT32_MAX), 0);
 
 }

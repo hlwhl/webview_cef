@@ -1,5 +1,3 @@
-import 'dart:io';
-
 import 'package:flutter/foundation.dart';
 import 'package:flutter/services.dart';
 
@@ -16,21 +14,22 @@ mixin WebeViewTextInput implements DeltaTextInputClient {
     _textInputConnection?.close();
     _textInputConnection = TextInput.attach(
         this, const TextInputConfiguration(enableDeltaModel: true));
-    if (!Platform.isWindows) {
-      _textInputConnection?.show();
-    }
-    // _textInputConnection
+    // show() must be called on every platform: it makes this connection the
+    // active IME target so the OS IME composes into it and the framework emits
+    // composing deltas that we relay to CEF (real-time on-screen composition).
+    _textInputConnection?.show();
   }
 
   detachTextInputClient() {
     _textInputConnection?.close();
   }
 
-  updateIMEComposionPosition(double x, double y, Offset offset) {
-    /// 1.It always displays at the last position, which should be a bug in the Flutter engine.
-    /// 2.If switch windows and switch back, this function can run well once.I think there must have a flush function called when switching windows
-    /// 3.Windows can run well, but Linux can't.
-    _textInputConnection?.setEditableSizeAndTransform(const Size(0, 0),
+  updateIMEComposionPosition(double x, double y, double height, Offset offset) {
+    // Report a non-zero caret rectangle (height comes from the focused node /
+    // composition bounds on the native side). A zero-area rect makes the engine
+    // treat the region as non-composing and mis-positions the candidate window.
+    final caretHeight = height > 0 ? height : 20.0;
+    _textInputConnection?.setEditableSizeAndTransform(Size(1, caretHeight),
         Matrix4.translationValues(offset.dx + x, offset.dy + y, 0));
   }
 

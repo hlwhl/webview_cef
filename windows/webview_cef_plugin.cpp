@@ -287,15 +287,27 @@ namespace webview_cef {
 			break;
 		}
 		case WM_SYSCHAR:
+		case WM_CHAR: {
+			// Character messages insert text. While a web input is focused, text
+			// is delivered through the Flutter IME/delta path (imeCommitText), so
+			// forwarding the raw char here too would double-insert. Control keys
+			// still flow through the WM_KEYDOWN/WM_KEYUP case below.
+			auto it = webviewPlugins.find(hwnd);
+			if (it != webviewPlugins.end() && !it->second->isEditableFocused()) {
+				CefKeyEvent keyEvent = getCefKeyEvent(message, wparam, lparam);
+				it->second->sendKeyEvent(keyEvent);
+			}
+			break;
+		}
 		case WM_SYSKEYDOWN:
 		case WM_SYSKEYUP:
 		case WM_KEYDOWN:
-		case WM_KEYUP:
-		case WM_CHAR:{
-			if(webviewPlugins.find(hwnd)!=webviewPlugins.end()){
+		case WM_KEYUP: {
+			if (webviewPlugins.find(hwnd) != webviewPlugins.end()) {
 				CefKeyEvent keyEvent = getCefKeyEvent(message, wparam, lparam);
 				webviewPlugins[hwnd]->sendKeyEvent(keyEvent);
 			}
+			break;
 		}
 		}
 	}

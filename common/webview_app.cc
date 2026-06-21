@@ -316,6 +316,7 @@ void WebviewApp::OnFocusedNodeChanged(CefRefPtr<CefBrowser> browser, CefRefPtr<C
         CefRect rect = node->GetElementBounds();
         message->GetArgumentList()->SetInt(1, rect.x);
         message->GetArgumentList()->SetInt(2, rect.y + rect.height);
+        message->GetArgumentList()->SetInt(3, rect.height);
     }
     frame->SendProcessMessage(PID_BROWSER, message);
 }

@@ -46,7 +46,7 @@ public:
     std::function<void(int browserId, std::string text)> onTooltipEvent;
     std::function<void(int browserId, int level, std::string message, std::string source, int line)>onConsoleMessageEvent;
     std::function<void(int browserId, bool editable)> onFocusedNodeChangeMessage;
-    std::function<void(int browserId, int32_t x, int32_t y)> onImeCompositionRangeChangedMessage;
+    std::function<void(int browserId, int32_t x, int32_t y, int32_t height)> onImeCompositionRangeChangedMessage;
     //webpage message
     std::function<void(std::string, std::string, std::string, int browserId, std::string)> onJavaScriptChannelMessage;
     std::function<void(int browserId, std::string url)> onLoadStart;

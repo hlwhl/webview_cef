@@ -1,5 +1,4 @@
 import 'dart:async';
-import 'dart:io';
 
 import 'package:flutter/gestures.dart';
 import 'package:flutter/material.dart';
@@ -274,7 +273,7 @@ class WebViewController extends ValueNotifier<bool> {
   Function(String)? _onToolTip;
   Function(int)? _onCursorChanged;
   Function(bool editable)? _onFocusedNodeChangeMessage;
-  Function(int, int)? _onImeCompositionRangeChangedMessage;
+  Function(int, int, int)? _onImeCompositionRangeChangedMessage;
 }
 
 class WebView extends StatefulWidget {
@@ -305,7 +304,9 @@ class WebViewState extends State<WebView> with WebeViewTextInput {
         if (d.composing.isValid) {
           _composingText += d.textInserted;
           _controller.imeSetComposition(_composingText);
-        } else if (!Platform.isWindows) {
+        } else {
+          // Directly committed text (e.g. English typing, or a commit delivered
+          // as a plain insertion). Must run on every platform, including Windows.
           _controller.imeCommitText(d.textInserted);
         }
       } else if (d is TextEditingDeltaDeletion) {
@@ -338,10 +339,10 @@ class WebViewState extends State<WebView> with WebeViewTextInput {
       _controller._focusEditable = editable;
     };
 
-    _controller._onImeCompositionRangeChangedMessage = (x, y) {
+    _controller._onImeCompositionRangeChangedMessage = (x, y, height) {
       final box = _key.currentContext!.findRenderObject() as RenderBox;
-      updateIMEComposionPosition(
-          x.toDouble(), y.toDouble(), box.localToGlobal(Offset.zero));
+      updateIMEComposionPosition(x.toDouble(), y.toDouble(), height.toDouble(),
+          box.localToGlobal(Offset.zero));
     };
 
     _controller._onToolTip = (final String text) {
@@ -417,7 +418,7 @@ class WebViewState extends State<WebView> with WebeViewTextInput {
           },
           onPointerDown: (ev) {
             if (!_focusNode.hasFocus) {
-              _controller._onImeCompositionRangeChangedMessage?.call(0, 0);
+              _controller._onImeCompositionRangeChangedMessage?.call(0, 0, 0);
               _focusNode.requestFocus();
               Future.delayed(const Duration(milliseconds: 50), () {
                 if (!_focusNode.hasFocus) {

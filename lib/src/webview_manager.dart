@@ -130,9 +130,10 @@ class WebviewManager extends ValueNotifier<bool> {
         return;
       case 'onImeCompositionRangeChangedMessage':
         int browserId = call.arguments['browserId'] as int;
-        _webViews[browserId]
-            ?.onImeCompositionRangeChangedMessage
-            ?.call(call.arguments['x'] as int, call.arguments['y'] as int);
+        _webViews[browserId]?.onImeCompositionRangeChangedMessage?.call(
+            call.arguments['x'] as int,
+            call.arguments['y'] as int,
+            call.arguments['height'] as int);
         return;
       case 'onLoadStart':
         int browserId = call.arguments["browserId"] as int;

@@ -25,8 +25,12 @@ namespace webview_cef {
         void setInvokeMethodFunc(std::function<void(std::string, WValue*)> func);
         void setCreateTextureFunc(std::function<std::shared_ptr<WebviewTexture>()> func);
         bool getAnyBrowserFocused();
+        // True while a web editable node is focused (so the platform layer can
+        // avoid double-forwarding raw character keys during IME input).
+        bool isEditableFocused() const { return m_editableFocused; }
 
     private :
+        bool m_editableFocused = false;
         int cursorAction(WValue *args, std::string name);
     	std::function<void(std::string, WValue*)> m_invokeFunc;
 	    std::function<std::shared_ptr<WebviewTexture>()> m_createTextureFunc;

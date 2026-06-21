@@ -148,6 +148,10 @@ namespace webview_cef {
 
 			m_handler->onFocusedNodeChangeMessage = [=](int nBrowserId, bool bEditable)
 			{
+				// Track editable focus so the platform layer can avoid forwarding
+				// raw character keys while a web input is focused (the IME/delta
+				// path handles text and would otherwise double-input).
+				m_editableFocused = bEditable;
 				if (m_invokeFunc)
 				{
 					WValue* bId = webview_value_new_int(int64_t(nBrowserId));
@@ -162,7 +166,7 @@ namespace webview_cef {
 				}
 			};
 
-			m_handler->onImeCompositionRangeChangedMessage = [=](int nBrowserId, int32_t x, int32_t y)
+			m_handler->onImeCompositionRangeChangedMessage = [=](int nBrowserId, int32_t x, int32_t y, int32_t height)
 			{
 				if (m_invokeFunc)
 				{
@@ -170,13 +174,16 @@ namespace webview_cef {
 					WValue* retMap = webview_value_new_map();
 					WValue* xValue = webview_value_new_int(x);
 					WValue* yValue = webview_value_new_int(y);
+					WValue* hValue = webview_value_new_int(height);
 					webview_value_set_string(retMap, "browserId", bId);
 					webview_value_set_string(retMap, "x", xValue);
 					webview_value_set_string(retMap, "y", yValue);
+					webview_value_set_string(retMap, "height", hValue);
 					m_invokeFunc("onImeCompositionRangeChangedMessage", retMap);
 					webview_value_unref(bId);
 					webview_value_unref(xValue);
 					webview_value_unref(yValue);
+					webview_value_unref(hValue);
 					webview_value_unref(retMap);
 				}
 			};
