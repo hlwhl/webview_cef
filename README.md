@@ -84,7 +84,21 @@ On the first build, the official CEF *Standard Distribution* (~330 MB, from <htt
    flutter pub add webview_cef
    ```
 
-2. Build and run the app — no runner changes are required.
+2. Enable multi-process (recommended) by adding the helper hook to your `macos/Podfile`'s existing `post_install`:
+
+   ```ruby
+   post_install do |installer|
+     installer.pods_project.targets.each do |target|
+       flutter_additional_macos_build_settings(target)
+     end
+     # webview_cef: embed the CEF helper sub-process apps (multi-process).
+     require File.expand_path(
+       'Flutter/ephemeral/.symlinks/plugins/webview_cef/macos/embed_cef_helpers.rb', __dir__)
+     WebviewCEF.install_helper_phase(installer)
+   end
+   ```
+
+   Then `pod install` (run automatically by `flutter run`). This installs an "Embed CEF Helpers" build phase that clones the prebuilt helper into the five CEF sub-process `.app` bundles inside your app — no manual Xcode target needed. **Without this hook the plugin still works but falls back to single-process** (an unsupported Chromium mode: no crash isolation, V8 proxy resolver disabled, etc.).
 
 macOS uses CocoaPods, which does not run the CMake download path. Instead the podspec's `prepare_command` runs [`macos/scripts/download_cef.sh`](macos/scripts/download_cef.sh) on `pod install`, which mirrors the Windows/Linux flow: it downloads the official CEF *Standard Distribution* for your arch (from <https://cef-builds.spotifycdn.com>, version pinned by `CEF_VERSION` in [`third/download.cmake`](third/download.cmake)), compiles `libcef_dll_wrapper` from source, lays the framework out as a versioned macOS bundle, and installs everything into the (git-ignored) `macos/third/cef`. The first `pod install` therefore takes noticeably longer; subsequent runs are a no-op once the pinned version is present.
 

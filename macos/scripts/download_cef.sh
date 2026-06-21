@@ -47,6 +47,7 @@ WANT="${CEF_VERSION}_${CEF_ARCH}_${BUILD_TYPE}"
 # --- skip if already prepared for this exact version/arch/type ---------------
 if [ -f "${STAMP}" ] && [ "$(cat "${STAMP}" 2>/dev/null)" = "${WANT}" ] \
    && [ -f "${DEST}/libcef_dll_wrapper.a" ] \
+   && [ -f "${DEST}/cef_helper" ] \
    && [ -e "${DEST}/Chromium Embedded Framework.framework/Resources/Info.plist" ] \
    && [ -f "${DEST}/include/cef_version.h" ]; then
   echo "CEF ${WANT} already prepared in ${DEST} — nothing to do."
@@ -101,6 +102,20 @@ ln -sfn A "${FW_DST}/Versions/Current"
 ln -sfn "Versions/Current/Chromium Embedded Framework" "${FW_DST}/Chromium Embedded Framework"
 ln -sfn Versions/Current/Libraries "${FW_DST}/Libraries"
 ln -sfn Versions/Current/Resources "${FW_DST}/Resources"
+
+# Build the standalone CEF helper executable used by the multi-process helper
+# bundles (embed_cef_helpers.sh clones this into the 5 named .app bundles).
+# It links the wrapper statically; the framework is dlopen'd at runtime
+# (LoadInHelper), so it does not link the framework here.
+echo "==> Building CEF helper executable"
+clang++ -std=c++20 -stdlib=libc++ -mmacosx-version-min=11.0 -w \
+  -I "${DEST}" -I "${REPO_ROOT}/common" \
+  "${MACOS_DIR}/helper/cef_helper_main.mm" \
+  "${DEST}/libcef_dll_wrapper.a" \
+  -framework Foundation -framework AppKit \
+  -Wl,-ObjC \
+  -o "${DEST}/cef_helper"
+[ -f "${DEST}/cef_helper" ] || err "cef_helper was not produced"
 
 echo "${WANT}" > "${STAMP}"
 echo "==> Done: CEF ${CEF_VERSION} (${CEF_ARCH}, wrapper ${BUILD_TYPE}) ready in ${DEST}"

@@ -4,7 +4,12 @@
 // separate executables. On macOS the main app bundle cannot serve as the
 // sub-process (its main() boots Flutter), so each sub-process is launched from
 // a dedicated "<App> Helper*.app" whose main() does nothing but hand control to
-// CEF. This file is that main().
+// CEF.
+//
+// This file is compiled into a standalone helper binary by
+// macos/scripts/download_cef.sh; the binary is then cloned into the five named
+// helper bundles and embedded into the host app by the embed build phase that
+// macos/embed_cef_helpers.rb installs (see README "macOS multi-process").
 //
 // It reuses the shared common/ sources (the same unity the plugin compiles via
 // macos/Classes/cef_bridge.cc) so the renderer process gets WebviewApp's

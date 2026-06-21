@@ -84,7 +84,21 @@
    flutter pub add webview_cef
    ```
 
-2. 直接构建运行 —— runner 无需改动。
+2. 启用多进程(推荐):在 `macos/Podfile` 已有的 `post_install` 里加上 helper 钩子:
+
+   ```ruby
+   post_install do |installer|
+     installer.pods_project.targets.each do |target|
+       flutter_additional_macos_build_settings(target)
+     end
+     # webview_cef: 嵌入 CEF helper 子进程 app(多进程)。
+     require File.expand_path(
+       'Flutter/ephemeral/.symlinks/plugins/webview_cef/macos/embed_cef_helpers.rb', __dir__)
+     WebviewCEF.install_helper_phase(installer)
+   end
+   ```
+
+   然后 `pod install`(`flutter run` 会自动跑)。它会装一个 "Embed CEF Helpers" 构建阶段,把预编译的 helper 克隆成 5 个 CEF 子进程 `.app` 嵌进你的 App —— 无需手动加 Xcode target。**不加这个钩子插件也能用,但会回退单进程**(Chromium 不支持的模式:无崩溃隔离、V8 proxy resolver 被禁等)。
 
 macOS 走 CocoaPods，不跑 CMake 的下载流程。改由 podspec 的 `prepare_command` 在 `pod install` 时运行 [`macos/scripts/download_cef.sh`](macos/scripts/download_cef.sh)，逻辑与 Windows/Linux 对齐：下载与本机架构匹配的官方 CEF *Standard Distribution*（来自 <https://cef-builds.spotifycdn.com>，版本由 [`third/download.cmake`](third/download.cmake) 的 `CEF_VERSION` 固定），从源码编译 `libcef_dll_wrapper`，把 framework 整理成 versioned macOS bundle，并安装进（已 git-ignore 的）`macos/third/cef`。所以首次 `pod install` 会明显变慢；之后只要版本未变即为 no-op。
 
