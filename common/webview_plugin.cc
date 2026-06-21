@@ -540,6 +540,12 @@ namespace webview_cef {
 		}
 		return false;
 	}
+
+	void WebviewPlugin::tickBeginFrame(){
+		if (m_handler) {
+			m_handler->sendExternalBeginFrame();
+		}
+	}
 	
 	int WebviewPlugin::cursorAction(WValue *args, std::string name) {
 		if (!args || webview_value_get_len(args) != 3) {

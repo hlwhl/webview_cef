@@ -28,6 +28,8 @@ namespace webview_cef {
         void setInvokeMethodFunc(std::function<void(std::string, WValue*)> func);
         void setCreateTextureFunc(std::function<std::shared_ptr<WebviewTexture>()> func);
         bool getAnyBrowserFocused();
+        // Drive one external BeginFrame for this plugin's browsers (GPU path).
+        void tickBeginFrame();
         // True while a web editable node is focused (so the platform layer can
         // avoid double-forwarding raw character keys during IME input).
         bool isEditableFocused() const { return m_editableFocused; }

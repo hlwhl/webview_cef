@@ -264,7 +264,9 @@ void WebviewHandler::createBrowser(std::string url, std::function<void(int)> cal
 	}
 #endif
     CefBrowserSettings browser_settings ;
-    browser_settings.windowless_frame_rate = 30;
+    // Capped at 60 by CEF; ignored entirely when external begin frame drives the
+    // frames (GPU path below). Kept for the software fallback path.
+    browser_settings.windowless_frame_rate = 60;
     CefWindowInfo window_info;
     window_info.SetAsWindowless(0);
 #ifdef WEBVIEW_CEF_GPU_TEXTURE
@@ -272,8 +274,26 @@ void WebviewHandler::createBrowser(std::string url, std::function<void(int)> cal
     // OnAcceleratedPaint (a D3D11 shared texture) instead of the software
     // OnPaint CPU buffer. Requires the GPU to be left enabled (see WebviewApp).
     window_info.shared_texture_enabled = true;
+    // Drive frame production ourselves so the rate can follow the display's
+    // refresh (>60 Hz) instead of being capped at windowless_frame_rate. The
+    // platform layer ticks SendExternalBeginFrame on each vblank.
+    window_info.external_begin_frame_enabled = true;
 #endif
     callback(CefBrowserHost::CreateBrowserSync(window_info, this, url, browser_settings, nullptr, nullptr)->GetIdentifier());
+}
+
+void WebviewHandler::sendExternalBeginFrame() {
+#ifdef WEBVIEW_CEF_GPU_TEXTURE
+    if (!CefCurrentlyOn(TID_UI)) {
+        CefPostTask(TID_UI, base::BindOnce(&WebviewHandler::sendExternalBeginFrame, this));
+        return;
+    }
+    for (auto& kv : browser_map_) {
+        if (kv.second.browser && kv.second.browser->GetHost()) {
+            kv.second.browser->GetHost()->SendExternalBeginFrame();
+        }
+    }
+#endif
 }
 
 void WebviewHandler::sendScrollEvent(int browserId, int x, int y, int deltaX, int deltaY) {

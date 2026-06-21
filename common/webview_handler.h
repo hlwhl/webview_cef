@@ -149,6 +149,10 @@ public:
     void closeBrowser(int browserId);
     void createBrowser(std::string url, std::function<void(int)> callback);
 
+    // Drives one external BeginFrame for every live browser (GPU path only).
+    // Marshals to the CEF UI thread; safe to call from any thread.
+    void sendExternalBeginFrame();
+
     void sendScrollEvent(int browserId, int x, int y, int deltaX, int deltaY);
     void changeSize(int browserId, float a_dpi, int width, int height);
     void cursorClick(int browserId, int x, int y, bool up);

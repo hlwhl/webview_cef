@@ -20,6 +20,9 @@
 #include <thread>
 #include <iostream>
 #include <mutex>
+#include <atomic>
+#include <chrono>
+#include <vector>
 
 namespace webview_cef {
 	class WebviewTextureRenderer : public WebviewTexture{
@@ -208,6 +211,76 @@ namespace webview_cef {
 
 	std::unordered_map<HWND, std::shared_ptr<WebviewPlugin>> webviewPlugins;
 	std::unordered_map<HWND, std::function<void(std::string method,flutter::EncodableValue * arguments)>> webviewChannels;
+	// Guards webviewPlugins against the vsync driver thread's snapshot reads.
+	static std::mutex g_pluginsMutex;
+
+#ifdef WEBVIEW_CEF_GPU_TEXTURE
+	// ---- Vsync-driven external BeginFrame -----------------------------------
+	// With external_begin_frame_enabled the browser only produces a frame when
+	// SendExternalBeginFrame is called. We tick it on every display vblank so the
+	// webview's frame rate follows the monitor's actual refresh rate (adaptive,
+	// not capped at 60). WaitForVBlank blocks until the next vblank and tracks
+	// the current refresh rate automatically.
+	static std::thread g_vsyncThread;
+	static std::atomic<bool> g_vsyncRunning{false};
+
+	static Microsoft::WRL::ComPtr<IDXGIOutput> AcquirePrimaryDxgiOutput() {
+		Microsoft::WRL::ComPtr<IDXGIFactory1> factory;
+		if (FAILED(CreateDXGIFactory1(IID_PPV_ARGS(&factory)))) return nullptr;
+		Microsoft::WRL::ComPtr<IDXGIAdapter1> adapter;
+		if (FAILED(factory->EnumAdapters1(0, &adapter))) return nullptr;
+		Microsoft::WRL::ComPtr<IDXGIOutput> output;
+		if (FAILED(adapter->EnumOutputs(0, &output))) return nullptr;
+		return output;
+	}
+
+	static UINT QueryRefreshIntervalMs() {
+		DEVMODE dm = {};
+		dm.dmSize = sizeof(dm);
+		if (EnumDisplaySettings(nullptr, ENUM_CURRENT_SETTINGS, &dm) && dm.dmDisplayFrequency > 1) {
+			return (std::max)(UINT(1), UINT(1000 / dm.dmDisplayFrequency));
+		}
+		return 16;  // assume ~60 Hz
+	}
+
+	static void VsyncThreadProc() {
+		Microsoft::WRL::ComPtr<IDXGIOutput> output = AcquirePrimaryDxgiOutput();
+		const UINT fallbackMs = QueryRefreshIntervalMs();
+		while (g_vsyncRunning) {
+			if (output) {
+				if (FAILED(output->WaitForVBlank())) {
+					output.Reset();
+				}
+			}
+			if (!output) {
+				std::this_thread::sleep_for(std::chrono::milliseconds(fallbackMs));
+				output = AcquirePrimaryDxgiOutput();
+			}
+			std::vector<std::shared_ptr<WebviewPlugin>> snapshot;
+			{
+				std::lock_guard<std::mutex> lock(g_pluginsMutex);
+				snapshot.reserve(webviewPlugins.size());
+				for (auto& kv : webviewPlugins) snapshot.push_back(kv.second);
+			}
+			for (auto& p : snapshot) {
+				if (p) p->tickBeginFrame();
+			}
+		}
+	}
+
+	static void StartVsyncDriver() {
+		bool expected = false;
+		if (g_vsyncRunning.compare_exchange_strong(expected, true)) {
+			g_vsyncThread = std::thread(VsyncThreadProc);
+		}
+	}
+
+	static void StopVsyncDriver() {
+		if (g_vsyncRunning.exchange(false)) {
+			if (g_vsyncThread.joinable()) g_vsyncThread.join();
+		}
+	}
+#endif  // WEBVIEW_CEF_GPU_TEXTURE
 
 	static constexpr UINT_PTR kImeSubclassId = 1;
 
@@ -288,7 +361,14 @@ namespace webview_cef {
 			});
 
 		plugin->m_hwnd = FlutterDesktopViewGetHWND(FlutterDesktopPluginRegistrarGetView(registrar));
-		webviewPlugins.emplace(plugin->m_hwnd, plugin->m_plugin);
+		{
+			std::lock_guard<std::mutex> lock(g_pluginsMutex);
+			webviewPlugins.emplace(plugin->m_hwnd, plugin->m_plugin);
+		}
+#ifdef WEBVIEW_CEF_GPU_TEXTURE
+		// Begin ticking external BeginFrame on every vblank (drives GPU frames).
+		StartVsyncDriver();
+#endif
 		// Subclass the Flutter view window to intercept WM_IME_* before the engine
 		// and DefWindowProc handle them (required for correct CJK composition/commit).
 		SetWindowSubclass(plugin->m_hwnd, ImeSubclassProc, kImeSubclassId, 0);
@@ -325,9 +405,19 @@ namespace webview_cef {
 	WebviewCefPlugin::~WebviewCefPlugin() {
         m_plugin = nullptr;
 		RemoveWindowSubclass(m_hwnd, ImeSubclassProc, kImeSubclassId);
-		webviewPlugins.erase(m_hwnd);
+		bool nowEmpty = false;
+		{
+			std::lock_guard<std::mutex> lock(g_pluginsMutex);
+			webviewPlugins.erase(m_hwnd);
+			nowEmpty = webviewPlugins.empty();
+		}
 		webviewChannels.erase(m_hwnd);
-        if(webviewPlugins.empty()){
+        if(nowEmpty){
+#ifdef WEBVIEW_CEF_GPU_TEXTURE
+			// Stop the vsync thread before shutting CEF down. Must not hold
+			// g_pluginsMutex here: the thread takes it while snapshotting.
+			StopVsyncDriver();
+#endif
 			webview_cef::stopCEF();
 		}
 	}
