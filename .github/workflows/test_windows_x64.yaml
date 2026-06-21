@@ -31,6 +31,11 @@ jobs:
         with:
           channel: stable
       - run: flutter --version
+      - name: Analyze plugin
+        run: flutter analyze
+      - name: Analyze example
+        working-directory: example
+        run: flutter analyze
       # The official CEF distribution is downloaded by third/download.cmake and
       # libcef_dll_wrapper is built from source during the CMake configure step.
       - run: cd example; flutter build windows
