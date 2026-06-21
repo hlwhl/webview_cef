@@ -53,6 +53,14 @@ namespace webview_cef {
     int initCEFProcesses(CefMainArgs args);
     int initCEFProcesses();
     void startCEF();
+#ifdef OS_MAC
+    // macOS multi-process: the platform layer (Obj-C) resolves these from the
+    // app bundle and sets them before startCEF() so CEF can launch the bundled
+    // helper sub-processes. Must be called before startCEF().
+    void setMacCEFPaths(const std::string& subprocessPath,
+                        const std::string& frameworkDirPath,
+                        const std::string& mainBundlePath);
+#endif
     void doMessageLoopWork();
     void SwapBufferFromBgraToRgba(void* _dest, const void* _src, int width, int height);
     void stopCEF();

@@ -162,7 +162,9 @@ void WebviewApp::OnBeforeCommandLineProcessing(const CefString &process_type, Ce
 
 #ifdef __APPLE__
     command_line->AppendSwitch("use-mock-keychain");
-    command_line->AppendSwitch("single-process");
+    // macOS now runs multi-process via bundled CEF helper apps (see the
+    // example Runner's "Embed CEF Helpers" phase). The process model is
+    // selected by m_uMode above, like the other platforms.
 #endif
 #ifdef __linux__
                                            

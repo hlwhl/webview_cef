@@ -284,6 +284,24 @@ private:
     if (self) {
         _plugin = std::make_shared<webview_cef::WebviewPlugin>();
         if(isCefProcessInit == NO){
+            // Resolve the bundled CEF framework + helper sub-process paths so
+            // CEF runs multi-process. The helper bundle is "<app exe> Helper.app"
+            // (see the example Runner's "Embed CEF Helpers" build phase).
+            NSBundle* mainBundle = [NSBundle mainBundle];
+            NSString* bundlePath = [mainBundle bundlePath];
+            NSString* exeName = [mainBundle objectForInfoDictionaryKey:@"CFBundleExecutable"];
+            NSString* helperName = [exeName stringByAppendingString:@" Helper"];
+            NSString* frameworksDir = [bundlePath stringByAppendingPathComponent:@"Contents/Frameworks"];
+            NSString* subprocessPath = [NSString stringWithFormat:@"%@/%@.app/Contents/MacOS/%@", frameworksDir, helperName, helperName];
+            NSString* frameworkDir = [frameworksDir stringByAppendingPathComponent:@"Chromium Embedded Framework.framework"];
+            // Only run multi-process if the bundled helper actually exists.
+            // Apps that embed webview_cef but haven't added the helper target
+            // fall back to single-process (handled in initCEFProcesses).
+            if ([[NSFileManager defaultManager] fileExistsAtPath:subprocessPath]) {
+                webview_cef::setMacCEFPaths(std::string([subprocessPath UTF8String]),
+                                            std::string([frameworkDir UTF8String]),
+                                            std::string([bundlePath UTF8String]));
+            }
             webview_cef::initCEFProcesses();
             isCefProcessInit = YES;
         }

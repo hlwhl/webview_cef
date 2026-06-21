@@ -15,6 +15,19 @@ namespace webview_cef {
 	CefRefPtr<WebviewApp> app;
 	CefString userAgent;
 	bool isCefInitialized = false;
+#ifdef OS_MAC
+	std::string g_macSubprocessPath;
+	std::string g_macFrameworkDirPath;
+	std::string g_macMainBundlePath;
+
+	void setMacCEFPaths(const std::string& subprocessPath,
+	                    const std::string& frameworkDirPath,
+	                    const std::string& mainBundlePath) {
+		g_macSubprocessPath = subprocessPath;
+		g_macFrameworkDirPath = frameworkDirPath;
+		g_macMainBundlePath = mainBundlePath;
+	}
+#endif
 
 	WebviewPlugin::WebviewPlugin() {
 		m_handler = new WebviewHandler();
@@ -588,6 +601,14 @@ namespace webview_cef {
 #endif
 		// handler = new WebviewHandler();
 		app = new WebviewApp();
+#ifdef OS_MAC
+		// No bundled helper resolved → fall back to single-process so consumers
+		// that haven't added the CEF helper apps keep working (mode 3 appends
+		// the "single-process" switch in OnBeforeCommandLineProcessing).
+		if (g_macSubprocessPath.empty()) {
+			app->SetProcessMode(3);
+		}
+#endif
 		return CefExecuteProcess(mainArgs, app, nullptr);
 	}
 
@@ -604,7 +625,17 @@ namespace webview_cef {
 #ifdef OS_MAC
 		//cef message loop handle by MainApplication on mac
 		cefs.external_message_pump = true;
-		//CefString(&cefs.browser_subprocess_path) = "/Library/Chaches"; //the helper Program path
+		// Multi-process: point CEF at the bundled helper executable and the
+		// framework. The platform layer fills these from the app bundle.
+		if (!g_macSubprocessPath.empty()) {
+			CefString(&cefs.browser_subprocess_path) = g_macSubprocessPath;
+		}
+		if (!g_macFrameworkDirPath.empty()) {
+			CefString(&cefs.framework_dir_path) = g_macFrameworkDirPath;
+		}
+		if (!g_macMainBundlePath.empty()) {
+			CefString(&cefs.main_bundle_path) = g_macMainBundlePath;
+		}
 #else
 		//cef message run in another thread on windows/linux
 		cefs.multi_threaded_message_loop = true;
