@@ -318,8 +318,14 @@ class WebViewState extends State<WebView> with WebeViewTextInput {
         }
       } else if (d is TextEditingDeltaReplacement) {
         if (d.composing.isValid) {
+          // Composition is still ongoing (preedit revised).
           _composingText = d.replacementText;
           _controller.imeSetComposition(_composingText);
+        } else {
+          // Composition finished (a candidate was selected): commit the final
+          // text. Without this the selected text was dropped and never shown.
+          _controller.imeCommitText(d.replacementText);
+          _composingText = '';
         }
       } else if (d is TextEditingDeltaNonTextUpdate) {
         if (_composingText.isNotEmpty) {

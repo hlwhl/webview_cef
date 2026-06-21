@@ -159,6 +159,13 @@ public:
     void imeCommitText(int browserId, std::string text);
     void setClientFocus(int browserId, bool focus);
 
+    // Native IME pipeline (Windows WM_IME_*): operate on the currently focused
+    // browser. |text| is UTF-16 read from the IMM composition string.
+    CefRefPtr<CefBrowser> getFocusedBrowser();
+    void imeSetCompositionNative(const std::wstring& text, int cursor);
+    void imeCommitTextNative(const std::wstring& text);
+    void imeFinishComposition();
+
     void setCookie(const std::string& domain, const std::string& key, const std::string& value);
     void deleteCookie(const std::string& domain, const std::string& key);
     void visitAllCookies(std::function<void(std::map<std::string, std::map<std::string, std::string>>)> callback);

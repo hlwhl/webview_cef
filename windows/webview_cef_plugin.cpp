@@ -2,6 +2,8 @@
 #include "webview_cef_keyevent.h"
 // This must be included before many other Windows headers.
 #include <windows.h>
+#include <imm.h>
+#include <commctrl.h>
 
 // For getPlatformVersion; remove unless needed for your plugin implementation.
 #include <VersionHelpers.h>
@@ -204,6 +206,67 @@ namespace webview_cef {
 	std::unordered_map<HWND, std::shared_ptr<WebviewPlugin>> webviewPlugins;
 	std::unordered_map<HWND, std::function<void(std::string method,flutter::EncodableValue * arguments)>> webviewChannels;
 
+	static constexpr UINT_PTR kImeSubclassId = 1;
+
+	// The OS IME must be intercepted in the window procedure BEFORE DefWindowProc
+	// runs, otherwise the default handling consumes/converts the result string and
+	// shows its own composition window. We can't do that from the runner's
+	// post-DispatchMessage hook, so the Flutter view HWND is subclassed here.
+	static LRESULT CALLBACK ImeSubclassProc(HWND hwnd, UINT message, WPARAM wparam,
+		LPARAM lparam, UINT_PTR, DWORD_PTR) {
+		switch (message) {
+		case WM_IME_SETCONTEXT:
+			// Don't let the OS draw its own composition window; the preedit is
+			// rendered inside the web page via ImeSetComposition.
+			lparam &= ~ISC_SHOWUICOMPOSITIONWINDOW;
+			return DefSubclassProc(hwnd, message, wparam, lparam);
+		case WM_IME_STARTCOMPOSITION:
+			// Suppress default composition UI; we drive composition ourselves.
+			return 0;
+		case WM_IME_COMPOSITION: {
+			auto pit = webviewPlugins.find(hwnd);
+			if (pit == webviewPlugins.end() || !pit->second->isEditableFocused()) {
+				return DefSubclassProc(hwnd, message, wparam, lparam);
+			}
+			HIMC imc = ImmGetContext(hwnd);
+			if (imc) {
+				// Committed result -> commit it to the focused browser.
+				if (lparam & GCS_RESULTSTR) {
+					LONG bytes = ImmGetCompositionStringW(imc, GCS_RESULTSTR, nullptr, 0);
+					if (bytes > 0) {
+						std::wstring ws(bytes / sizeof(wchar_t), L'\0');
+						ImmGetCompositionStringW(imc, GCS_RESULTSTR, &ws[0], bytes);
+						pit->second->imeCommitTextNative(ws);
+					}
+				}
+				// Ongoing preedit -> set composition (real-time on-screen text).
+				if (lparam & GCS_COMPSTR) {
+					LONG bytes = ImmGetCompositionStringW(imc, GCS_COMPSTR, nullptr, 0);
+					if (bytes > 0) {
+						std::wstring ws(bytes / sizeof(wchar_t), L'\0');
+						ImmGetCompositionStringW(imc, GCS_COMPSTR, &ws[0], bytes);
+						int cursor = static_cast<int>(
+							ImmGetCompositionStringW(imc, GCS_CURSORPOS, nullptr, 0));
+						pit->second->imeSetCompositionNative(ws, cursor);
+					}
+				}
+				ImmReleaseContext(hwnd, imc);
+			}
+			// Consume: prevent DefWindowProc from showing the default IME window or
+			// generating duplicate WM_IME_CHAR/WM_CHAR for the committed text.
+			return 0;
+		}
+		case WM_IME_ENDCOMPOSITION: {
+			auto pit = webviewPlugins.find(hwnd);
+			if (pit != webviewPlugins.end()) {
+				pit->second->imeFinishCompositionNative();
+			}
+			return DefSubclassProc(hwnd, message, wparam, lparam);
+		}
+		}
+		return DefSubclassProc(hwnd, message, wparam, lparam);
+	}
+
 	void WebviewCefPlugin::RegisterWithRegistrar(FlutterDesktopPluginRegistrarRef registrar) {
 
 		auto plugin = std::make_unique<WebviewCefPlugin>();
@@ -223,6 +286,9 @@ namespace webview_cef {
 
 		plugin->m_hwnd = FlutterDesktopViewGetHWND(FlutterDesktopPluginRegistrarGetView(registrar));
 		webviewPlugins.emplace(plugin->m_hwnd, plugin->m_plugin);
+		// Subclass the Flutter view window to intercept WM_IME_* before the engine
+		// and DefWindowProc handle them (required for correct CJK composition/commit).
+		SetWindowSubclass(plugin->m_hwnd, ImeSubclassProc, kImeSubclassId, 0);
 		webviewChannels.emplace(plugin->m_hwnd, [plugin_pointer = plugin.get()](std::string method, flutter::EncodableValue* arguments) {
 			plugin_pointer->m_channel->InvokeMethod(method, std::make_unique<flutter::EncodableValue>(*arguments));
 			});
@@ -246,6 +312,7 @@ namespace webview_cef {
 
 	WebviewCefPlugin::~WebviewCefPlugin() {
         m_plugin = nullptr;
+		RemoveWindowSubclass(m_hwnd, ImeSubclassProc, kImeSubclassId);
 		webviewPlugins.erase(m_hwnd);
 		webviewChannels.erase(m_hwnd);
         if(webviewPlugins.empty()){
@@ -286,23 +353,13 @@ namespace webview_cef {
 			delete args;
 			break;
 		}
+		// WM_IME_* are handled in ImeSubclassProc (before DefWindowProc), not here.
 		case WM_SYSCHAR:
-		case WM_CHAR: {
-			// Character messages insert text. While a web input is focused, text
-			// is delivered through the Flutter IME/delta path (imeCommitText), so
-			// forwarding the raw char here too would double-insert. Control keys
-			// still flow through the WM_KEYDOWN/WM_KEYUP case below.
-			auto it = webviewPlugins.find(hwnd);
-			if (it != webviewPlugins.end() && !it->second->isEditableFocused()) {
-				CefKeyEvent keyEvent = getCefKeyEvent(message, wparam, lparam);
-				it->second->sendKeyEvent(keyEvent);
-			}
-			break;
-		}
 		case WM_SYSKEYDOWN:
 		case WM_SYSKEYUP:
 		case WM_KEYDOWN:
-		case WM_KEYUP: {
+		case WM_KEYUP:
+		case WM_CHAR: {
 			if (webviewPlugins.find(hwnd) != webviewPlugins.end()) {
 				CefKeyEvent keyEvent = getCefKeyEvent(message, wparam, lparam);
 				webviewPlugins[hwnd]->sendKeyEvent(keyEvent);

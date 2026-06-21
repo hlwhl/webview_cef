@@ -1,3 +1,5 @@
+import 'dart:io';
+
 import 'package:flutter/foundation.dart';
 import 'package:flutter/services.dart';
 
@@ -11,12 +13,17 @@ mixin WebeViewTextInput implements DeltaTextInputClient {
   TextInputConnection? _textInputConnection;
 
   attachTextInputClient() {
+    // On Windows the OS IME is driven by the native WM_IME pipeline (the Flutter
+    // text-input/delta path does not deliver composition for an OSR browser on
+    // Windows). Don't claim the IME here so the native path can own it.
+    if (Platform.isWindows) {
+      return;
+    }
     _textInputConnection?.close();
     _textInputConnection = TextInput.attach(
         this, const TextInputConfiguration(enableDeltaModel: true));
-    // show() must be called on every platform: it makes this connection the
-    // active IME target so the OS IME composes into it and the framework emits
-    // composing deltas that we relay to CEF (real-time on-screen composition).
+    // show() makes this connection the active IME target so the OS IME composes
+    // into it and the framework emits composing deltas we relay to CEF.
     _textInputConnection?.show();
   }
 

@@ -100,7 +100,9 @@ target_link_libraries(${PLUGIN_NAME} PRIVATE
   flutter
   flutter_wrapper_plugin
   libcef_lib
-  libcef_dll_wrapper)
+  libcef_dll_wrapper
+  imm32
+  comctl32)
 
 # === Bundle the CEF runtime next to the application executable. ===
 # Binaries are configuration-specific (Debug vs Release); every non-Debug

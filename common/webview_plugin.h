@@ -29,6 +29,11 @@ namespace webview_cef {
         // avoid double-forwarding raw character keys during IME input).
         bool isEditableFocused() const { return m_editableFocused; }
 
+        // Native IME pipeline forwarders (driven by the Windows WM_IME_* handler).
+        void imeSetCompositionNative(const std::wstring& text, int cursor);
+        void imeCommitTextNative(const std::wstring& text);
+        void imeFinishCompositionNative();
+
     private :
         bool m_editableFocused = false;
         int cursorAction(WValue *args, std::string name);

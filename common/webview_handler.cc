@@ -484,6 +484,69 @@ void WebviewHandler::setClientFocus(int browserId, bool focus)
     it->second.browser->GetHost()->SetFocus(focus);
 }
 
+CefRefPtr<CefBrowser> WebviewHandler::getFocusedBrowser()
+{
+    return current_focused_browser_;
+}
+
+void WebviewHandler::imeSetCompositionNative(const std::wstring& text, int cursor)
+{
+    if (!CefCurrentlyOn(TID_UI)) {
+        CefPostTask(TID_UI, base::BindOnce(&WebviewHandler::imeSetCompositionNative, this, text, cursor));
+        return;
+    }
+    auto browser = current_focused_browser_;
+    if (!browser.get()) {
+        return;
+    }
+    CefString cTextStr;
+    cTextStr.FromWString(text);
+
+    std::vector<CefCompositionUnderline> underlines;
+    cef_composition_underline_t underline = {};
+    underline.range.from = 0;
+    underline.range.to = static_cast<int>(cTextStr.length());
+    underline.color = ColorUNDERLINE;
+    underline.background_color = ColorBKCOLOR;
+    underline.thick = 0;
+    underline.style = CEF_CUS_DOT;
+    underlines.push_back(underline);
+
+    const int len = static_cast<int>(cTextStr.length());
+    const int caret = (cursor < 0 || cursor > len) ? len : cursor;
+    CefRange selection_range(caret, caret);
+    browser->GetHost()->ImeSetComposition(cTextStr, underlines,
+        CefRange(UINT32_MAX, UINT32_MAX), selection_range);
+}
+
+void WebviewHandler::imeCommitTextNative(const std::wstring& text)
+{
+    if (!CefCurrentlyOn(TID_UI)) {
+        CefPostTask(TID_UI, base::BindOnce(&WebviewHandler::imeCommitTextNative, this, text));
+        return;
+    }
+    auto browser = current_focused_browser_;
+    if (!browser.get()) {
+        return;
+    }
+    CefString cTextStr;
+    cTextStr.FromWString(text);
+    browser->GetHost()->ImeCommitText(cTextStr, CefRange(UINT32_MAX, UINT32_MAX), 0);
+}
+
+void WebviewHandler::imeFinishComposition()
+{
+    if (!CefCurrentlyOn(TID_UI)) {
+        CefPostTask(TID_UI, base::BindOnce(&WebviewHandler::imeFinishComposition, this));
+        return;
+    }
+    auto browser = current_focused_browser_;
+    if (!browser.get()) {
+        return;
+    }
+    browser->GetHost()->ImeFinishComposingText(false);
+}
+
 void WebviewHandler::setCookie(const std::string& domain, const std::string& key, const std::string& value){
     CefRefPtr<CefCookieManager> manager = CefCookieManager::GetGlobalManager(nullptr);
     if(manager){

@@ -489,6 +489,21 @@ namespace webview_cef {
 		}
 	}
 
+	void WebviewPlugin::imeSetCompositionNative(const std::wstring& text, int cursor)
+	{
+		m_handler->imeSetCompositionNative(text, cursor);
+	}
+
+	void WebviewPlugin::imeCommitTextNative(const std::wstring& text)
+	{
+		m_handler->imeCommitTextNative(text);
+	}
+
+	void WebviewPlugin::imeFinishCompositionNative()
+	{
+		m_handler->imeFinishComposition();
+	}
+
 	void WebviewPlugin::sendKeyEvent(CefKeyEvent& ev)
 	{
 		m_handler->sendKeyEvent(ev);

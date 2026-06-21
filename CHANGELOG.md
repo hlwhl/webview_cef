@@ -10,7 +10,7 @@
 - Fixed command-line switch typos (`no-sanbox` -> `no-sandbox`, stray space in `renderer-process-limit`).
 - Removed the unused federated platform-interface scaffolding (`WebviewCefPlatform` / `MethodChannelWebviewCef` / `getPlatformVersion`) and the `plugin_platform_interface` dependency; the public API is `WebviewManager` / `WebViewController`.
 - Housekeeping: stopped tracking the downloaded CEF headers in git, added Windows/macOS CI, and cleaned up dead example code.
-- Fixed real-time IME composition (CJK "上屏"): the text-input connection is now shown on all platforms, the composing caret rect is reported with a real height, committed text is delivered on Windows, the composition caret/selection range is corrected, and raw character keys are no longer double-forwarded while a web input is focused.
+- Fixed real-time CJK IME composition ("上屏") in the off-screen webview. Windows now uses a native WM_IME pipeline (a window subclass that intercepts WM_IME_* before DefWindowProc and drives CefBrowserHost ImeSetComposition/ImeCommitText on the CEF UI thread), fixing live pinyin preedit and candidate commit. macOS/Linux: the Flutter text-input connection is now shown, the composing caret rect carries a real height, committed/replacement text is delivered, and the composition selection range is corrected.
 
 ## 0.2.0
 - Linux support!
