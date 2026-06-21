@@ -1,5 +1,8 @@
 ﻿#include "webview_cef_plugin.h"
 #include "webview_cef_keyevent.h"
+#ifdef WEBVIEW_CEF_GPU_TEXTURE
+#include "webview_cef_gpu_texture.h"
+#endif
 // This must be included before many other Windows headers.
 #include <windows.h>
 #include <imm.h>
@@ -299,6 +302,15 @@ namespace webview_cef {
 			});
 
 		plugin->m_plugin->setCreateTextureFunc([plugin_pointer = plugin.get()]() {
+#ifdef WEBVIEW_CEF_GPU_TEXTURE
+			// Zero-copy GPU path: CEF OnAcceleratedPaint shared texture -> Flutter
+			// D3D11 surface texture. Falls back to the software pixel-buffer path
+			// only if the D3D11 device could not be created.
+			auto gpu = std::make_shared<WebviewGpuTextureRenderer>(plugin_pointer->m_textureRegistrar);
+			if (gpu->isValid()) {
+				return std::dynamic_pointer_cast<WebviewTexture>(gpu);
+			}
+#endif
 			std::shared_ptr<WebviewTextureRenderer> renderer = std::make_shared<WebviewTextureRenderer>(plugin_pointer->m_textureRegistrar);
 			return std::dynamic_pointer_cast<WebviewTexture>(renderer);
 		});

@@ -41,6 +41,8 @@ list(APPEND PLUGIN_SOURCES
   "webview_cef_plugin.cpp"
   "webview_cef_plugin.h"
   "webview_cef_keyevent.h"
+  "webview_cef_gpu_texture.cc"
+  "webview_cef_gpu_texture.h"
   "${CMAKE_CURRENT_LIST_DIR}/../common/webview_app.cc"
   "${CMAKE_CURRENT_LIST_DIR}/../common/webview_app.h"
   "${CMAKE_CURRENT_LIST_DIR}/../common/webview_handler.cc"
@@ -83,6 +85,14 @@ target_compile_definitions(${PLUGIN_NAME} PRIVATE FLUTTER_PLUGIN_IMPL)
 # collide with the min/max macros from <windows.h>. Disable those macros.
 target_compile_definitions(${PLUGIN_NAME} PRIVATE NOMINMAX)
 
+# Zero-copy GPU rendering: bridge CEF's OnAcceleratedPaint D3D11 shared texture
+# straight to a Flutter GPU surface texture (no CPU swizzle / upload). Turn OFF
+# to fall back to the software pixel-buffer path.
+option(WEBVIEW_CEF_GPU_TEXTURE "Use the zero-copy GPU texture rendering path" ON)
+if(WEBVIEW_CEF_GPU_TEXTURE)
+  target_compile_definitions(${PLUGIN_NAME} PRIVATE WEBVIEW_CEF_GPU_TEXTURE)
+endif()
+
 # Source include directories and library dependencies. Add any plugin-specific
 # dependencies here.
 target_include_directories(${PLUGIN_NAME} INTERFACE
@@ -115,7 +125,9 @@ target_link_libraries(${PLUGIN_NAME} PRIVATE
   libcef_lib
   libcef_dll_wrapper
   imm32
-  comctl32)
+  comctl32
+  d3d11
+  dxgi)
 
 # === Bundle the CEF runtime next to the application executable. ===
 # Bundle the same runtime we linked against. By default that is the Release CEF

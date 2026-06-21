@@ -103,11 +103,15 @@ void WebviewApp::OnBeforeCommandLineProcessing(const CefString &process_type, Ce
     // Pass additional command-line flags to the browser process.
 	if (process_type.empty())
 	{
+#ifndef WEBVIEW_CEF_GPU_TEXTURE
+		// The GPU shared-texture path (OnAcceleratedPaint) requires the GPU
+		// compositor; only allow disabling the GPU when it is not compiled in.
 		if (!m_bEnableGPU)
 		{
 			command_line->AppendSwitch("disable-gpu");
 			command_line->AppendSwitch("disable-gpu-compositing");
 		}
+#endif
 
 		command_line->AppendSwitch("disable-web-security");                                     //disable web security
 		command_line->AppendSwitch("allow-running-insecure-content");                           //allow running insecure content in secure pages

@@ -10,7 +10,10 @@ namespace webview_cef {
     class WebviewTexture{
     public:
         virtual ~WebviewTexture(){}
+        // Software off-screen frame (CPU BGRA buffer from CefRenderHandler::OnPaint).
         virtual void onFrame(const void* buffer, int width, int height){}
+        // GPU accelerated frame (shared texture handle from OnAcceleratedPaint).
+        virtual void onAcceleratedFrame(const void* sharedHandle, int width, int height, int format){}
         int64_t textureId = 0;
         bool isFocused = false;
     };

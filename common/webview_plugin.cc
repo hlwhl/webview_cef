@@ -38,6 +38,12 @@ namespace webview_cef {
 				}
 			};
 
+			m_handler->onAcceleratedPaintCallback = [=](int browserId, const void* sharedHandle, int32_t width, int32_t height, int32_t format) {
+				if (m_renderers.find(browserId) != m_renderers.end() && m_renderers[browserId] != nullptr) {
+					m_renderers[browserId]->onAcceleratedFrame(sharedHandle, width, height, format);
+				}
+			};
+
 			m_handler->onTooltipEvent = [=](int browserId, std::string text) {
 				if (m_invokeFunc) {
 					WValue* bId = webview_value_new_int(browserId);
@@ -227,6 +233,7 @@ namespace webview_cef {
 
 	void WebviewPlugin::uninitCallback(){
 		m_handler->onPaintCallback = nullptr;
+		m_handler->onAcceleratedPaintCallback = nullptr;
 		m_handler->onTooltipEvent = nullptr;
 		m_handler->onCursorChangedEvent = nullptr;
 		m_handler->onConsoleMessageEvent = nullptr;

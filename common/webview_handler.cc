@@ -267,6 +267,12 @@ void WebviewHandler::createBrowser(std::string url, std::function<void(int)> cal
     browser_settings.windowless_frame_rate = 30;
     CefWindowInfo window_info;
     window_info.SetAsWindowless(0);
+#ifdef WEBVIEW_CEF_GPU_TEXTURE
+    // Enable GPU shared-texture rendering: CEF delivers frames via
+    // OnAcceleratedPaint (a D3D11 shared texture) instead of the software
+    // OnPaint CPU buffer. Requires the GPU to be left enabled (see WebviewApp).
+    window_info.shared_texture_enabled = true;
+#endif
     callback(CefBrowserHost::CreateBrowserSync(window_info, this, url, browser_settings, nullptr, nullptr)->GetIdentifier());
 }
 
@@ -705,6 +711,27 @@ void WebviewHandler::OnPaint(CefRefPtr<CefBrowser> browser, CefRenderHandler::Pa
     if (!browser->IsPopup() && onPaintCallback != nullptr) {
         onPaintCallback(browser->GetIdentifier(), buffer, w, h);
     }
+}
+
+void WebviewHandler::OnAcceleratedPaint(CefRefPtr<CefBrowser> browser, CefRenderHandler::PaintElementType type,
+                            const CefRenderHandler::RectList &dirtyRects, const CefAcceleratedPaintInfo &info) {
+#ifdef WEBVIEW_CEF_GPU_TEXTURE
+    if (!browser->IsPopup() && onAcceleratedPaintCallback != nullptr) {
+        int w = 0, h = 0;
+        auto it = browser_map_.find(browser->GetIdentifier());
+        if (it != browser_map_.end()) {
+            w = it->second.width;
+            h = it->second.height;
+        }
+        // On Windows the shared texture is a HANDLE openable with
+        // ID3D11Device1::OpenSharedResource1. The handle is pool-owned and only
+        // valid for the duration of this callback, so the renderer must reopen
+        // and copy it before returning.
+        onAcceleratedPaintCallback(browser->GetIdentifier(),
+                                   reinterpret_cast<const void*>(info.shared_texture_handle),
+                                   w, h, static_cast<int>(info.format));
+    }
+#endif
 }
 
 

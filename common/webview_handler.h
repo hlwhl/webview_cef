@@ -37,8 +37,12 @@ public CefFocusHandler,
 public CefLoadHandler,
 public CefRenderHandler{
 public:
-    //Paint callback
+    //Paint callback (software off-screen rendering)
     std::function<void(int browserId, const void* buffer, int32_t width, int32_t height)> onPaintCallback;
+    //Accelerated paint callback (GPU shared texture). On Windows |sharedHandle|
+    //is the OnAcceleratedPaint shared-texture HANDLE; |format| is a
+    //cef_color_type_t. Only fired when shared textures are enabled.
+    std::function<void(int browserId, const void* sharedHandle, int32_t width, int32_t height, int32_t format)> onAcceleratedPaintCallback;
     //cef message event
     std::function<void(int browserId, std::string url)> onUrlChangedEvent;
     std::function<void(int browserId, std::string title)> onTitleChangedEvent;
@@ -130,6 +134,7 @@ public:
     // CefRenderHandler methods:
     virtual void GetViewRect(CefRefPtr<CefBrowser> browser, CefRect& rect) override;
     virtual void OnPaint(CefRefPtr<CefBrowser> browser, PaintElementType type, const RectList& dirtyRects, const void* buffer, int width, int height) override;
+    virtual void OnAcceleratedPaint(CefRefPtr<CefBrowser> browser, PaintElementType type, const RectList& dirtyRects, const CefAcceleratedPaintInfo& info) override;
     virtual bool GetScreenInfo(CefRefPtr<CefBrowser> browser, CefScreenInfo& screen_info) override;
     virtual bool StartDragging(CefRefPtr<CefBrowser> browser,
                                CefRefPtr<CefDragData> drag_data,
