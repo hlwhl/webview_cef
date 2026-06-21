@@ -16,6 +16,13 @@ Flutter webview backed by CEF (Chromium Embedded Framework)
   s.source           = { :path => '.' }
   s.source_files     = 'Classes/**/*'
   s.dependency 'FlutterMacOS'
+
+  # CEF is not tracked in git for macOS (mirrors the Windows/Linux CMake
+  # download path in third/download.cmake). It is fetched and the wrapper built
+  # on demand into third/cef. Runs on every `pod install`; a no-op once the
+  # pinned version is present. Override build type via CEF_WRAPPER_BUILD_TYPE.
+  s.prepare_command = 'bash scripts/download_cef.sh'
+
   s.vendored_frameworks = 'third/cef/Chromium Embedded Framework.framework'
   s.vendored_libraries = 'third/cef/libcef_dll_wrapper.a'
 

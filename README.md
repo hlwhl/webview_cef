@@ -78,30 +78,21 @@ On the first build, the official CEF *Standard Distribution* (~330 MB, from <htt
 
 ### macOS
 
-macOS uses CocoaPods rather than the CMake download path, so the CEF binaries must be placed manually. Clone this repo into your project (e.g. `packages/webview_cef`) and reference it by path:
-
-```yaml
-dependencies:
-  webview_cef:
-    path: ./packages/webview_cef
-```
-
-Then, **inside the cloned repo**, populate `macos/third/cef`:
-
-1. Download the official CEF *Standard Distribution* for your arch from <https://cef-builds.spotifycdn.com> (`...macosarm64.tar.bz2` for Apple Silicon, `...macosx64.tar.bz2` for Intel). The exact version is `CEF_VERSION` in [`third/download.cmake`](third/download.cmake).
-2. Build `libcef_dll_wrapper` (not shipped prebuilt):
+1. Add the dependency:
 
    ```bash
-   cd cef_binary_<version>_macos<arch>
-   mkdir build && cd build
-   cmake -G Ninja -DPROJECT_ARCH=<arm64|x86_64> -DCMAKE_BUILD_TYPE=Release ..
-   ninja libcef_dll_wrapper
+   flutter pub add webview_cef
    ```
 
-3. Copy `Release/Chromium Embedded Framework.framework` and the built `libcef_dll_wrapper.a` into `macos/third/cef/`.
-4. Run the app.
+2. Build and run the app — no runner changes are required.
 
-> For a Universal (arm64 + x86_64) app, `lipo` the wrapper and use a universal framework — see [#30](/../../issues/30). **`[HELP WANTED]`** a more elegant binary distribution.
+macOS uses CocoaPods, which does not run the CMake download path. Instead the podspec's `prepare_command` runs [`macos/scripts/download_cef.sh`](macos/scripts/download_cef.sh) on `pod install`, which mirrors the Windows/Linux flow: it downloads the official CEF *Standard Distribution* for your arch (from <https://cef-builds.spotifycdn.com>, version pinned by `CEF_VERSION` in [`third/download.cmake`](third/download.cmake)), compiles `libcef_dll_wrapper` from source, lays the framework out as a versioned macOS bundle, and installs everything into the (git-ignored) `macos/third/cef`. The first `pod install` therefore takes noticeably longer; subsequent runs are a no-op once the pinned version is present.
+
+Requirements: `cmake` (and `ninja`, otherwise `make` is used) must be on `PATH` to build the wrapper — `brew install cmake ninja`.
+
+> The wrapper is built `Debug` by default to match `flutter run` / `flutter build macos --debug`. For a release build set `CEF_WRAPPER_BUILD_TYPE=Release` before `pod install` (debug and release builds need a wrapper compiled in the matching configuration — `#if DCHECK_IS_ON()` changes its ABI).
+
+> The script builds for the host arch only (arm64 **or** x86_64). For a Universal (arm64 + x86_64) app, `lipo` the wrapper and use a universal framework — see [#30](/../../issues/30). **`[HELP WANTED]`** a more elegant binary distribution.
 
 ### Linux
 

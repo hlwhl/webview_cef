@@ -78,30 +78,21 @@
 
 ### macOS
 
-macOS 走 CocoaPods，而不是 CMake 自动下载，所以需要手动放置 CEF 二进制。把本仓库克隆进你的项目（例如 `packages/webview_cef`），并以路径方式引用：
-
-```yaml
-dependencies:
-  webview_cef:
-    path: ./packages/webview_cef
-```
-
-然后在**克隆下来的仓库内**填充 `macos/third/cef`：
-
-1. 从 <https://cef-builds.spotifycdn.com> 下载与目标架构匹配的官方 *Standard Distribution*（Apple Silicon 用 `...macosarm64.tar.bz2`，Intel 用 `...macosx64.tar.bz2`）。确切版本见 [`third/download.cmake`](third/download.cmake) 里的 `CEF_VERSION`。
-2. 从下载包编译 `libcef_dll_wrapper`（官方不提供预编译）：
+1. 添加依赖：
 
    ```bash
-   cd cef_binary_<version>_macos<arch>
-   mkdir build && cd build
-   cmake -G Ninja -DPROJECT_ARCH=<arm64|x86_64> -DCMAKE_BUILD_TYPE=Release ..
-   ninja libcef_dll_wrapper
+   flutter pub add webview_cef
    ```
 
-3. 把 `Release/Chromium Embedded Framework.framework` 和编出来的 `libcef_dll_wrapper.a` 复制到 `macos/third/cef/`。
-4. 运行 App。
+2. 直接构建运行 —— runner 无需改动。
 
-> 如需 Universal（arm64 + x86_64）App，用 `lipo` 合并 wrapper 并使用 universal framework，详见 [#30](/../../issues/30)。**`[征集帮助]`** 更优雅的二进制分发方式。
+macOS 走 CocoaPods，不跑 CMake 的下载流程。改由 podspec 的 `prepare_command` 在 `pod install` 时运行 [`macos/scripts/download_cef.sh`](macos/scripts/download_cef.sh)，逻辑与 Windows/Linux 对齐：下载与本机架构匹配的官方 CEF *Standard Distribution*（来自 <https://cef-builds.spotifycdn.com>，版本由 [`third/download.cmake`](third/download.cmake) 的 `CEF_VERSION` 固定），从源码编译 `libcef_dll_wrapper`，把 framework 整理成 versioned macOS bundle，并安装进（已 git-ignore 的）`macos/third/cef`。所以首次 `pod install` 会明显变慢；之后只要版本未变即为 no-op。
+
+要求：`PATH` 上需有 `cmake`（以及 `ninja`，否则退回 `make`）来编译 wrapper —— `brew install cmake ninja`。
+
+> wrapper 默认编 `Debug`，以匹配 `flutter run` / `flutter build macos --debug`。如需 release 构建，在 `pod install` 前设置 `CEF_WRAPPER_BUILD_TYPE=Release`（debug 与 release 需要对应配置编译的 wrapper —— `#if DCHECK_IS_ON()` 会改变其 ABI）。
+
+> 脚本只为本机架构编译（arm64 **或** x86_64）。如需 Universal（arm64 + x86_64）App，用 `lipo` 合并 wrapper 并使用 universal framework，详见 [#30](/../../issues/30)。**`[征集帮助]`** 更优雅的二进制分发方式。
 
 ### Linux
 

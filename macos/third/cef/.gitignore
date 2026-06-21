@@ -1,0 +1,5 @@
+# CEF for macOS is fetched + built on demand by ../../scripts/download_cef.sh
+# (invoked via the podspec prepare_command), mirroring the Windows/Linux
+# download path in third/download.cmake. None of it is tracked.
+*
+!.gitignore
