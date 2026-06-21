@@ -78,7 +78,7 @@ SRC="${WORK}/${PKG}"
 echo "==> Building libcef_dll_wrapper (${BUILD_TYPE}, ${PROJECT_ARCH})"
 cmake -S "${SRC}" -B "${SRC}/build" -G "${GENERATOR}" \
   -DPROJECT_ARCH="${PROJECT_ARCH}" -DCMAKE_BUILD_TYPE="${BUILD_TYPE}" \
-  -DCMAKE_OSX_DEPLOYMENT_TARGET=11.0 >/dev/null
+  -DCMAKE_OSX_DEPLOYMENT_TARGET=12.0 >/dev/null
 ( cd "${SRC}/build" && "${BUILD_TOOL[@]}" >/dev/null )
 WRAPPER="${SRC}/build/libcef_dll_wrapper/libcef_dll_wrapper.a"
 [ -f "${WRAPPER}" ] || err "libcef_dll_wrapper.a was not produced"
@@ -108,7 +108,7 @@ ln -sfn Versions/Current/Resources "${FW_DST}/Resources"
 # It links the wrapper statically; the framework is dlopen'd at runtime
 # (LoadInHelper), so it does not link the framework here.
 echo "==> Building CEF helper executable"
-clang++ -std=c++20 -stdlib=libc++ -mmacosx-version-min=11.0 -w \
+clang++ -std=c++20 -stdlib=libc++ -mmacosx-version-min=12.0 -w \
   -I "${DEST}" -I "${REPO_ROOT}/common" \
   "${MACOS_DIR}/helper/cef_helper_main.mm" \
   "${DEST}/libcef_dll_wrapper.a" \

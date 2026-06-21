@@ -78,6 +78,8 @@
 
 ### macOS
 
+> **要求 macOS 12.0 及以上** —— CEF 149 的 framework 以 12.0 为部署目标,所以你 App 的 macOS 部署目标必须 **≥ 12.0**(在 `macos/Podfile` 设 `platform :osx, '12.0'`,并同步 Runner target)。更低的版本无法干净链接。
+
 1. 添加依赖：
 
    ```bash

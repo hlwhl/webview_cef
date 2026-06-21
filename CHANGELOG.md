@@ -2,9 +2,11 @@
 - Adapted to the latest stable Flutter (tested on 3.44.x).
 - Raised minimum supported Flutter to 3.27.0 / Dart 3.6.0.
 - Migrated deprecated APIs (`Color.withOpacity` -> `withValues`, `Overlay.of` non-null, generic typedef, `print` -> `debugPrint`, `TextInputClient.onFocusReceived`) and bumped `flutter_lints` to ^5.
-- Raised minimum Windows to 10 and minimum macOS deployment target to 10.15; refreshed example desktop runner templates.
+- Raised minimum Windows to 10 and minimum macOS deployment target to 12.0 (CEF 149's framework is built for 12.0); refreshed example desktop runner templates.
 - Upgraded CEF to 149 (Chromium 149) on all platforms, unified in `third/download.cmake`.
 - Windows now consumes the official CEF Standard Distribution and builds `libcef_dll_wrapper` from source (no more custom prebuilt package); plugin builds as C++20 (required by CEF 149).
+- macOS now fetches CEF on demand like Windows/Linux instead of committing headers: the podspec `prepare_command` runs `macos/scripts/download_cef.sh`, which downloads the pinned Standard Distribution, builds `libcef_dll_wrapper` from source, lays the framework out as a versioned bundle, and builds the helper executable — all into the git-ignored `macos/third/cef`.
+- macOS now runs CEF multi-process (was hardcoded to the unsupported single-process mode). Add `WebviewCEF.install_helper_phase(installer)` to your `macos/Podfile` `post_install` (see README) and the bundled CEF helper sub-process apps are embedded automatically — no Xcode target changes. Falls back to single-process when the hook/helper is absent, so existing integrations keep working.
 - Fixed CEF API drift: `OnBeforePopup` popup_id, `CefFrame::GetIdentifier()` -> string, and a C++20 `EncodableValue(nullptr)`/variant crash on Windows.
 - Fixed a per-event memory leak in the Windows native→Dart message dispatch.
 - Fixed command-line switch typos (`no-sanbox` -> `no-sandbox`, stray space in `renderer-process-limit`).

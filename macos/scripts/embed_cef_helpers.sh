@@ -51,7 +51,7 @@ for spec in ":" " (GPU):.gpu" " (Plugin):.plugin" " (Renderer):.renderer" " (Ale
 	<key>CFBundlePackageType</key><string>APPL</string>
 	<key>CFBundleShortVersionString</key><string>1.0</string>
 	<key>CFBundleVersion</key><string>1.0</string>
-	<key>LSMinimumSystemVersion</key><string>11.0</string>
+	<key>LSMinimumSystemVersion</key><string>12.0</string>
 	<key>LSUIElement</key><true/>
 	<key>NSSupportsAutomaticGraphicsSwitching</key><true/>
 </dict>

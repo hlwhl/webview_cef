@@ -31,7 +31,7 @@ Flutter webview backed by CEF (Chromium Embedded Framework)
   s.xcconfig = { "HEADER_SEARCH_PATHS" => $dir}
   # s.private_header_files = '../common/simple_app.h', '../common/simple_handler.h'
 
-  s.platform = :osx, '10.15'
+  s.platform = :osx, '12.0'
   # CEF 149 public headers require C++20.
   s.pod_target_xcconfig = { 'DEFINES_MODULE' => 'YES', 'CLANG_CXX_LANGUAGE_STANDARD' => 'c++20' }
   s.swift_version = '5.0'

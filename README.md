@@ -78,6 +78,8 @@ On the first build, the official CEF *Standard Distribution* (~330 MB, from <htt
 
 ### macOS
 
+> **Requires macOS 12.0 or newer** — CEF 149 ships a framework with a 12.0 deployment target, so your app's macOS deployment target must be **≥ 12.0** (set it in `macos/Podfile` (`platform :osx, '12.0'`) and the Runner target). Older targets fail to link cleanly.
+
 1. Add the dependency:
 
    ```bash
