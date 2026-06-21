@@ -101,16 +101,24 @@ private:
 + (WValue*) encode_flvalue_to_wvalue: (NSObject *)value{
     if([value isKindOfClass:[NSNumber class]]) {
         NSNumber* number = (NSNumber*)value;
-        if(strcmp([number objCType], @encode(BOOL)) == 0) {
+        // A Dart bool arrives as an NSNumber backed by CFBoolean. Detect it via
+        // the CoreFoundation type id, NOT @encode(BOOL): on arm64 @encode(BOOL)
+        // is "B" while a boxed bool's objCType is "c", so the old strcmp matched
+        // nothing, fell through every branch and returned nil — decoded as false.
+        // That silently turned every Dart `true` (e.g. setClientFocus(true)) into
+        // false on Apple Silicon, so the browser never received keyboard focus.
+        if(CFGetTypeID((__bridge CFTypeRef)number) == CFBooleanGetTypeID()) {
             return webview_value_new_bool([number boolValue]);
-        } else if(strcmp([number objCType], @encode(int)) == 0) {
-            return webview_value_new_int([number intValue]);
-        } else if(strcmp([number objCType], @encode(float)) == 0) {
+        }
+        const char* t = [number objCType];
+        if(strcmp(t, @encode(float)) == 0) {
             return webview_value_new_float([number floatValue]);
-        } else if(strcmp([number objCType], @encode(double)) == 0) {
+        } else if(strcmp(t, @encode(double)) == 0) {
             return webview_value_new_double([number doubleValue]);
         } else {
-            return nil;
+            // Any other numeric type is an integer. Flutter's codec sends int32
+            // as "i" and int64 as "q"; read 64-bit so large ints aren't dropped.
+            return webview_value_new_int([number longLongValue]);
         }
     } else if([value isKindOfClass:[NSString class]]) {
         NSString* string = (NSString*)value;
