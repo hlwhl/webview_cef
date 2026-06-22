@@ -9,12 +9,20 @@
 #define WebviewCefTexture_h
 #import <FlutterMacOS/FlutterMacOS.h>
 #import <IOSurface/IOSurface.h>
+#import <Metal/Metal.h>
 
 @interface WebviewCefTexture : NSObject<FlutterTexture>
 {
     CVPixelBufferRef _pixelBuffer;
     CVPixelBufferRef _pixelBufferTemp;
     dispatch_semaphore_t _lock;
+    // GPU-path state: a Metal blit copies CEF's pool-owned IOSurface into our
+    // own pooled CVPixelBuffer (CEF recycles its surface after the callback).
+    id<MTLDevice> _metalDevice;
+    id<MTLCommandQueue> _metalQueue;
+    CVPixelBufferPoolRef _pool;
+    size_t _poolWidth;
+    size_t _poolHeight;
 }
 
 // Software path: CEF's OnPaint CPU buffer (copied into a CVPixelBuffer).

@@ -16,6 +16,8 @@ Flutter webview backed by CEF (Chromium Embedded Framework)
   s.source           = { :path => '.' }
   s.source_files     = 'Classes/**/*'
   s.dependency 'FlutterMacOS'
+  # GPU zero-copy path: blit CEF's shared IOSurface into our own CVPixelBuffer.
+  s.frameworks = 'Metal', 'CoreVideo', 'IOSurface'
 
   # CEF is not tracked in git for macOS (mirrors the Windows/Linux CMake
   # download path in third/download.cmake). It is fetched and the wrapper built
