@@ -530,6 +530,12 @@ void WebviewHandler::setClientFocus(int browserId, bool focus)
     if (it==browser_map_.end() || !it->second.browser.get()) {
         return;
     }
+    it->second.wants_focus = focus;
+    if (focus) {
+        // Re-arm the first-frame re-assert (handles a SetFocus that lands before
+        // the browser is render/input-ready under external_begin_frame).
+        it->second.focus_reasserted = false;
+    }
     it->second.browser->GetHost()->SetFocus(focus);
 }
 
@@ -766,6 +772,15 @@ void WebviewHandler::OnAcceleratedPaint(CefRefPtr<CefBrowser> browser, CefRender
         if (it != browser_map_.end()) {
             w = it->second.width;
             h = it->second.height;
+            // A produced frame means the browser is render/input-ready. With
+            // external_begin_frame a SetFocus issued right after creation can be
+            // dropped (the browser wasn't ready yet), which left the webview
+            // unable to receive keyboard input until the window was re-focused.
+            // Re-apply the requested focus once, now that frames are flowing.
+            if (it->second.wants_focus && !it->second.focus_reasserted) {
+                it->second.focus_reasserted = true;
+                it->second.browser->GetHost()->SetFocus(true);
+            }
         }
         // The shared texture is pool-owned and only valid for the duration of
         // this callback. On Windows it is a HANDLE (open with

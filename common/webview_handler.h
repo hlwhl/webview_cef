@@ -28,6 +28,12 @@ struct browser_info{
     bool is_dragging = false;
     CefRect prev_ime_position = CefRect();
     bool is_ime_commit = false;
+    // Focus the host requested (via setClientFocus) and whether it has been
+    // re-asserted after the first rendered frame. With external_begin_frame the
+    // browser isn't input/focus-ready until frames flow, so a SetFocus issued
+    // right after creation is lost; we re-apply it once the first frame lands.
+    bool wants_focus = false;
+    bool focus_reasserted = false;
 };
 
 class WebviewHandler : public CefClient,
