@@ -398,7 +398,7 @@ namespace webview_cef {
 			result(1, nullptr);
 		}
 		else if (name.compare("visitAllCookies") == 0) {
-			m_handler->visitAllCookies([=, this](std::map<std::string, std::map<std::string, std::string>> cookies){
+			m_handler->visitAllCookies([=](std::map<std::string, std::map<std::string, std::string>> cookies){
 				WValue* retMap = webview_value_new_map();
 				for (auto &cookie : cookies)
 				{
@@ -419,7 +419,7 @@ namespace webview_cef {
 		else if (name.compare("visitUrlCookies") == 0) {
 			const auto domain = webview_value_get_string(webview_value_get_list_value(values, 0));
 			const auto isHttpOnly = webview_value_get_bool(webview_value_get_list_value(values, 1));
-			m_handler->visitUrlCookies(domain, isHttpOnly,[=, this](std::map<std::string, std::map<std::string, std::string>> cookies){
+			m_handler->visitUrlCookies(domain, isHttpOnly,[=](std::map<std::string, std::map<std::string, std::string>> cookies){
 				WValue* retMap = webview_value_new_map();
 				for (auto &cookie : cookies)
 				{
@@ -467,7 +467,7 @@ namespace webview_cef {
 		else if(name.compare("evaluateJavascript") == 0){
 			int browserId = int(webview_value_get_int(webview_value_get_list_value(values, 0)));
 			const auto code = webview_value_get_string(webview_value_get_list_value(values, 1));
-			m_handler->executeJavaScript(browserId, code, [=, this](CefRefPtr<CefValue> values){
+			m_handler->executeJavaScript(browserId, code, [=](CefRefPtr<CefValue> values){
                 WValue* retValue;
 
                 if (values == nullptr) {
