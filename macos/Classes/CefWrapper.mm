@@ -15,12 +15,32 @@
 #import "../../common/webview_js_handler.h"
 #import "../../common/webview_plugin.h"
 #import "../../common/webview_value.h"
+#import <CoreVideo/CoreVideo.h>
 #include <thread>
 
 static NSTimer* _timer;
 static BOOL isCefProcessInit = NO;
 static BOOL isCefMessageLoop = NO;
+// vblank clock for external-begin-frame (high-refresh / adaptive frame rate).
+static CVDisplayLinkRef _displayLink = NULL;
+static BOOL _displayLinkActive = NO;
 NSMapTable* webviewPlugins = [NSMapTable weakToWeakObjectsMapTable];
+
+// Fires on a high-priority background thread once per display refresh. Hop to
+// the main thread (the CEF UI thread under external_message_pump) to deliver the
+// frame produced by the previous tick and request the next one.
+static CVReturn WebviewDisplayLinkCallback(CVDisplayLinkRef displayLink,
+                                           const CVTimeStamp* now,
+                                           const CVTimeStamp* outputTime,
+                                           CVOptionFlags flagsIn,
+                                           CVOptionFlags* flagsOut,
+                                           void* context) {
+    dispatch_async(dispatch_get_main_queue(), ^{
+        webview_cef::doMessageLoopWork();
+        [CefWrapper beginFrameAllPlugins];
+    });
+    return kCVReturnSuccess;
+}
 
 @implementation CefWrapper{
     std::shared_ptr<webview_cef::WebviewPlugin> _plugin;
@@ -336,6 +356,24 @@ private:
 
 - (void)doMessageLoopWork {
     webview_cef::doMessageLoopWork();
+    // Fallback: if no CVDisplayLink is driving frames (e.g. headless / no
+    // active display), the pump timer also requests frames so the
+    // external-begin-frame browser still produces output.
+    if (!_displayLinkActive) {
+        [CefWrapper beginFrameAllPlugins];
+    }
+}
+
++ (void)beginFrameAllPlugins {
+    for (CefWrapper* wrapper in [[webviewPlugins objectEnumerator] allObjects]) {
+        [wrapper tickBeginFrame];
+    }
+}
+
+- (void)tickBeginFrame {
+    if (_plugin) {
+        _plugin->tickBeginFrame();
+    }
 }
 
 - (id) init {
@@ -404,6 +442,17 @@ private:
             }
             return event;
         }];
+        // Drive frame production on the display's vblank so the webview renders
+        // at the monitor's refresh rate (e.g. 120 Hz ProMotion) and idles when
+        // static, instead of CEF's 60 fps windowless cap. If the display link
+        // can't start (e.g. headless), the pump timer's fallback above keeps
+        // requesting frames.
+        if (CVDisplayLinkCreateWithActiveCGDisplays(&_displayLink) == kCVReturnSuccess && _displayLink) {
+            CVDisplayLinkSetOutputCallback(_displayLink, &WebviewDisplayLinkCallback, NULL);
+            if (CVDisplayLinkStart(_displayLink) == kCVReturnSuccess) {
+                _displayLinkActive = YES;
+            }
+        }
         isCefMessageLoop = YES;
    }
     webview_value_unref(encodeArgs);

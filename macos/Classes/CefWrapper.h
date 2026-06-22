@@ -18,6 +18,12 @@ extern NSMapTable* webviewPlugins;
 
 - (void)handleMethodCallWrapper: (FlutterMethodCall*)call result:(FlutterResult)result;
 
+// Request one external BeginFrame for every live webview (drives the GPU
+// frame-production clock). Called from the CVDisplayLink tick and, as a
+// fallback, from the message-pump timer.
++ (void)beginFrameAllPlugins;
+- (void)tickBeginFrame;
+
 @end
 
 #endif /* CefWrapper_h */

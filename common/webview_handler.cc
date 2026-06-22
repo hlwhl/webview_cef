@@ -275,14 +275,11 @@ void WebviewHandler::createBrowser(std::string url, std::function<void(int)> cal
     // macOS) instead of the software OnPaint CPU buffer. Requires the GPU to be
     // left enabled (see WebviewApp).
     window_info.shared_texture_enabled = true;
-#ifndef __APPLE__
-    // Windows drives frame production itself so the rate can follow the
-    // display's refresh (>60 Hz) instead of being capped at
-    // windowless_frame_rate; the platform layer ticks SendExternalBeginFrame on
-    // each vblank. macOS lets CEF schedule frames internally (capped at
-    // windowless_frame_rate), pumped by the app's CefDoMessageLoopWork timer.
+    // Drive frame production ourselves so the rate can follow the display's
+    // refresh (>60 Hz) instead of being capped at windowless_frame_rate. The
+    // platform layer ticks SendExternalBeginFrame on each vblank — Windows from
+    // an IDXGIOutput vblank wait, macOS from a CVDisplayLink.
     window_info.external_begin_frame_enabled = true;
-#endif
 #endif
     callback(CefBrowserHost::CreateBrowserSync(window_info, this, url, browser_settings, nullptr, nullptr)->GetIdentifier());
 }
