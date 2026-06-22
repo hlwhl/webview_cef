@@ -1,3 +1,6 @@
+## 0.5.1
+- Docs: fixed a stale version reference in the Chinese README (the upgrade-guide intro still said 0.2.3 instead of 0.5.0). No code changes.
+
 ## 0.5.0
 - **Upgrading from ≤ 0.2.2?** This release has breaking changes (toolchain, removed API, platform minimums, Windows `initCEFProcesses` signature). See the "Upgrading from ≤ 0.2.2" section in the README.
 - Adapted to the latest stable Flutter (tested on 3.44.x).
