@@ -39,7 +39,7 @@
 
 ## 从 ≤ 0.2.2 升级
 
-0.2.3 是一次大版本升级（Flutter 3.44 + CEF 149），在所有平台上都有破坏性变更。若你从旧版本升级，请按以下步骤操作：
+0.5.0 是一次大版本升级（Flutter 3.44 + CEF 149），在所有平台上都有破坏性变更。若你从旧版本升级，请按以下步骤操作：
 
 - **工具链** —— 升级到 Flutter **≥ 3.27.0** / Dart **≥ 3.6.0**（原为 2.5.0 / 2.17.1）。原生构建现在需要 **C++20**（CEF 149）；请确保你的工程没有把插件 target 强制设为更低的 C++ 标准。
 - **移除的 Dart API** —— `WebviewCefPlatform`、`MethodChannelWebviewCef`、`getPlatformVersion()` 已移除（同时移除了 `plugin_platform_interface` 依赖）。它们本就不是对外 API，且无替代（`getPlatformVersion` 仅返回演示值）。请只 import `package:webview_cef/webview_cef.dart`，使用 `WebviewManager` / `WebViewController`。
