@@ -1,4 +1,4 @@
-## 0.2.3
+## 0.5.0
 - **Upgrading from ≤ 0.2.2?** This release has breaking changes (toolchain, removed API, platform minimums, Windows `initCEFProcesses` signature). See the "Upgrading from ≤ 0.2.2" section in the README.
 - Adapted to the latest stable Flutter (tested on 3.44.x).
 - Raised minimum supported Flutter to 3.27.0 / Dart 3.6.0.
