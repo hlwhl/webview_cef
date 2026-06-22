@@ -45,19 +45,19 @@ namespace webview_cef {
 	void WebviewPlugin::initCallback() {
 		if (!m_init)
 		{
-			m_handler->onPaintCallback = [=](int browserId, const void* buffer, int32_t width, int32_t height) {
+			m_handler->onPaintCallback = [=, this](int browserId, const void* buffer, int32_t width, int32_t height) {
 				if (m_renderers.find(browserId) != m_renderers.end() && m_renderers[browserId] != nullptr) {
 					m_renderers[browserId]->onFrame(buffer, width, height);
 				}
 			};
 
-			m_handler->onAcceleratedPaintCallback = [=](int browserId, const void* sharedHandle, int32_t width, int32_t height, int32_t format) {
+			m_handler->onAcceleratedPaintCallback = [=, this](int browserId, const void* sharedHandle, int32_t width, int32_t height, int32_t format) {
 				if (m_renderers.find(browserId) != m_renderers.end() && m_renderers[browserId] != nullptr) {
 					m_renderers[browserId]->onAcceleratedFrame(sharedHandle, width, height, format);
 				}
 			};
 
-			m_handler->onTooltipEvent = [=](int browserId, std::string text) {
+			m_handler->onTooltipEvent = [=, this](int browserId, std::string text) {
 				if (m_invokeFunc) {
 					WValue* bId = webview_value_new_int(browserId);
 					WValue* wText = webview_value_new_string(const_cast<char*>(text.c_str()));
@@ -71,7 +71,7 @@ namespace webview_cef {
 				}
 			};
 
-			m_handler->onCursorChangedEvent = [=](int browserId, int type) {
+			m_handler->onCursorChangedEvent = [=, this](int browserId, int type) {
 				if(m_invokeFunc){
 					WValue* bId = webview_value_new_int(browserId);
 					WValue* wType = webview_value_new_int(type);
@@ -85,7 +85,7 @@ namespace webview_cef {
 				}
 			};
 
-			m_handler->onConsoleMessageEvent = [=](int browserId, int level, std::string message, std::string source, int line){
+			m_handler->onConsoleMessageEvent = [=, this](int browserId, int level, std::string message, std::string source, int line){
 				if(m_invokeFunc){
 					WValue* bId = webview_value_new_int(browserId);
 					WValue* wLevel = webview_value_new_int(level);
@@ -108,7 +108,7 @@ namespace webview_cef {
 				}
 			};
 
-			m_handler->onUrlChangedEvent = [=](int browserId, std::string url)
+			m_handler->onUrlChangedEvent = [=, this](int browserId, std::string url)
 			{
 				if (m_invokeFunc)
 				{
@@ -124,7 +124,7 @@ namespace webview_cef {
 				}
 			};
 
-			m_handler->onTitleChangedEvent = [=](int browserId, std::string title)
+			m_handler->onTitleChangedEvent = [=, this](int browserId, std::string title)
 			{
 				if (m_invokeFunc)
 				{
@@ -140,7 +140,7 @@ namespace webview_cef {
 				}
 			};
 
-			m_handler->onJavaScriptChannelMessage = [=](std::string channelName, std::string message, std::string callbackId, int browserId, std::string frameId)
+			m_handler->onJavaScriptChannelMessage = [=, this](std::string channelName, std::string message, std::string callbackId, int browserId, std::string frameId)
 			{
 				if (m_invokeFunc)
 				{
@@ -165,16 +165,17 @@ namespace webview_cef {
 				}
 			};
 
-			m_handler->onFocusedNodeChangeMessage = [=](int nBrowserId, bool bEditable)
+			m_handler->onFocusedNodeChangeMessage = [=, this](int nBrowserId, bool bEditable)
 			{
-				// Track editable focus so the platform layer can avoid forwarding
-				// raw character keys while a web input is focused (the IME/delta
-				// path handles text and would otherwise double-input).
-				m_editableFocused = bEditable;
-				// Focus moved to a different node → any prior IME composition is
-				// gone. Reset so the platform layer doesn't keep routing keys to
-				// a stale composition.
-				m_composing = false;
+				// Track editable focus per browser so the platform layer can route
+				// raw character keys to the OS IME while a web input is focused
+				// (the IME/delta path handles text). Focus moving to a new node
+				// also ends any prior composition for that browser.
+				auto rit = m_renderers.find(nBrowserId);
+				if (rit != m_renderers.end() && rit->second) {
+					rit->second->editableFocused = bEditable;
+					rit->second->composing = false;
+				}
 				if (m_invokeFunc)
 				{
 					WValue* bId = webview_value_new_int(int64_t(nBrowserId));
@@ -189,7 +190,7 @@ namespace webview_cef {
 				}
 			};
 
-			m_handler->onImeCompositionRangeChangedMessage = [=](int nBrowserId, int32_t x, int32_t y, int32_t height)
+			m_handler->onImeCompositionRangeChangedMessage = [=, this](int nBrowserId, int32_t x, int32_t y, int32_t height)
 			{
 				if (m_invokeFunc)
 				{
@@ -212,7 +213,7 @@ namespace webview_cef {
 			};
 
 
-            m_handler->onLoadStart = [=](int nBrowserId, std::string urlId)
+            m_handler->onLoadStart = [=, this](int nBrowserId, std::string urlId)
             {
                 if (m_invokeFunc)
                 {
@@ -228,7 +229,7 @@ namespace webview_cef {
                 }
             };
 
-            m_handler->onLoadEnd = [=](int nBrowserId, std::string urlId)
+            m_handler->onLoadEnd = [=, this](int nBrowserId, std::string urlId)
             {
                 if (m_invokeFunc)
                 {
@@ -281,7 +282,7 @@ namespace webview_cef {
 		}
 		else if (name.compare("create") == 0) {
 			std::string url = webview_value_get_string(values);
-			m_handler->createBrowser(url, [=](int browserId) {
+			m_handler->createBrowser(url, [=, this](int browserId) {
 				std::shared_ptr<WebviewTexture> renderer = m_createTextureFunc();
 				m_renderers[browserId] = renderer;
 				WValue	*response = webview_value_new_list();
@@ -355,7 +356,7 @@ namespace webview_cef {
 			const auto text = webview_value_get_string(webview_value_get_list_value(values, 1));
 			// Non-empty preedit → composition active; empty preedit means the IME
 			// cleared it (e.g. the user deleted the last composing letter).
-			m_composing = (text != nullptr && text[0] != '\0');
+			setComposingForBrowser(browserId, text != nullptr && text[0] != '\0');
 			m_handler->imeSetComposition(browserId, text);
 			result(1, nullptr);
 		} 
@@ -363,15 +364,23 @@ namespace webview_cef {
 			int browserId = int(webview_value_get_int(webview_value_get_list_value(values, 0)));
 			const auto text = webview_value_get_string(webview_value_get_list_value(values, 1));
 			// Commit ends the active composition.
-			m_composing = false;
+			setComposingForBrowser(browserId, false);
 			m_handler->imeCommitText(browserId, text);
 			result(1, nullptr);
 		} 
 		else if (name.compare("setClientFocus") == 0) {
 			int browserId = int(webview_value_get_int(webview_value_get_list_value(values, 0)));
 			if (m_renderers.find(browserId) != m_renderers.end() && m_renderers[browserId] != nullptr) {
-				m_renderers[browserId].get()->isFocused = webview_value_get_bool(webview_value_get_list_value(values, 1));
-				m_handler->setClientFocus(browserId, m_renderers[browserId].get()->isFocused);
+				bool focused = webview_value_get_bool(webview_value_get_list_value(values, 1));
+				m_renderers[browserId].get()->isFocused = focused;
+				// Losing focus ends any composition: the OS IME drops marked text,
+				// but CEF's SetFocus(false) does not blur the DOM node, so no
+				// FocusedNodeChanged fires to clear it — a stale flag would then
+				// mis-route the first keys after the webview is refocused.
+				if (!focused) {
+					m_renderers[browserId].get()->composing = false;
+				}
+				m_handler->setClientFocus(browserId, focused);
 			}
 			result(1, nullptr);
 		}
@@ -389,7 +398,7 @@ namespace webview_cef {
 			result(1, nullptr);
 		}
 		else if (name.compare("visitAllCookies") == 0) {
-			m_handler->visitAllCookies([=](std::map<std::string, std::map<std::string, std::string>> cookies){
+			m_handler->visitAllCookies([=, this](std::map<std::string, std::map<std::string, std::string>> cookies){
 				WValue* retMap = webview_value_new_map();
 				for (auto &cookie : cookies)
 				{
@@ -410,7 +419,7 @@ namespace webview_cef {
 		else if (name.compare("visitUrlCookies") == 0) {
 			const auto domain = webview_value_get_string(webview_value_get_list_value(values, 0));
 			const auto isHttpOnly = webview_value_get_bool(webview_value_get_list_value(values, 1));
-			m_handler->visitUrlCookies(domain, isHttpOnly,[=](std::map<std::string, std::map<std::string, std::string>> cookies){
+			m_handler->visitUrlCookies(domain, isHttpOnly,[=, this](std::map<std::string, std::map<std::string, std::string>> cookies){
 				WValue* retMap = webview_value_new_map();
 				for (auto &cookie : cookies)
 				{
@@ -458,7 +467,7 @@ namespace webview_cef {
 		else if(name.compare("evaluateJavascript") == 0){
 			int browserId = int(webview_value_get_int(webview_value_get_list_value(values, 0)));
 			const auto code = webview_value_get_string(webview_value_get_list_value(values, 1));
-			m_handler->executeJavaScript(browserId, code, [=](CefRefPtr<CefValue> values){
+			m_handler->executeJavaScript(browserId, code, [=, this](CefRefPtr<CefValue> values){
                 WValue* retValue;
 
                 if (values == nullptr) {
@@ -561,6 +570,40 @@ namespace webview_cef {
 			}
 		}
 		return false;
+	}
+
+	int WebviewPlugin::focusedBrowserId(){
+		for(auto& render : m_renderers){
+			if(render.second != nullptr && render.second->isFocused){
+				return render.first;
+			}
+		}
+		return -1;
+	}
+
+	bool WebviewPlugin::isEditableFocused(){
+		int id = focusedBrowserId();
+		if(id < 0){
+			return false;
+		}
+		auto it = m_renderers.find(id);
+		return it != m_renderers.end() && it->second && it->second->editableFocused;
+	}
+
+	bool WebviewPlugin::isComposing(){
+		int id = focusedBrowserId();
+		if(id < 0){
+			return false;
+		}
+		auto it = m_renderers.find(id);
+		return it != m_renderers.end() && it->second && it->second->composing;
+	}
+
+	void WebviewPlugin::setComposingForBrowser(int browserId, bool composing){
+		auto it = m_renderers.find(browserId);
+		if(it != m_renderers.end() && it->second){
+			it->second->composing = composing;
+		}
 	}
 
 	void WebviewPlugin::tickBeginFrame(){

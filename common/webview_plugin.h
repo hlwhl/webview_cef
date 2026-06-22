@@ -16,6 +16,11 @@ namespace webview_cef {
         virtual void onAcceleratedFrame(const void* sharedHandle, int width, int height, int format){}
         int64_t textureId = 0;
         bool isFocused = false;
+        // IME state for THIS browser (a single plugin can host several). The
+        // macOS key router consults the focused browser's state so one webview's
+        // editable focus / composition never gates another's keyboard input.
+        bool editableFocused = false;  // a web editable node is focused
+        bool composing = false;        // the OS IME has an active marked composition
     };
     class WebviewPlugin {
     public:
@@ -30,13 +35,12 @@ namespace webview_cef {
         bool getAnyBrowserFocused();
         // Drive one external BeginFrame for this plugin's browsers (GPU path).
         void tickBeginFrame();
-        // True while a web editable node is focused (so the platform layer can
-        // avoid double-forwarding raw character keys during IME input).
-        bool isEditableFocused() const { return m_editableFocused; }
-        // True while the OS IME has an active (marked) composition. While
-        // composing, the platform layer routes every key to the IME so preedit
-        // editing and candidate selection work instead of hitting CEF raw.
-        bool isComposing() const { return m_composing; }
+        // IME state of the currently focused browser (see WebviewTexture). The
+        // macOS key router uses these to send text/composition keys to the OS
+        // IME and navigation/control keys to CEF. Per-browser, so one webview's
+        // composition never gates another's keyboard input.
+        bool isEditableFocused();
+        bool isComposing();
 
         // Native IME pipeline forwarders (driven by the Windows WM_IME_* handler).
         void imeSetCompositionNative(const std::wstring& text, int cursor);
@@ -44,8 +48,10 @@ namespace webview_cef {
         void imeFinishCompositionNative();
 
     private :
-        bool m_editableFocused = false;
-        bool m_composing = false;
+        // Resolve the browserId whose renderer currently has focus, or -1.
+        int focusedBrowserId();
+        // Set the composing flag for a specific browser (no-op if unknown).
+        void setComposingForBrowser(int browserId, bool composing);
         int cursorAction(WValue *args, std::string name);
     	std::function<void(std::string, WValue*)> m_invokeFunc;
 	    std::function<std::shared_ptr<WebviewTexture>()> m_createTextureFunc;
