@@ -282,6 +282,27 @@ void WebviewHandler::createBrowser(std::string url, std::function<void(int)> cal
     window_info.external_begin_frame_enabled = true;
 #endif
     callback(CefBrowserHost::CreateBrowserSync(window_info, this, url, browser_settings, nullptr, nullptr)->GetIdentifier());
+#ifdef WEBVIEW_CEF_GPU_TEXTURE
+    // The GPU shared-texture path is the only render path on this build (no
+    // OnPaint fallback). If no accelerated frame arrives shortly, the GPU
+    // compositor likely can't export a shared texture — warn so a black webview
+    // isn't silent.
+    CefPostDelayedTask(TID_UI, base::BindOnce(&WebviewHandler::warnIfNoAcceleratedFrame, this), 5000);
+#endif
+}
+
+void WebviewHandler::warnIfNoAcceleratedFrame() {
+#ifdef WEBVIEW_CEF_GPU_TEXTURE
+    if (!received_accelerated_frame_ && !gpu_warning_logged_) {
+        gpu_warning_logged_ = true;
+        fprintf(stderr,
+                "[webview_cef] WARNING: no GPU accelerated-paint frame after 5s. "
+                "This build renders the webview only via the GPU shared-texture "
+                "path; if it appears black, the GPU compositor may be unavailable "
+                "(headless, VM, software GL, or a crashed GPU process).\n");
+        fflush(stderr);
+    }
+#endif
 }
 
 void WebviewHandler::sendExternalBeginFrame() {
@@ -739,6 +760,7 @@ void WebviewHandler::OnAcceleratedPaint(CefRefPtr<CefBrowser> browser, CefRender
                             const CefRenderHandler::RectList &dirtyRects, const CefAcceleratedPaintInfo &info) {
 #ifdef WEBVIEW_CEF_GPU_TEXTURE
     if (!browser->IsPopup() && onAcceleratedPaintCallback != nullptr) {
+        received_accelerated_frame_ = true;
         int w = 0, h = 0;
         auto it = browser_map_.find(browser->GetIdentifier());
         if (it != browser_map_.end()) {

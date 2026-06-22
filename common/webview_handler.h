@@ -153,6 +153,11 @@ public:
     // Marshals to the CEF UI thread; safe to call from any thread.
     void sendExternalBeginFrame();
 
+    // Diagnostic (GPU path): warn once if no accelerated-paint frame has arrived
+    // shortly after a browser is created — the symptom of an unavailable GPU
+    // shared texture, which would otherwise be a silent black webview.
+    void warnIfNoAcceleratedFrame();
+
     void sendScrollEvent(int browserId, int x, int y, int deltaX, int deltaY);
     void changeSize(int browserId, float a_dpi, int width, int height);
     void cursorClick(int browserId, int x, int y, bool up);
@@ -189,6 +194,15 @@ private:
     std::unordered_map<int, browser_info> browser_map_;
 
     std::unordered_map<std::string, std::function<void(CefRefPtr<CefValue>)>> js_callbacks_;
+
+#ifdef WEBVIEW_CEF_GPU_TEXTURE
+    // GPU diagnostic state: whether any accelerated-paint frame has arrived, and
+    // whether the "no GPU frame" warning was already logged (log it once).
+    // Only declared on GPU builds so non-GPU builds don't see unused fields.
+    bool received_accelerated_frame_ = false;
+    bool gpu_warning_logged_ = false;
+#endif
+
     // Include the default reference counting implementation.
     IMPLEMENT_REFCOUNTING(WebviewHandler);
 
