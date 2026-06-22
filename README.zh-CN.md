@@ -13,8 +13,8 @@
 ## 特性
 
 - 🌐 **完整 Chromium 引擎** —— 现代 Web 标准、WebGL、HTML5 视频等。
-- ⚡ **GPU 零拷贝渲染**（Windows）—— 帧直接从 Chromium 的 GPU 输出经共享 D3D11 纹理交给 Flutter/ANGLE，每帧不再做 CPU 端的 BGRA→RGBA 换色，也不再做 CPU→GPU 上传。
-- 🎞️ **自适应帧率**（Windows）—— 由显示器的垂直消隐（vblank）驱动产帧，因此 webview 跟随显示器真实刷新率（如 120/144Hz），不再被限制在 60fps；静态内容则保持空闲不产帧。
+- ⚡ **GPU 零拷贝渲染**（Windows 与 macOS）—— 帧直接从 Chromium 的 GPU 输出经共享纹理交给 Flutter（Windows 用 D3D11 纹理，macOS 用 IOSurface），每帧不再做 CPU 端换色，也不再做 CPU→GPU 上传。Linux 仍走软件路径。
+- 🎞️ **自适应帧率**（Windows 与 macOS）—— 由显示器的垂直消隐（vblank）驱动产帧（Windows 用 `IDXGIOutput::WaitForVBlank`，macOS 用 `CVDisplayLink`），因此 webview 跟随显示器真实刷新率（如 120/144Hz），不再被限制在 60fps；静态内容则保持空闲不产帧。
 - ⌨️ **中日韩输入法实时上屏** —— 原生输入法合成管线，拼音预编辑实时显示、选词正确上屏。
 - 🔌 **JavaScript 桥** —— JS 调用 Dart，Dart 执行 JS。
 - 🍪 **Cookie 管理** —— 读取、设置、删除 Cookie。
@@ -27,12 +27,24 @@
 | 平台 | 最低版本 | 架构 |
 | --- | --- | --- |
 | Windows | Windows 10 | x64 |
-| macOS | macOS 10.15 | arm64、x86_64 |
+| macOS | macOS 12.0 | arm64 或 x86_64（仅本机架构，非 Universal） |
 | Linux | — | x64、arm64 |
 
 ## 环境要求
 
 - Flutter **>= 3.27.0**、Dart **>= 3.6.0**（已在最新稳定版 Flutter 3.44.x 上测试）。
+- 原生侧需要 C++20 工具链（CEF 149 要求）—— 较新的 MSVC / Clang / GCC。
+
+---
+
+## 从 ≤ 0.2.2 升级
+
+0.2.3 是一次大版本升级（Flutter 3.44 + CEF 149），在所有平台上都有破坏性变更。若你从旧版本升级，请按以下步骤操作：
+
+- **工具链** —— 升级到 Flutter **≥ 3.27.0** / Dart **≥ 3.6.0**（原为 2.5.0 / 2.17.1）。原生构建现在需要 **C++20**（CEF 149）；请确保你的工程没有把插件 target 强制设为更低的 C++ 标准。
+- **移除的 Dart API** —— `WebviewCefPlatform`、`MethodChannelWebviewCef`、`getPlatformVersion()` 已移除（同时移除了 `plugin_platform_interface` 依赖）。它们本就不是对外 API，且无替代（`getPlatformVersion` 仅返回演示值）。请只 import `package:webview_cef/webview_cef.dart`，使用 `WebviewManager` / `WebViewController`。
+- **Windows** —— `initCEFProcesses` 签名变更。请更新 `windows/runner/main.cpp`：它现在接收 `HINSTANCE` 并返回子进程退出码，且必须作为 `wWinMain` 的第一条语句立即返回（见下方 Windows 安装片段）。最低系统现为 **Windows 10**。
+- **macOS** —— 把部署目标提升到 **12.0**：在 `macos/Podfile` 设置 `platform :osx, '12.0'`，并在 Xcode 中把 Runner target 的 macOS Deployment Target 也设为 12.0（CEF 149 的 framework 以 12.0 构建）。要启用多进程渲染，请在 `macos/Podfile` 的 `post_install` 中加入一行钩子（见 macOS 安装一节）。构建现在**仅针对本机架构**（arm64 *或* x86_64）—— 不再生成 Universal 包。
 
 ---
 
@@ -262,7 +274,7 @@ final controller = WebviewManager().createWebView(injectUserScripts: scripts);
 
 ## 升级 CEF
 
-CEF/Chromium 版本只在一处管理 —— [`third/download.cmake`](third/download.cmake) 里的 `CEF_VERSION`。修改它即可升级 Windows 与 Linux 的 CEF（自动下载）。macOS 需要按上文把对应版本的发行包放进 `macos/third/cef`，并同步更新 `.github/workflows/test_macos.yaml` 里的版本号。
+CEF/Chromium 版本只在一处管理 —— [`third/download.cmake`](third/download.cmake) 里的 `CEF_VERSION`。修改它即可升级三端的 CEF：Windows 与 Linux 自动下载，macOS 也读取同一个 `CEF_VERSION`（通过 podspec `prepare_command` 运行的 [`macos/scripts/download_cef.sh`](macos/scripts/download_cef.sh)），在下次 `pod install` 时重新下载，无需手动放置。唯一的额外步骤是同步 [`.github/workflows/test_macos.yaml`](.github/workflows/test_macos.yaml) 里硬编码的 `CEF_VERSION`。
 
 ---
 
@@ -284,12 +296,12 @@ CEF/Chromium 版本只在一处管理 —— [`third/download.cmake`](third/down
 - [x] Windows / macOS / Linux 支持
 - [x] 多实例
 - [x] JavaScript 桥与 Cookie 管理
-- [x] 输入法支持（Windows / Linux；已用中文输入法测试）
+- [x] 输入法支持（Windows / macOS / Linux；已用中文输入法测试）
 - [x] 鼠标与触控板输入
 - [x] DevTools
-- [x] GPU 渲染与自适应帧率（Windows）
-- [ ] 更优的 macOS 二进制分发
-- [ ] 更简单的 macOS 多进程 helper bundle 集成
+- [x] GPU 零拷贝渲染与自适应帧率（Windows 与 macOS）
+- [x] 更简单的 macOS 多进程 helper bundle 集成（一行 Podfile 钩子）
+- [ ] macOS Universal（arm64 + x86_64）构建（需要 lipo 合并的 CEF）
 - [ ] Windows 上无撕裂的 GPU 同步（keyed-mutex）
 
 欢迎提交 PR。每个 PR 都会在 Windows、macOS、Linux 上运行构建 + `flutter analyze` CI。

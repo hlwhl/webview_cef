@@ -13,8 +13,8 @@ A Flutter **desktop** WebView backed by [CEF](https://bitbucket.org/chromiumembe
 ## Features
 
 - 🌐 **Full Chromium engine** — modern web standards, WebGL, HTML5 video, and more.
-- ⚡ **GPU zero-copy rendering** (Windows) — frames go straight from Chromium's GPU output to Flutter/ANGLE via a shared D3D11 texture, with no per-frame CPU color-swizzle or CPU→GPU upload.
-- 🎞️ **Adaptive frame rate** (Windows) — frame production is driven by the display's vblank, so the webview tracks your monitor's real refresh rate (e.g. 120/144 Hz) instead of being capped at 60 fps. Static content stays idle.
+- ⚡ **GPU zero-copy rendering** (Windows & macOS) — frames go straight from Chromium's GPU output to Flutter via a shared texture (a D3D11 texture on Windows, an IOSurface on macOS), with no per-frame CPU color-swizzle or CPU→GPU upload. Linux still uses the software path.
+- 🎞️ **Adaptive frame rate** (Windows & macOS) — frame production is driven by the display's vblank (`IDXGIOutput::WaitForVBlank` on Windows, `CVDisplayLink` on macOS), so the webview tracks your monitor's real refresh rate (e.g. 120/144 Hz) instead of being capped at 60 fps. Static content stays idle.
 - ⌨️ **Real-time CJK/IME input** — native composition pipeline; Chinese/Japanese/Korean preedit appears live and commits correctly.
 - 🔌 **JavaScript bridge** — call into Dart from JS and evaluate JS from Dart.
 - 🍪 **Cookie management** — read, set, and delete cookies.
@@ -27,12 +27,24 @@ A Flutter **desktop** WebView backed by [CEF](https://bitbucket.org/chromiumembe
 | Platform | Minimum version | Architectures |
 | --- | --- | --- |
 | Windows | Windows 10 | x64 |
-| macOS | macOS 10.15 | arm64, x86_64 |
+| macOS | macOS 12.0 | arm64 or x86_64 (host arch only — no universal build) |
 | Linux | — | x64, arm64 |
 
 ## Requirements
 
 - Flutter **>= 3.27.0**, Dart **>= 3.6.0** (tested against the latest stable Flutter, 3.44.x).
+- A C++20 toolchain for the native side (required by CEF 149) — recent MSVC / Clang / GCC.
+
+---
+
+## Upgrading from ≤ 0.2.2
+
+0.2.3 is a large upgrade (Flutter 3.44 + CEF 149) with breaking changes on every platform. If you are coming from an older release, do the following:
+
+- **Toolchain** — upgrade to Flutter **≥ 3.27.0** / Dart **≥ 3.6.0** (was 2.5.0 / 2.17.1). The native build now requires **C++20** (CEF 149); make sure your app doesn't force the plugin target to an older C++ standard.
+- **Removed Dart API** — `WebviewCefPlatform`, `MethodChannelWebviewCef`, and `getPlatformVersion()` were removed (along with the `plugin_platform_interface` dependency). They were never the intended API and have no replacement (`getPlatformVersion` returned a demo value). Import only `package:webview_cef/webview_cef.dart` and use `WebviewManager` / `WebViewController`.
+- **Windows** — `initCEFProcesses` changed signature. Update `windows/runner/main.cpp`: it now takes the `HINSTANCE` and returns a sub-process exit code that must be returned immediately, as the first statement in `wWinMain` (see the Windows install snippet below). The minimum OS is now **Windows 10**.
+- **macOS** — raise the deployment target to **12.0**: set `platform :osx, '12.0'` in `macos/Podfile` **and** the Runner target's macOS Deployment Target in Xcode (CEF 149's framework is built for 12.0). To enable multi-process rendering, add the one-line `post_install` hook to `macos/Podfile` (see the macOS install section). Builds are now **host-architecture only** (arm64 *or* x86_64) — universal macOS apps are no longer produced.
 
 ---
 
@@ -262,7 +274,7 @@ These CMake options can be set on the plugin target (defaults shown):
 
 ## Updating CEF
 
-The CEF/Chromium version is pinned in one place — `CEF_VERSION` in [`third/download.cmake`](third/download.cmake). Bump it to update CEF on Windows and Linux (downloaded automatically). For macOS, place the matching distribution into `macos/third/cef` as described above and keep the version in `.github/workflows/test_macos.yaml` in sync.
+The CEF/Chromium version is pinned in one place — `CEF_VERSION` in [`third/download.cmake`](third/download.cmake). Bump it to update CEF on all three platforms: Windows and Linux download it automatically, and macOS reads the same `CEF_VERSION` (via `macos/scripts/download_cef.sh`, run by the podspec's `prepare_command`) and re-downloads on the next `pod install` — no manual placement needed. The only extra step is keeping the hardcoded `CEF_VERSION` in [`.github/workflows/test_macos.yaml`](.github/workflows/test_macos.yaml) in sync.
 
 ---
 
@@ -284,12 +296,12 @@ The CEF/Chromium version is pinned in one place — `CEF_VERSION` in [`third/dow
 - [x] Windows / macOS / Linux support
 - [x] Multiple instances
 - [x] JavaScript bridge & cookie management
-- [x] IME support (Windows / Linux; tested with Chinese IMEs)
+- [x] IME support (Windows / macOS / Linux; tested with Chinese IMEs)
 - [x] Mouse & trackpad input
 - [x] DevTools
-- [x] GPU rendering & adaptive frame rate (Windows)
-- [ ] Better macOS binary distribution
-- [ ] Easier macOS multi-process helper-bundle integration
+- [x] GPU zero-copy rendering & adaptive frame rate (Windows & macOS)
+- [x] Easier macOS multi-process helper-bundle integration (one-line Podfile hook)
+- [ ] Universal (arm64 + x86_64) macOS builds (needs a lipo'd CEF)
 - [ ] Tear-free GPU sync (keyed-mutex) on Windows
 
 Pull requests are welcome. Every PR runs build + `flutter analyze` CI on Windows, macOS, and Linux.
