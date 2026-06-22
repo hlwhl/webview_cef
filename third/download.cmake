@@ -1,21 +1,33 @@
+# Official CEF "Standard Distribution" from the Spotify automated builds CDN
+# (https://cef-builds.spotifycdn.com). All platforms are kept on the same
+# CEF/Chromium version. To bump CEF, change CEF_VERSION below.
+set(CEF_CDN "https://cef-builds.spotifycdn.com")
+set(CEF_VERSION "149.0.4+g2f1bfd8+chromium-149.0.7827.156")
+
 if(CMAKE_SYSTEM_NAME STREQUAL "Linux")
     message(WARNING "current system is Linux")
     if(CMAKE_HOST_SYSTEM_PROCESSOR STREQUAL "aarch64")
-        set(cef_prebuilt_path "https://cef-builds.spotifycdn.com/cef_binary_130.1.2%2Bg48f3ef6%2Bchromium-130.0.6723.44_linuxarm64.tar.bz2")
-        set(cef_prebuilt_version "cef_binary_130.1.2%2Bg48f3ef6%2Bchromium-130.0.6723.44_linuxarm64.tar.bz2")
+        set(cef_prebuilt_version "cef_binary_${CEF_VERSION}_linuxarm64.tar.bz2")
     else()
-        set(cef_prebuilt_path "https://cef-builds.spotifycdn.com/cef_binary_130.1.2%2Bg48f3ef6%2Bchromium-130.0.6723.44_linux64.tar.bz2")
-        set(cef_prebuilt_version "cef_binary_130.1.2%2Bg48f3ef6%2Bchromium-130.0.6723.44_linux64.tar.bz2")
+        set(cef_prebuilt_version "cef_binary_${CEF_VERSION}_linux64.tar.bz2")
     endif()
 elseif(CMAKE_SYSTEM_NAME STREQUAL "Windows")
     message(WARNING "current system is Windows")
-    set(cef_prebuilt_path "https://github.com/hlwhl/webview_cef/releases/download/prebuilt_cef_bin_linux/webview_cef_bin_0.0.2_101.0.18+chromium-101.0.4951.67_windows64.zip")
-    set(cef_prebuilt_version "webview_cef_bin_0.0.2_101.0.18+chromium-101.0.4951.67_windows64")
-# elseif(CMAKE_SYSTEM_NAME STREQUAL "Darwin")
-#     message(STATUS "current system is MacOS")
-#     set(cef_prebuilt_path "")
+    # Use the official CEF standard distribution and build libcef_dll_wrapper
+    # from source (see windows/CMakeLists.txt), the same way Linux does.
+    set(cef_prebuilt_version "cef_binary_${CEF_VERSION}_windows64.tar.bz2")
+elseif(CMAKE_SYSTEM_NAME STREQUAL "Darwin")
+    message(WARNING "current system is macOS")
+    if(CMAKE_HOST_SYSTEM_PROCESSOR STREQUAL "arm64")
+        set(cef_prebuilt_version "cef_binary_${CEF_VERSION}_macosarm64.tar.bz2")
+    else()
+        set(cef_prebuilt_version "cef_binary_${CEF_VERSION}_macosx64.tar.bz2")
+    endif()
 endif()
-set(cef_prebuilt_version_path "https://github.com/hlwhl/webview_cef/releases/download/prebuilt_cef_bin_linux/version.txt")
+
+# The CDN path requires '+' to be percent-encoded as %2B.
+string(REPLACE "+" "%2B" cef_prebuilt_url_name "${cef_prebuilt_version}")
+set(cef_prebuilt_path "${CEF_CDN}/${cef_prebuilt_url_name}")
 
 
 function(extract_file filename extract_dir)
@@ -70,7 +82,9 @@ function(prepare_prebuilt_files filepath)
 
     if(need_download)
         message(WARNING "Need to update ${filepath}")
-        file(REMOVE_RECURSE ${filepath}/cmake ${filepath}/Debug ${filepath}/Release ${filepath}/Resources ${filepath}/libcef_dll ${filepath}/libcef_dll_wrapper)
+        file(REMOVE_RECURSE ${filepath}/cmake ${filepath}/Debug ${filepath}/Release ${filepath}/Resources ${filepath}/libcef_dll ${filepath}/libcef_dll_wrapper ${filepath}/include)
+        # Also remove the legacy lower-case layout from the old custom Windows package.
+        file(REMOVE_RECURSE ${filepath}/debug ${filepath}/release ${filepath}/resources)
         download_file(${cef_prebuilt_path} ${CMAKE_CURRENT_SOURCE_DIR}/prebuilt.zip)
         file(MAKE_DIRECTORY ${filepath})
         extract_file(${CMAKE_CURRENT_SOURCE_DIR}/prebuilt.zip ${filepath})

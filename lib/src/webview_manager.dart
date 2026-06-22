@@ -130,9 +130,10 @@ class WebviewManager extends ValueNotifier<bool> {
         return;
       case 'onImeCompositionRangeChangedMessage':
         int browserId = call.arguments['browserId'] as int;
-        _webViews[browserId]
-            ?.onImeCompositionRangeChangedMessage
-            ?.call(call.arguments['x'] as int, call.arguments['y'] as int);
+        _webViews[browserId]?.onImeCompositionRangeChangedMessage?.call(
+            call.arguments['x'] as int,
+            call.arguments['y'] as int,
+            call.arguments['height'] as int);
         return;
       case 'onLoadStart':
         int browserId = call.arguments["browserId"] as int;
@@ -163,9 +164,9 @@ class WebviewManager extends ValueNotifier<bool> {
 
     await _webViews[browserId]?.ready;
 
-    scripts.forEach((script) async {
+    for (final script in scripts) {
       await _webViews[browserId]?.executeJavaScript(script.script);
-    },);
+    }
   }
 
   Future<void> setCookie(String domain, String key, String val) async {

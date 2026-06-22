@@ -4,7 +4,7 @@ import 'package:flutter/material.dart';
 
 class WebviewTooltip {
   WebviewTooltip(BuildContext context) {
-    _overlayState = Overlay.of(context)!;
+    _overlayState = Overlay.of(context);
     _box = context.findRenderObject() as RenderBox;
   }
   late OverlayState _overlayState;
@@ -60,7 +60,8 @@ class WebviewTooltip {
                 color: Colors.white,
                 borderRadius: const BorderRadius.all(Radius.circular(4)),
                 boxShadow: [
-                  BoxShadow(blurRadius: 2, color: Colors.black.withOpacity(.2))
+                  BoxShadow(
+                      blurRadius: 2, color: Colors.black.withValues(alpha: .2))
                 ],
               ),
               child: RichText(

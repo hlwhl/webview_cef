@@ -9,7 +9,8 @@ cmake_policy(SET CMP0074 NEW)
 # Project-level configuration.
 set(PROJECT_NAME "webview_cef")
 project(${PROJECT_NAME} LANGUAGES CXX C)
-set(CMAKE_CXX_STANDARD 17)
+# CEF 149 public headers require C++20.
+set(CMAKE_CXX_STANDARD 20)
 
 # Auto setup Linux target
 execute_process(

@@ -69,7 +69,7 @@ bool WebviewHandler::OnProcessMessageReceived(
         bool editable = message->GetArgumentList()->GetBool(0);
         onFocusedNodeChangeMessage(browser->GetIdentifier(), editable);
         if (editable) {
-            onImeCompositionRangeChangedMessage(browser->GetIdentifier(), message->GetArgumentList()->GetInt(1), message->GetArgumentList()->GetInt(2));
+            onImeCompositionRangeChangedMessage(browser->GetIdentifier(), message->GetArgumentList()->GetInt(1), message->GetArgumentList()->GetInt(2), message->GetArgumentList()->GetInt(3));
         }
     }
     else if(message_name == kJSCallCppFunctionMessage)
@@ -83,7 +83,7 @@ bool WebviewHandler::OnProcessMessageReceived(
 	    }
 
         onJavaScriptChannelMessage(
-            fun_name,param,stringpatch::to_string(js_callback_id), browser->GetIdentifier(), stringpatch::to_string(frame->GetIdentifier()));
+            fun_name,param,stringpatch::to_string(js_callback_id), browser->GetIdentifier(), frame->GetIdentifier().ToString());
     }
     else if(message_name == kEvaluateCallbackMessage){
         CefString callbackId = message->GetArgumentList()->GetString(0);
@@ -167,6 +167,7 @@ void WebviewHandler::OnBeforeClose(CefRefPtr<CefBrowser> browser) {
 
 bool WebviewHandler::OnBeforePopup(CefRefPtr<CefBrowser> browser,
                                   CefRefPtr<CefFrame> frame,
+                                  int popup_id,
                                   const CefString& target_url,
                                   const CefString& target_frame_name,
                                   WindowOpenDisposition target_disposition,
@@ -201,11 +202,7 @@ void WebviewHandler::OnLoadError(CefRefPtr<CefBrowser> browser,
                                 const CefString& errorText,
                                 const CefString& failedUrl) {
     CEF_REQUIRE_UI_THREAD();
-    
-    // Allow Chrome to show the error page.
-    if (IsChromeRuntimeEnabled())
-        return;
-    
+
     // Don't display an error for downloaded files.
     if (errorCode == ERR_ABORTED)
         return;
@@ -248,17 +245,6 @@ void WebviewHandler::CloseAllBrowsers(bool force_close) {
     browser_map_.clear();
 }
 
-// static
-bool WebviewHandler::IsChromeRuntimeEnabled() {
-    static int value = -1;
-    if (value == -1) {
-        CefRefPtr<CefCommandLine> command_line =
-        CefCommandLine::GetGlobalCommandLine();
-        value = command_line->HasSwitch("enable-chrome-runtime") ? 1 : 0;
-    }
-    return value == 1;
-}
-
 void WebviewHandler::closeBrowser(int browserId)
 {
     auto it = browser_map_.find(browserId);
@@ -278,10 +264,59 @@ void WebviewHandler::createBrowser(std::string url, std::function<void(int)> cal
 	}
 #endif
     CefBrowserSettings browser_settings ;
-    browser_settings.windowless_frame_rate = 30;
+    // Capped at 60 by CEF; ignored entirely when external begin frame drives the
+    // frames (GPU path below). Kept for the software fallback path.
+    browser_settings.windowless_frame_rate = 60;
     CefWindowInfo window_info;
     window_info.SetAsWindowless(0);
+#ifdef WEBVIEW_CEF_GPU_TEXTURE
+    // Enable GPU shared-texture rendering: CEF delivers frames via
+    // OnAcceleratedPaint (a D3D11 shared texture on Windows, an IOSurface on
+    // macOS) instead of the software OnPaint CPU buffer. Requires the GPU to be
+    // left enabled (see WebviewApp).
+    window_info.shared_texture_enabled = true;
+    // Drive frame production ourselves so the rate can follow the display's
+    // refresh (>60 Hz) instead of being capped at windowless_frame_rate. The
+    // platform layer ticks SendExternalBeginFrame on each vblank — Windows from
+    // an IDXGIOutput vblank wait, macOS from a CVDisplayLink.
+    window_info.external_begin_frame_enabled = true;
+#endif
     callback(CefBrowserHost::CreateBrowserSync(window_info, this, url, browser_settings, nullptr, nullptr)->GetIdentifier());
+#ifdef WEBVIEW_CEF_GPU_TEXTURE
+    // The GPU shared-texture path is the only render path on this build (no
+    // OnPaint fallback). If no accelerated frame arrives shortly, the GPU
+    // compositor likely can't export a shared texture — warn so a black webview
+    // isn't silent.
+    CefPostDelayedTask(TID_UI, base::BindOnce(&WebviewHandler::warnIfNoAcceleratedFrame, this), 5000);
+#endif
+}
+
+void WebviewHandler::warnIfNoAcceleratedFrame() {
+#ifdef WEBVIEW_CEF_GPU_TEXTURE
+    if (!received_accelerated_frame_ && !gpu_warning_logged_) {
+        gpu_warning_logged_ = true;
+        fprintf(stderr,
+                "[webview_cef] WARNING: no GPU accelerated-paint frame after 5s. "
+                "This build renders the webview only via the GPU shared-texture "
+                "path; if it appears black, the GPU compositor may be unavailable "
+                "(headless, VM, software GL, or a crashed GPU process).\n");
+        fflush(stderr);
+    }
+#endif
+}
+
+void WebviewHandler::sendExternalBeginFrame() {
+#ifdef WEBVIEW_CEF_GPU_TEXTURE
+    if (!CefCurrentlyOn(TID_UI)) {
+        CefPostTask(TID_UI, base::BindOnce(&WebviewHandler::sendExternalBeginFrame, this));
+        return;
+    }
+    for (auto& kv : browser_map_) {
+        if (kv.second.browser && kv.second.browser->GetHost()) {
+            kv.second.browser->GetHost()->SendExternalBeginFrame();
+        }
+    }
+#endif
 }
 
 void WebviewHandler::sendScrollEvent(int browserId, int x, int y, int deltaX, int deltaY) {
@@ -380,7 +415,7 @@ void WebviewHandler::OnImeCompositionRangeChanged(CefRefPtr<CefBrowser> browser,
         if (it->second.is_ime_commit) {
             auto lastCharacter = character_bounds.back();
             it->second.prev_ime_position = lastCharacter;
-            onImeCompositionRangeChangedMessage(browser->GetIdentifier(), lastCharacter.x + lastCharacter.width, lastCharacter.y + lastCharacter.height);
+            onImeCompositionRangeChangedMessage(browser->GetIdentifier(), lastCharacter.x + lastCharacter.width, lastCharacter.y + lastCharacter.height, lastCharacter.height);
             it->second.is_ime_commit = false;
         }
         else
@@ -388,7 +423,7 @@ void WebviewHandler::OnImeCompositionRangeChanged(CefRefPtr<CefBrowser> browser,
             auto firstCharacter = character_bounds.front();
             if (firstCharacter != it->second.prev_ime_position) {
                 it->second.prev_ime_position = firstCharacter;
-                onImeCompositionRangeChangedMessage(browser->GetIdentifier(), firstCharacter.x, firstCharacter.y + firstCharacter.height);
+                onImeCompositionRangeChangedMessage(browser->GetIdentifier(), firstCharacter.x, firstCharacter.y + firstCharacter.height, firstCharacter.height);
             }
         }
     }
@@ -464,7 +499,8 @@ void WebviewHandler::imeSetComposition(int browserId, std::string text)
 
     // Keeps the caret at the end of the composition
     auto selection_range_end = static_cast<int>(0 + cTextStr.length());
-    CefRange selection_range = CefRange(0, selection_range_end);
+    // Keep the caret at the end of the composition (matches cefclient).
+    CefRange selection_range = CefRange(selection_range_end, selection_range_end);
     it->second.browser->GetHost()->ImeSetComposition(cTextStr, underlines, CefRange(UINT32_MAX, UINT32_MAX), selection_range);
 }
 
@@ -481,9 +517,9 @@ void WebviewHandler::imeCommitText(int browserId, std::string text)
     std::vector<CefCompositionUnderline> underlines;
     auto selection_range_end = static_cast<int>(0 + cTextStr.length());
     CefRange selection_range = CefRange(selection_range_end, selection_range_end);
-#ifndef _WIN32
-        it->second.browser->GetHost()->ImeSetComposition(cTextStr, underlines, CefRange(UINT32_MAX, UINT32_MAX), selection_range);
-#endif
+    // Establish the composition on all platforms before committing so the commit
+    // has a live composition to replace (previously skipped on Windows).
+    it->second.browser->GetHost()->ImeSetComposition(cTextStr, underlines, CefRange(UINT32_MAX, UINT32_MAX), selection_range);
     it->second.browser->GetHost()->ImeCommitText(cTextStr, CefRange(UINT32_MAX, UINT32_MAX), 0);
 
 }
@@ -494,7 +530,76 @@ void WebviewHandler::setClientFocus(int browserId, bool focus)
     if (it==browser_map_.end() || !it->second.browser.get()) {
         return;
     }
+    it->second.wants_focus = focus;
+    if (focus) {
+        // Re-arm the first-frame re-assert (handles a SetFocus that lands before
+        // the browser is render/input-ready under external_begin_frame).
+        it->second.focus_reasserted = false;
+    }
     it->second.browser->GetHost()->SetFocus(focus);
+}
+
+CefRefPtr<CefBrowser> WebviewHandler::getFocusedBrowser()
+{
+    return current_focused_browser_;
+}
+
+void WebviewHandler::imeSetCompositionNative(const std::wstring& text, int cursor)
+{
+    if (!CefCurrentlyOn(TID_UI)) {
+        CefPostTask(TID_UI, base::BindOnce(&WebviewHandler::imeSetCompositionNative, this, text, cursor));
+        return;
+    }
+    auto browser = current_focused_browser_;
+    if (!browser.get()) {
+        return;
+    }
+    CefString cTextStr;
+    cTextStr.FromWString(text);
+
+    std::vector<CefCompositionUnderline> underlines;
+    cef_composition_underline_t underline = {};
+    underline.range.from = 0;
+    underline.range.to = static_cast<int>(cTextStr.length());
+    underline.color = ColorUNDERLINE;
+    underline.background_color = ColorBKCOLOR;
+    underline.thick = 0;
+    underline.style = CEF_CUS_DOT;
+    underlines.push_back(underline);
+
+    const int len = static_cast<int>(cTextStr.length());
+    const int caret = (cursor < 0 || cursor > len) ? len : cursor;
+    CefRange selection_range(caret, caret);
+    browser->GetHost()->ImeSetComposition(cTextStr, underlines,
+        CefRange(UINT32_MAX, UINT32_MAX), selection_range);
+}
+
+void WebviewHandler::imeCommitTextNative(const std::wstring& text)
+{
+    if (!CefCurrentlyOn(TID_UI)) {
+        CefPostTask(TID_UI, base::BindOnce(&WebviewHandler::imeCommitTextNative, this, text));
+        return;
+    }
+    auto browser = current_focused_browser_;
+    if (!browser.get()) {
+        return;
+    }
+    CefString cTextStr;
+    cTextStr.FromWString(text);
+    browser->GetHost()->ImeCommitText(cTextStr, CefRange(UINT32_MAX, UINT32_MAX), 0);
+}
+
+void WebviewHandler::imeFinishComposition()
+{
+    if (!CefCurrentlyOn(TID_UI)) {
+        CefPostTask(TID_UI, base::BindOnce(&WebviewHandler::imeFinishComposition, this));
+        return;
+    }
+    auto browser = current_focused_browser_;
+    if (!browser.get()) {
+        return;
+    }
+    browser->GetHost()->ImeFinishComposingText(false);
 }
 
 void WebviewHandler::setCookie(const std::string& domain, const std::string& key, const std::string& value){
@@ -580,13 +685,9 @@ void WebviewHandler::sendJavaScriptChannelCallBack(const bool error, const std::
 
         CefRefPtr<CefFrame> frame = bit->second.browser->GetMainFrame();
 
-        // Return types for frame->GetIdentifier() changed, use the Linux way when updating MacOS or Windows
-        // versions in download.cmake
-#if __linux__
+        // CefFrame::GetIdentifier() returns a string identifier in current CEF
+        // (since CEF 122) on every platform.
         bool identifierMatch = std::stoll(frame->GetIdentifier().ToString()) == frameIdInt;
-#else
-        bool identifierMatch = frame->GetIdentifier() == frameIdInt;
-#endif
         if (identifierMatch)
         {
             frame->SendProcessMessage(PID_RENDERER, message);
@@ -659,6 +760,41 @@ void WebviewHandler::OnPaint(CefRefPtr<CefBrowser> browser, CefRenderHandler::Pa
     if (!browser->IsPopup() && onPaintCallback != nullptr) {
         onPaintCallback(browser->GetIdentifier(), buffer, w, h);
     }
+}
+
+void WebviewHandler::OnAcceleratedPaint(CefRefPtr<CefBrowser> browser, CefRenderHandler::PaintElementType type,
+                            const CefRenderHandler::RectList &dirtyRects, const CefAcceleratedPaintInfo &info) {
+#ifdef WEBVIEW_CEF_GPU_TEXTURE
+    if (!browser->IsPopup() && onAcceleratedPaintCallback != nullptr) {
+        received_accelerated_frame_ = true;
+        int w = 0, h = 0;
+        auto it = browser_map_.find(browser->GetIdentifier());
+        if (it != browser_map_.end()) {
+            w = it->second.width;
+            h = it->second.height;
+            // A produced frame means the browser is render/input-ready. With
+            // external_begin_frame a SetFocus issued right after creation can be
+            // dropped (the browser wasn't ready yet), which left the webview
+            // unable to receive keyboard input until the window was re-focused.
+            // Re-apply the requested focus once, now that frames are flowing.
+            if (it->second.wants_focus && !it->second.focus_reasserted) {
+                it->second.focus_reasserted = true;
+                it->second.browser->GetHost()->SetFocus(true);
+            }
+        }
+        // The shared texture is pool-owned and only valid for the duration of
+        // this callback. On Windows it is a HANDLE (open with
+        // ID3D11Device1::OpenSharedResource1); on macOS it is an IOSurfaceRef.
+        // The platform renderer wraps/copies it before returning.
+#ifdef __APPLE__
+        const void* sharedTexture = reinterpret_cast<const void*>(info.shared_texture_io_surface);
+#else
+        const void* sharedTexture = reinterpret_cast<const void*>(info.shared_texture_handle);
+#endif
+        onAcceleratedPaintCallback(browser->GetIdentifier(), sharedTexture,
+                                   w, h, static_cast<int>(info.format));
+    }
+#endif
 }
 
 
