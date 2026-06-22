@@ -46,6 +46,10 @@ Flutter webview backed by CEF (Chromium Embedded Framework)
     'DEFINES_MODULE' => 'YES',
     'CLANG_CXX_LANGUAGE_STANDARD' => 'c++20',
     "EXCLUDED_ARCHS[sdk=macosx*]" => non_host_arch,
+    # Zero-copy GPU rendering: CEF delivers frames as a shared-texture IOSurface
+    # via OnAcceleratedPaint instead of a software CPU buffer (OnPaint). The IME
+    # and frame plumbing key off this define in the shared common/ sources.
+    'GCC_PREPROCESSOR_DEFINITIONS' => '$(inherited) WEBVIEW_CEF_GPU_TEXTURE=1',
   }
   # The app target links the CEF framework/wrapper too, so it must drop the same
   # architecture or its slice fails to link.

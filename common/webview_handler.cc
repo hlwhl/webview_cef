@@ -271,13 +271,18 @@ void WebviewHandler::createBrowser(std::string url, std::function<void(int)> cal
     window_info.SetAsWindowless(0);
 #ifdef WEBVIEW_CEF_GPU_TEXTURE
     // Enable GPU shared-texture rendering: CEF delivers frames via
-    // OnAcceleratedPaint (a D3D11 shared texture) instead of the software
-    // OnPaint CPU buffer. Requires the GPU to be left enabled (see WebviewApp).
+    // OnAcceleratedPaint (a D3D11 shared texture on Windows, an IOSurface on
+    // macOS) instead of the software OnPaint CPU buffer. Requires the GPU to be
+    // left enabled (see WebviewApp).
     window_info.shared_texture_enabled = true;
-    // Drive frame production ourselves so the rate can follow the display's
-    // refresh (>60 Hz) instead of being capped at windowless_frame_rate. The
-    // platform layer ticks SendExternalBeginFrame on each vblank.
+#ifndef __APPLE__
+    // Windows drives frame production itself so the rate can follow the
+    // display's refresh (>60 Hz) instead of being capped at
+    // windowless_frame_rate; the platform layer ticks SendExternalBeginFrame on
+    // each vblank. macOS lets CEF schedule frames internally (capped at
+    // windowless_frame_rate), pumped by the app's CefDoMessageLoopWork timer.
     window_info.external_begin_frame_enabled = true;
+#endif
 #endif
     callback(CefBrowserHost::CreateBrowserSync(window_info, this, url, browser_settings, nullptr, nullptr)->GetIdentifier());
 }
@@ -743,12 +748,16 @@ void WebviewHandler::OnAcceleratedPaint(CefRefPtr<CefBrowser> browser, CefRender
             w = it->second.width;
             h = it->second.height;
         }
-        // On Windows the shared texture is a HANDLE openable with
-        // ID3D11Device1::OpenSharedResource1. The handle is pool-owned and only
-        // valid for the duration of this callback, so the renderer must reopen
-        // and copy it before returning.
-        onAcceleratedPaintCallback(browser->GetIdentifier(),
-                                   reinterpret_cast<const void*>(info.shared_texture_handle),
+        // The shared texture is pool-owned and only valid for the duration of
+        // this callback. On Windows it is a HANDLE (open with
+        // ID3D11Device1::OpenSharedResource1); on macOS it is an IOSurfaceRef.
+        // The platform renderer wraps/copies it before returning.
+#ifdef __APPLE__
+        const void* sharedTexture = reinterpret_cast<const void*>(info.shared_texture_io_surface);
+#else
+        const void* sharedTexture = reinterpret_cast<const void*>(info.shared_texture_handle);
+#endif
+        onAcceleratedPaintCallback(browser->GetIdentifier(), sharedTexture,
                                    w, h, static_cast<int>(info.format));
     }
 #endif

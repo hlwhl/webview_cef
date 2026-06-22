@@ -56,6 +56,35 @@ typedef void(^RetainSelfBlock)(void);
     dispatch_semaphore_signal(_lock);
 }
 
+- (void)onAcceleratedFrame:(IOSurfaceRef)surface {
+    if (!surface) {
+        return;
+    }
+    // Wrap CEF's shared IOSurface directly — no CPU copy, no swizzle (the
+    // surface is already BGRA on the GPU), no per-frame allocation. The surface
+    // is owned by CEF's pool and recycled after OnAcceleratedPaint returns;
+    // CVPixelBufferCreateWithIOSurface retains it, and the double buffer below
+    // keeps the previous frame alive until the next one arrives, which (with
+    // CEF's multi-surface pool) covers Flutter's one-frame read latency.
+    NSDictionary* attrs = @{
+        (__bridge NSString*)kCVPixelBufferMetalCompatibilityKey : @YES,
+        (__bridge NSString*)kCVPixelBufferOpenGLCompatibilityKey : @YES,
+    };
+    CVPixelBufferRef buf = NULL;
+    CVReturn ret = CVPixelBufferCreateWithIOSurface(
+        kCFAllocatorDefault, surface, (__bridge CFDictionaryRef)attrs, &buf);
+    if (ret != kCVReturnSuccess || buf == NULL) {
+        return;
+    }
+
+    dispatch_semaphore_wait(_lock, DISPATCH_TIME_FOREVER);
+    if (_pixelBuffer) {
+        CVPixelBufferRelease(_pixelBuffer);
+    }
+    _pixelBuffer = buf;
+    dispatch_semaphore_signal(_lock);
+}
+
 - (CVPixelBufferRef _Nullable)copyPixelBuffer {
     dispatch_semaphore_wait(_lock, DISPATCH_TIME_FOREVER);
     _pixelBufferTemp = _pixelBuffer;

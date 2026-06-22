@@ -43,6 +43,14 @@ public:
         [textureRegistry textureFrameAvailable: textureId];
     }
 
+    // GPU zero-copy path: |sharedHandle| is the CEF shared-texture IOSurface
+    // (see WebviewHandler::OnAcceleratedPaint). |format| is unused on macOS —
+    // the IOSurface already carries its BGRA pixel format.
+    virtual void onAcceleratedFrame(const void* sharedHandle, int width, int height, int format) {
+        [texture onAcceleratedFrame:(IOSurfaceRef)sharedHandle];
+        [textureRegistry textureFrameAvailable: textureId];
+    }
+
 private:
     WebviewCefTexture* texture;
     NSObject<FlutterTextureRegistry>* textureRegistry;
