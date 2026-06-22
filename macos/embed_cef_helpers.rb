@@ -29,10 +29,15 @@ module WebviewCEF
         # Only application targets get a bundle to embed helpers into.
         next unless target.product_type == 'com.apple.product-type.application'
 
-        # Idempotent: drop a previous phase before re-adding.
-        target.build_phases.delete_if do |ph|
-          ph.respond_to?(:name) && ph.name == PHASE_NAME
-        end
+        # Idempotent: remove a previous phase before re-adding. Use
+        # remove_from_project (not delete_if) so the underlying
+        # PBXShellScriptBuildPhase object is deleted from the project graph, not
+        # just detached from buildPhases — otherwise every `pod install` (Flutter
+        # runs it routinely) leaves an orphaned phase object behind and the
+        # tracked project.pbxproj grows unboundedly.
+        target.build_phases
+              .select { |ph| ph.respond_to?(:name) && ph.name == PHASE_NAME }
+              .each(&:remove_from_project)
 
         phase = target.new_shell_script_build_phase(PHASE_NAME)
         phase.shell_path = '/bin/bash'
