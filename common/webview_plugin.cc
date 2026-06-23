@@ -342,6 +342,12 @@ namespace webview_cef {
 			}
 			result(1, nullptr);
 		}
+		else if (name.compare("wasHidden") == 0) {
+			int browserId = int(webview_value_get_int(webview_value_get_list_value(values, 0)));
+			bool hidden = webview_value_get_bool(webview_value_get_list_value(values, 1));
+			m_handler->wasHidden(browserId, hidden);
+			result(1, nullptr);
+		}
 		else if(name.compare("setCookie") == 0){
 			const auto domain = webview_value_get_string(webview_value_get_list_value(values, 0));
 			const auto key = webview_value_get_string(webview_value_get_list_value(values, 1));
@@ -622,7 +628,8 @@ namespace webview_cef {
 		cefs.remote_debugging_port = 0;		   // disable remote debugger
 		cefs.log_severity = LOGSEVERITY_ERROR; // only log errors, reduces I/O
 		CefString(&cefs.user_agent) =
-			"Mozilla/5.0 (Linux; arm64) AppleWebKit/537.36 Chrome/130.0 Safari/537.36";
+			"Mozilla/5.0 (Linux; Android 13; Pixel 7) AppleWebKit/537.36 "
+			"(KHTML, like Gecko) Chrome/130.0.0.0 Mobile Safari/537.36";
 
 		// Get the absolute path of the current executable
 		char result[PATH_MAX];

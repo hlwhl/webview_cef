@@ -507,6 +507,15 @@ void WebviewHandler::setClientFocus(int browserId, bool focus)
     it->second.browser->GetHost()->SetFocus(focus);
 }
 
+void WebviewHandler::wasHidden(int browserId, bool hidden)
+{
+    auto it = browser_map_.find(browserId);
+    if (it == browser_map_.end() || !it->second.browser.get()) {
+        return;
+    }
+    it->second.browser->GetHost()->WasHidden(hidden);
+}
+
 void WebviewHandler::setCookie(const std::string& domain, const std::string& key, const std::string& value){
     CefRefPtr<CefCookieManager> manager = CefCookieManager::GetGlobalManager(nullptr);
     if(manager){

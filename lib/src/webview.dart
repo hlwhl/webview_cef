@@ -13,12 +13,15 @@ import 'webview_textinput.dart';
 import 'webview_tooltip.dart';
 
 class WebViewController extends ValueNotifier<bool> {
-  WebViewController(this._pluginChannel, this._index, {Widget? loading})
+  WebViewController(this._pluginChannel, this._index, {Widget? loading, this.scrollSpeed = 1.0})
       : super(false) {
     _loadingWidget = loading;
   }
   final MethodChannel _pluginChannel;
   Widget? _loadingWidget;
+
+  /// The multiplier for touch scroll speed. Default is 1.0.
+  final double scrollSpeed;
 
   late WebView _webviewWidget;
   Widget get webviewWidget => _webviewWidget;
@@ -157,6 +160,14 @@ class WebViewController extends ValueNotifier<bool> {
     }
     assert(value);
     return _pluginChannel.invokeMethod('setClientFocus', [_browserId, focus]);
+  }
+
+  Future<void> wasHidden(bool hidden) async {
+    if (_isDisposed) {
+      return;
+    }
+    assert(value);
+    return _pluginChannel.invokeMethod('wasHidden', [_browserId, hidden]);
   }
 
   Future<void> setJavaScriptChannels(Set<JavascriptChannel> channels) async {
@@ -318,6 +329,7 @@ class WebViewState extends State<WebView> with WebeViewTextInput {
   bool isPrimaryFocus = false;
   WebviewTooltip? _tooltip;
   MouseCursor _mouseType = SystemMouseCursors.basic;
+  Offset? _lastTouchPos;
 
   WebViewController get _controller => widget.controller;
 
@@ -407,11 +419,6 @@ class WebViewState extends State<WebView> with WebeViewTextInput {
     if (!Platform.isLinux) {
       return KeyEventResult.ignored;
     }
-
-  print("KEY EVENT: ${event.runtimeType} logicalKey=${event.logicalKey} "
-          "physicalKey=${event.physicalKey} character=${event.character} "
-          "keyId=${event.logicalKey.keyId.toRadixString(16)}");
-
     // Map Flutter KeyEvent to CEF CefKeyEvent
     // CefKeyEvent type:
     // 0: KEYEVENT_RAWKEYDOWN
@@ -533,13 +540,32 @@ class WebViewState extends State<WebView> with WebeViewTextInput {
                 }
               });
             }
-            _controller._cursorClickDown(ev.localPosition);
+
+            if (ev.kind == PointerDeviceKind.touch) {
+              _lastTouchPos = ev.localPosition;
+            } else {
+              _controller._cursorClickDown(ev.localPosition);
+            }
           },
           onPointerUp: (ev) {
-            _controller._cursorClickUp(ev.localPosition);
+            if (ev.kind == PointerDeviceKind.touch) {
+              _lastTouchPos = null;
+            } else {
+              _controller._cursorClickUp(ev.localPosition);
+            }
           },
           onPointerMove: (ev) {
-            _controller._cursorDragging(ev.localPosition);
+            if (ev.kind == PointerDeviceKind.touch && _lastTouchPos != null) {
+              final delta = _lastTouchPos! - ev.localPosition;
+              _controller._setScrollDelta(
+                ev.localPosition,
+                (delta.dx * _controller.scrollSpeed).round(),
+                (delta.dy * _controller.scrollSpeed).round(),
+              );
+              _lastTouchPos = ev.localPosition;
+            } else {
+              _controller._cursorDragging(ev.localPosition);
+            }
           },
           onPointerSignal: (signal) {
             if (signal is PointerScrollEvent) {

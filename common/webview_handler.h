@@ -162,6 +162,7 @@ public:
     void imeSetComposition(int browserId, std::string text);
     void imeCommitText(int browserId, std::string text);
     void setClientFocus(int browserId, bool focus);
+    void wasHidden(int browserId, bool hidden);
 
     void setCookie(const std::string& domain, const std::string& key, const std::string& value);
     void deleteCookie(const std::string& domain, const std::string& key);
