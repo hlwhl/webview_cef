@@ -624,40 +624,6 @@ namespace webview_cef {
 		CefSettings cefs;
 		cefs.windowless_rendering_enabled = true;
 		cefs.no_sandbox = true;
-			// CefSettings cefs;
-			// cefs.windowless_rendering_enabled = true;
-			// cefs.no_sandbox = true;
-			// cefs.multi_threaded_message_loop = true;
-			// cefs.remote_debugging_port = 0;		   // disable remote debugger
-			// cefs.log_severity = LOGSEVERITY_ERROR; // only log errors, reduces I/O
-			// CefString(&cefs.user_agent) =
-			// 	"Mozilla/5.0 (Linux; Android 13; Pixel 7) AppleWebKit/537.36 "
-			// 	"(KHTML, like Gecko) Chrome/130.0.0.0 Mobile Safari/537.36";
-
-			// // Get the absolute path of the current executable
-			// char result[PATH_MAX];
-			// ssize_t count = readlink("/proc/self/exe", result, PATH_MAX);
-			// std::string exe_path;
-			// if (count != -1)
-			// {
-			// 	exe_path = std::string(dirname(result));
-			// }
-			// else
-			// {
-			// 	exe_path = "."; // Fallback
-			// }
-
-			// // Construct absolute paths for resources and locales
-			// // Assuming the structure: bundle/webview_cef_example and bundle/lib/
-			// std::string lib_path = exe_path + "/lib";
-			// std::string locales_path = lib_path + "/locales";
-
-			// CefString(&cefs.resources_dir_path) = lib_path;
-			// CefString(&cefs.locales_dir_path) = locales_path;
-
-			// // Use an absolute path for the cache as well
-			// CefString(&cefs.root_cache_path) = "/tmp/webview_cef_cache";
-			// CefString(&cefs.browser_subprocess_path) = exe_path + "/webview_cef_example";
 
 		if (!userAgent.empty())
 		{

@@ -161,44 +161,7 @@ void WebviewApp::OnBeforeCommandLineProcessing(const CefString &process_type, Ce
     command_line->AppendSwitch("single-process");
 #endif
 #ifdef __linux__
-    // Required for Wayland support
-    // command_line->AppendSwitchWithValue("ozone-platform", "wayland");
 
-    // // // Enable Keyboard
-    // // command_line->AppendSwitch("enable-wayland-ime");
-    // // command_line->AppendSwitchWithValue("wayland-text-input-version", "1");
-
-    // // Disable unnecessary UI/system integrations
-    // command_line->AppendSwitch("disable-file-system");
-    // command_line->AppendSwitch("noerrdialogs");
-    // command_line->AppendSwitch("disable-notifications");
-    // command_line->AppendSwitch("disable-translate");
-    // command_line->AppendSwitch("disable-sync");
-    // command_line->AppendSwitch("no-first-run");
-    // command_line->AppendSwitch("disable-default-apps");
-    // command_line->AppendSwitch("disable-extensions");
-    // command_line->AppendSwitch("disable-component-update");
-    // command_line->AppendSwitch("disable-background-networking");
-    // command_line->AppendSwitch("disable-domain-reliability");
-    // command_line->AppendSwitch("disable-client-side-phishing-detection");
-    // command_line->AppendSwitch("disable-hang-monitor");
-    // command_line->AppendSwitch("disable-prompt-on-repost");
-    // command_line->AppendSwitch("disable-breakpad"); // no crash reporting
-    // command_line->AppendSwitch("disable-logging");
-
-    // // Disable file chooser portal (suppresses the DBus errors)
-    // command_line->AppendSwitchWithValue("disable-features",
-    //                                     "DialMediaRouteProvider,MediaRouter,"
-    //                                     "GlobalMediaControls,DestroyProfileOnBrowserClose,"
-    //                                     "DirectSockets");
-
-    // // Memory / performance
-    // command_line->AppendSwitch("disable-dev-shm-usage"); // important on embedded
-    // command_line->AppendSwitch("disable-software-rasterizer");
-    // command_line->AppendSwitchWithValue("js-flags", "--max-old-space-size=128");
-    // command_line->AppendSwitchWithValue("renderer-process-limit", "2");
-    // command_line->AppendSwitchWithValue("blink-settings",
-    //                                     "imagesEnabled=true,scriptEnabled=true");
 #endif
 }
 
