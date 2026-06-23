@@ -1,10 +1,10 @@
 if(CMAKE_SYSTEM_NAME STREQUAL "Linux")
     message(WARNING "current system is Linux")
     # Check for arm64/aarch64 target
-    # if(CMAKE_SYSTEM_PROCESSOR STREQUAL "aarch64" OR CMAKE_SYSTEM_PROCESSOR STREQUAL "arm64")
-    if(TRUE)
-        # set(cef_prebuilt_path "https://cef-builds.spotifycdn.com/cef_binary_130.1.2%2Bg48f3ef6%2Bchromium-130.0.6723.44_linuxarm64.tar.bz2")
-        # set(cef_prebuilt_version "cef_binary_130.1.2%2Bg48f3ef6%2Bchromium-130.0.6723.44_linuxarm64.tar.bz2")
+       if(CMAKE_SYSTEM_PROCESSOR STREQUAL "aarch64" OR
+           CMAKE_SYSTEM_PROCESSOR STREQUAL "arm64" OR
+           CMAKE_CXX_COMPILER_TARGET MATCHES "aarch64" OR
+           CMAKE_CXX_COMPILER_TARGET MATCHES "arm64")
         
         set(cef_prebuilt_path "https://cef-builds.spotifycdn.com/cef_binary_148.0.10%2Bg7ee53f5%2Bchromium-148.0.7778.218_linuxarm64.tar.bz2")
         set(cef_prebuilt_version "cef_binary_148.0.10%2Bg7ee53f5%2Bchromium-148.0.7778.218_linuxarm64.tar.bz2")
