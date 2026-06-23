@@ -61,7 +61,6 @@ When building the project for the first time, a prebuilt cef bin package (200MB,
 
 To use the plugin in macOS, you'll need to clone the repository onto your project location, prefereably inside a `packages/` folder on the root of your project.
 Update your `pubspec.yaml` file to accomodate the change.
-
 ```
 ...
 
@@ -69,8 +68,6 @@ dependencies:
   # Webview
   webview_cef:
     path: ./packages/webview_cef     # Or wherever you cloned the repo
-
-
 ...
 ```
 
@@ -126,8 +123,6 @@ Ensure the target eLinux system has the following libraries installed:
 
 `cp -r ~/exploration/flutter/browser/webview_cef/third/cef/Resources/locales   build/elinux/x64/release/bundle/lib/`
 
-`sudo chown root:root lib/chrome-sandbox && sudo chmod 4755 lib/chrome-sandbox`
-
 `./build/elinux/x64/release/bundle/webview_cef_example -b .`
 
 ## TODOs
@@ -166,24 +161,3 @@ This demo is a simple webview app that can be used to test the `webview_cef` plu
 ## Credits
 
 This project is inspired from [**`flutter_webview_windows`**](https://github.com/jnschulze/flutter-webview-windows).
-
-####
-
-# On your build machine, copy locales to the bundle first
-
-cp -r ~/exploration/flutter/browser/webview_cef/third/cef/Resources/locales \
- ~/exploration/flutter/browser/webview_cef/example/build/elinux/arm64/release/bundle/lib/
-
-# Verify
-
-ls ~/exploration/flutter/browser/webview_cef/example/build/elinux/arm64/release/bundle/lib/locales/ | head -5
-
-# Should show: am.pak, ar.pak, bg.pak etc.
-
-# Then scp just the locales dir to device
-
-scp -r ~/exploration/flutter/browser/webview_cef/example/build/elinux/arm64/release/bundle/lib/locales \
- mecha@192.168.29.89:/home/mecha/webview_cef_demo/lib/
-
-sudo chown root:root /home/mecha/webview_cef_demo/lib/chrome-sandbox
-sudo chmod 4755 /home/mecha/webview_cef_demo/lib/chrome-sandbox
