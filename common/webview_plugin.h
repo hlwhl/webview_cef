@@ -29,7 +29,6 @@ namespace webview_cef {
         void initCallback();
         void uninitCallback();
         void HandleMethodCall(std::string name, WValue* values, std::function<void(int ,WValue*)> result);
-        void sendKeyEvent(int browserId, CefKeyEvent& ev);
         void sendKeyEvent(CefKeyEvent& ev);
         void setInvokeMethodFunc(std::function<void(std::string, WValue*)> func);
         void setCreateTextureFunc(std::function<std::shared_ptr<WebviewTexture>()> func);

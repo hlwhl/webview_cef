@@ -185,43 +185,12 @@ class WebviewCefPlugin : public flutter::Plugin {
        auto result_ptr = result.release();
        plugin_->HandleMethodCall(
            method.c_str(), args,
-           [this, result_ptr, method, args](int ret, WValue* responseArgs) {
+           [result_ptr, method, args](int ret, WValue* responseArgs) {
              if (ret > 0) {
                auto val = encode_wvalue(responseArgs);
                result_ptr->Success(val);
              } else if (ret < 0) {
                result_ptr->Error("error", "error");
-             } else if (method == "sendKeyEvent") {
-               if (webview_value_get_type(args) == Webview_Value_Type_Map) {
-                 CefKeyEvent key_event;
-                 // Use webview_value_get_by_string as defined in common/webview_value.h
-                 WValue* type_val = webview_value_get_by_string(args, "type");
-                 WValue* modifiers_val = webview_value_get_by_string(args, "modifiers");
-                 WValue* windows_key_code_val = webview_value_get_by_string(args, "windows_key_code");
-                 WValue* native_key_code_val = webview_value_get_by_string(args, "native_key_code");
-                 WValue* is_system_key_val = webview_value_get_by_string(args, "is_system_key");
-                 WValue* character_val = webview_value_get_by_string(args, "character");
-                 WValue* unmodified_character_val = webview_value_get_by_string(args, "unmodified_character");
-
-                 if (type_val) key_event.type = (cef_key_event_type_t)webview_value_get_int(type_val);
-                 if (modifiers_val) key_event.modifiers = webview_value_get_int(modifiers_val);
-                 if (windows_key_code_val) key_event.windows_key_code = webview_value_get_int(windows_key_code_val);
-                 if (native_key_code_val) key_event.native_key_code = webview_value_get_int(native_key_code_val);
-                 if (is_system_key_val) key_event.is_system_key = webview_value_get_bool(is_system_key_val);
-                 if (character_val) key_event.character = webview_value_get_int(character_val);
-                 if (unmodified_character_val) key_event.unmodified_character = webview_value_get_int(unmodified_character_val);
-
-                 WValue* browser_id_val = webview_value_get_by_string(args, "browserId");
-                 if (browser_id_val) {
-                   plugin_->sendKeyEvent(webview_value_get_int(browser_id_val), key_event);
-                 } else {
-                   plugin_->sendKeyEvent(key_event);
-                 }
-                 result_ptr->Success();
-               } else {
-                 fprintf(stderr, "ELINUX: sendKeyEvent failed - arguments not a map\n");
-                 result_ptr->Error("error", "Invalid arguments for sendKeyEvent");
-               }
              } else {
                result_ptr->NotImplemented();
              }

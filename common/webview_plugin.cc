@@ -522,50 +522,6 @@ namespace webview_cef {
 				webview_value_unref(retValue);
 			});
 		}
-		else if (name.compare("sendKeyEvent") == 0)
-		{
-			if (webview_value_get_type(values) == Webview_Value_Type_Map)
-			{
-				CefKeyEvent key_event;
-				WValue *type_val = webview_value_get_by_string(values, "type");
-				WValue *modifiers_val = webview_value_get_by_string(values, "modifiers");
-				WValue *windows_key_code_val = webview_value_get_by_string(values, "windows_key_code");
-				WValue *native_key_code_val = webview_value_get_by_string(values, "native_key_code");
-				WValue *is_system_key_val = webview_value_get_by_string(values, "is_system_key");
-				WValue *character_val = webview_value_get_by_string(values, "character");
-				WValue *unmodified_character_val = webview_value_get_by_string(values, "unmodified_character");
-
-				if (type_val)
-					key_event.type = (cef_key_event_type_t)webview_value_get_int(type_val);
-				if (modifiers_val)
-					key_event.modifiers = webview_value_get_int(modifiers_val);
-				if (windows_key_code_val)
-					key_event.windows_key_code = webview_value_get_int(windows_key_code_val);
-				if (native_key_code_val)
-					key_event.native_key_code = webview_value_get_int(native_key_code_val);
-				if (is_system_key_val)
-					key_event.is_system_key = webview_value_get_bool(is_system_key_val);
-				if (character_val)
-					key_event.character = webview_value_get_int(character_val);
-				if (unmodified_character_val)
-					key_event.unmodified_character = webview_value_get_int(unmodified_character_val);
-
-				WValue *browser_id_val = webview_value_get_by_string(values, "browserId");
-				if (browser_id_val)
-				{
-					sendKeyEvent(webview_value_get_int(browser_id_val), key_event);
-				}
-				else
-				{
-					sendKeyEvent(key_event);
-				}
-				result(1, nullptr);
-			}
-			else
-			{
-				result(0, nullptr);
-			}
-		}
 		else
 		{
 			// CRITICAL: Call the callback with 0 so the platform plugin knows it's unhandled
@@ -573,13 +529,6 @@ namespace webview_cef {
 		}
 	}
 
-	void WebviewPlugin::sendKeyEvent(int browserId, CefKeyEvent& ev)
-	{
-		m_handler->sendKeyEvent(browserId, ev);
-		if(ev.type == KEYEVENT_RAWKEYDOWN && ev.windows_key_code == 0x7B && (ev.modifiers & EVENTFLAG_CONTROL_DOWN) != 0){
-			m_handler->openDevTools(browserId);
-		}
-	}
 
 	void WebviewPlugin::imeSetCompositionNative(const std::wstring& text, int cursor)
 	{
