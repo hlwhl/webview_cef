@@ -92,31 +92,14 @@ function(prepare_prebuilt_files filepath)
         file(MAKE_DIRECTORY ${filepath})
         extract_file(${CMAKE_CURRENT_SOURCE_DIR}/prebuilt.zip ${filepath})
 
+        ## Needed for making it run on arm64 Linux (makes it check for arm64 or aarch64 instead of just arm64)
         if(CMAKE_SYSTEM_NAME STREQUAL "Linux")
-            # 1. Fix architecture detection to support aarch64/arm64
             execute_process(
-                COMMAND sed -i "s/\"\\\${CMAKE_HOST_SYSTEM_PROCESSOR}\" STREQUAL \"arm64\"/(\"\\\${CMAKE_HOST_SYSTEM_PROCESSOR}\" STREQUAL \"arm64\" OR \"\\\${CMAKE_HOST_SYSTEM_PROCESSOR}\" STREQUAL \"aarch64\" OR \"\\\${CMAKE_SYSTEM_PROCESSOR}\" STREQUAL \"aarch64\" OR \"\\\${CMAKE_SYSTEM_PROCESSOR}\" STREQUAL \"arm64\")/" ${filepath}/cmake/cef_variables.cmake
-                WORKING_DIRECTORY ${CMAKE_CURRENT_SOURCE_DIR}
-            )
-
-            # 2. Remove incompatible x86-64 flags when targeting ARM
-            # This completely removes -march=x86-64 and -m64 from cef_variables.cmake
-            # so they don't cause issues during cross-compilation.
-            execute_process(
-                COMMAND sed -i "s/-march=x86-64//g" ${filepath}/cmake/cef_variables.cmake
-                WORKING_DIRECTORY ${CMAKE_CURRENT_SOURCE_DIR}
-            )
-
-            execute_process(
-                COMMAND sed -i "s/-m64//g" ${filepath}/cmake/cef_variables.cmake
+                COMMAND sed -i "s/\"\\\${CMAKE_HOST_SYSTEM_PROCESSOR}\" STREQUAL \"arm64\"/(\"\\\${CMAKE_HOST_SYSTEM_PROCESSOR}\" STREQUAL \"arm64\" OR \"\\\${CMAKE_HOST_SYSTEM_PROCESSOR}\" STREQUAL \"aarch64\")/" ${filepath}/cmake/cef_variables.cmake
                 WORKING_DIRECTORY ${CMAKE_CURRENT_SOURCE_DIR}
             )
         endif()
-        # Ensure we don't have broken lines from previous failed patching if file exists
-        execute_process(
-            COMMAND sed -i "/\$(test/d" ${filepath}/cmake/cef_variables.cmake
-            WORKING_DIRECTORY ${CMAKE_CURRENT_SOURCE_DIR}
-        )
+
         file(WRITE "${filepath}/version.txt" "${cef_prebuilt_version}")
         file(REMOVE_RECURSE ${CMAKE_CURRENT_SOURCE_DIR}/prebuilt.zip)
     endif()

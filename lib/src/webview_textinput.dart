@@ -93,7 +93,4 @@ mixin WebeViewTextInput implements DeltaTextInputClient {
 
   @override
   updateFloatingCursor(RawFloatingCursorPoint point) {}
-
-  @override
-  bool onFocusReceived() => false;
 }

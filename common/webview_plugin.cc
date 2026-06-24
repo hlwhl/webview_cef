@@ -1,6 +1,3 @@
-#include <unistd.h>
-#include <libgen.h>
-#include <limits.h>
 #include "webview_plugin.h"
 
 #ifdef OS_MAC
@@ -726,8 +723,7 @@ namespace webview_cef {
 		CefSettings cefs;
 		cefs.windowless_rendering_enabled = true;
 		cefs.no_sandbox = true;
-		if (!userAgent.empty())
-		{
+		if(!userAgent.empty()){
 			CefString(&cefs.user_agent_product) = userAgent;
 		}
 		//locale language setting
