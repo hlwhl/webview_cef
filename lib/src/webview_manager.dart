@@ -17,10 +17,10 @@ class WebviewManager extends ValueNotifier<bool> {
   final MethodChannel pluginChannel = const MethodChannel("webview_cef");
 
   final Map<int, WebViewController> _webViews = <int, WebViewController>{};
-  final Map<int, InjectUserScripts?> _injectUserScripts = <int, InjectUserScripts?>{};
+  final Map<int, InjectUserScripts?> _injectUserScripts = <int, InjectUserScripts>{};
 
   final Map<int, WebViewController> _tempWebViews = <int, WebViewController>{};
-  final Map<int, InjectUserScripts?> _tempInjectUserScripts = <int, InjectUserScripts?>{};
+  final Map<int, InjectUserScripts?> _tempInjectUserScripts = <int, InjectUserScripts>{};
 
   int nextIndex = 1;
 
@@ -29,11 +29,10 @@ class WebviewManager extends ValueNotifier<bool> {
   WebViewController createWebView({
     Widget? loading,
     InjectUserScripts? injectUserScripts,
-    double scrollSpeed = 1.0,
   }) {
     int browserIndex = nextIndex++;
-    final controller = WebViewController(pluginChannel, browserIndex,
-        loading: loading, scrollSpeed: scrollSpeed);
+    final controller =
+        WebViewController(pluginChannel, browserIndex, loading: loading);
     _tempWebViews[browserIndex] = controller;
     _tempInjectUserScripts[browserIndex] = injectUserScripts;
 
