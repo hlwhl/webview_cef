@@ -1,10 +1,8 @@
 import 'dart:async';
-import 'dart:io';
 
 import 'package:flutter/gestures.dart';
 import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
-import 'package:webview_cef/src/webview_inject_user_script.dart';
 
 import 'webview_manager.dart';
 import 'webview_events_listener.dart';
@@ -47,7 +45,7 @@ class WebViewController extends ValueNotifier<bool> {
           _javascriptChannels[channelName]!.onMessageReceived(
               JavascriptMessage(message, callbackId, frameId));
         } else {
-          print('Channel "$channelName" is not exstis');
+          debugPrint('Channel "$channelName" is not exists');
         }
       };
 
@@ -310,13 +308,13 @@ class WebViewController extends ValueNotifier<bool> {
   Function(String)? _onToolTip;
   Function(int)? _onCursorChanged;
   Function(bool editable)? _onFocusedNodeChangeMessage;
-  Function(int, int)? _onImeCompositionRangeChangedMessage;
+  Function(int, int, int)? _onImeCompositionRangeChangedMessage;
 }
 
 class WebView extends StatefulWidget {
   final WebViewController controller;
 
-  const WebView(this.controller, {Key? key}) : super(key: key);
+  const WebView(this.controller, {super.key});
 
   @override
   WebViewState createState() => WebViewState();
@@ -342,7 +340,9 @@ class WebViewState extends State<WebView> with WebeViewTextInput {
         if (d.composing.isValid) {
           _composingText += d.textInserted;
           _controller.imeSetComposition(_composingText);
-        } else if (!Platform.isWindows) {
+        } else {
+          // Directly committed text (e.g. English typing, or a commit delivered
+          // as a plain insertion). Must run on every platform, including Windows.
           _controller.imeCommitText(d.textInserted);
         }
       } else if (d is TextEditingDeltaDeletion) {
@@ -354,8 +354,14 @@ class WebViewState extends State<WebView> with WebeViewTextInput {
         }
       } else if (d is TextEditingDeltaReplacement) {
         if (d.composing.isValid) {
+          // Composition is still ongoing (preedit revised).
           _composingText = d.replacementText;
           _controller.imeSetComposition(_composingText);
+        } else {
+          // Composition finished (a candidate was selected): commit the final
+          // text. Without this the selected text was dropped and never shown.
+          _controller.imeCommitText(d.replacementText);
+          _composingText = '';
         }
       } else if (d is TextEditingDeltaNonTextUpdate) {
         if (_composingText.isNotEmpty) {
@@ -375,10 +381,10 @@ class WebViewState extends State<WebView> with WebeViewTextInput {
       _controller._focusEditable = editable;
     };
 
-    _controller._onImeCompositionRangeChangedMessage = (x, y) {
+    _controller._onImeCompositionRangeChangedMessage = (x, y, height) {
       final box = _key.currentContext!.findRenderObject() as RenderBox;
-      updateIMEComposionPosition(
-          x.toDouble(), y.toDouble(), box.localToGlobal(Offset.zero));
+      updateIMEComposionPosition(x.toDouble(), y.toDouble(), height.toDouble(),
+          box.localToGlobal(Offset.zero));
     };
 
     _controller._onToolTip = (final String text) {
@@ -532,7 +538,7 @@ class WebViewState extends State<WebView> with WebeViewTextInput {
           },
           onPointerDown: (ev) {
             if (!_focusNode.hasFocus) {
-              _controller._onImeCompositionRangeChangedMessage?.call(0, 0);
+              _controller._onImeCompositionRangeChangedMessage?.call(0, 0, 0);
               _focusNode.requestFocus();
               Future.delayed(const Duration(milliseconds: 50), () {
                 if (!_focusNode.hasFocus) {

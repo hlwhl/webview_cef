@@ -1,0 +1,56 @@
+name: Test if the example app still builds on macOS
+on:
+  push:
+    branches: ["main"]
+    paths:
+      - "common/**"
+      - "example/**"
+      - "lib/**"
+      - "macos/**"
+      - "pubspec.yaml"
+      - ".github/workflows/test_macos.yaml"
+  pull_request:
+    paths:
+      - "common/**"
+      - "example/**"
+      - "lib/**"
+      - "macos/**"
+      - "pubspec.yaml"
+      - ".github/workflows/test_macos.yaml"
+
+jobs:
+  main:
+    # macos-latest is Apple Silicon (arm64).
+    runs-on: macos-latest
+    steps:
+      - name: Clone repository
+        uses: actions/checkout@v4
+      - name: Set up Flutter
+        uses: subosito/flutter-action@v2
+        with:
+          channel: stable
+      - name: Install build tools
+        run: brew install ninja cmake
+      # macOS uses CocoaPods (not third/download.cmake), so the CEF framework and
+      # libcef_dll_wrapper must be placed into macos/third/cef manually.
+      # Keep CEF_VERSION in sync with third/download.cmake.
+      - name: Download CEF and build libcef_dll_wrapper
+        run: |
+          set -eo pipefail
+          CEF_VERSION="149.0.4+g2f1bfd8+chromium-149.0.7827.156"
+          NAME="cef_binary_${CEF_VERSION}_macosarm64"
+          URL_NAME=$(printf '%s' "$NAME" | sed 's/+/%2B/g')
+          curl -L -o cef.tar.bz2 "https://cef-builds.spotifycdn.com/${URL_NAME}.tar.bz2"
+          tar -xjf cef.tar.bz2
+          cmake -S "$NAME" -B "$NAME/build" -G Ninja -DPROJECT_ARCH=arm64 -DCMAKE_BUILD_TYPE=Release
+          cmake --build "$NAME/build" --target libcef_dll_wrapper
+          mkdir -p macos/third/cef
+          cp -R "$NAME/Release/Chromium Embedded Framework.framework" macos/third/cef/
+          cp "$NAME/build/libcef_dll_wrapper/libcef_dll_wrapper.a" macos/third/cef/
+      - run: flutter --version
+      - name: Analyze plugin
+        run: flutter analyze
+      - name: Analyze example
+        working-directory: example
+        run: flutter analyze
+      - run: cd example && flutter build macos

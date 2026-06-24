@@ -18,6 +18,19 @@ namespace webview_cef {
 	CefRefPtr<WebviewApp> app;
 	CefString userAgent;
 	bool isCefInitialized = false;
+#ifdef OS_MAC
+	std::string g_macSubprocessPath;
+	std::string g_macFrameworkDirPath;
+	std::string g_macMainBundlePath;
+
+	void setMacCEFPaths(const std::string& subprocessPath,
+	                    const std::string& frameworkDirPath,
+	                    const std::string& mainBundlePath) {
+		g_macSubprocessPath = subprocessPath;
+		g_macFrameworkDirPath = frameworkDirPath;
+		g_macMainBundlePath = mainBundlePath;
+	}
+#endif
 
 	WebviewPlugin::WebviewPlugin() {
 		m_handler = new WebviewHandler();
@@ -38,6 +51,12 @@ namespace webview_cef {
 			m_handler->onPaintCallback = [=, this](int browserId, const void* buffer, int32_t width, int32_t height) {
 				if (m_renderers.find(browserId) != m_renderers.end() && m_renderers[browserId] != nullptr) {
 					m_renderers[browserId]->onFrame(buffer, width, height);
+				}
+			};
+
+			m_handler->onAcceleratedPaintCallback = [=, this](int browserId, const void* sharedHandle, int32_t width, int32_t height, int32_t format) {
+				if (m_renderers.find(browserId) != m_renderers.end() && m_renderers[browserId] != nullptr) {
+					m_renderers[browserId]->onAcceleratedFrame(sharedHandle, width, height, format);
 				}
 			};
 
@@ -151,6 +170,15 @@ namespace webview_cef {
 
 			m_handler->onFocusedNodeChangeMessage = [=, this](int nBrowserId, bool bEditable)
 			{
+				// Track editable focus per browser so the platform layer can route
+				// raw character keys to the OS IME while a web input is focused
+				// (the IME/delta path handles text). Focus moving to a new node
+				// also ends any prior composition for that browser.
+				auto rit = m_renderers.find(nBrowserId);
+				if (rit != m_renderers.end() && rit->second) {
+					rit->second->editableFocused = bEditable;
+					rit->second->composing = false;
+				}
 				if (m_invokeFunc)
 				{
 					WValue* bId = webview_value_new_int(int64_t(nBrowserId));
@@ -165,7 +193,7 @@ namespace webview_cef {
 				}
 			};
 
-			m_handler->onImeCompositionRangeChangedMessage = [=, this](int nBrowserId, int32_t x, int32_t y)
+			m_handler->onImeCompositionRangeChangedMessage = [=, this](int nBrowserId, int32_t x, int32_t y, int32_t height)
 			{
 				if (m_invokeFunc)
 				{
@@ -173,13 +201,16 @@ namespace webview_cef {
 					WValue* retMap = webview_value_new_map();
 					WValue* xValue = webview_value_new_int(x);
 					WValue* yValue = webview_value_new_int(y);
+					WValue* hValue = webview_value_new_int(height);
 					webview_value_set_string(retMap, "browserId", bId);
 					webview_value_set_string(retMap, "x", xValue);
 					webview_value_set_string(retMap, "y", yValue);
+					webview_value_set_string(retMap, "height", hValue);
 					m_invokeFunc("onImeCompositionRangeChangedMessage", retMap);
 					webview_value_unref(bId);
 					webview_value_unref(xValue);
 					webview_value_unref(yValue);
+					webview_value_unref(hValue);
 					webview_value_unref(retMap);
 				}
 			};
@@ -223,6 +254,7 @@ namespace webview_cef {
 
 	void WebviewPlugin::uninitCallback(){
 		m_handler->onPaintCallback = nullptr;
+		m_handler->onAcceleratedPaintCallback = nullptr;
 		m_handler->onTooltipEvent = nullptr;
 		m_handler->onCursorChangedEvent = nullptr;
 		m_handler->onConsoleMessageEvent = nullptr;
@@ -325,27 +357,34 @@ namespace webview_cef {
 		else if (name.compare("imeSetComposition") == 0) {
 			int browserId = int(webview_value_get_int(webview_value_get_list_value(values, 0)));
 			const auto text = webview_value_get_string(webview_value_get_list_value(values, 1));
+			// Non-empty preedit → composition active; empty preedit means the IME
+			// cleared it (e.g. the user deleted the last composing letter).
+			setComposingForBrowser(browserId, text != nullptr && text[0] != '\0');
 			m_handler->imeSetComposition(browserId, text);
 			result(1, nullptr);
 		} 
 		else if (name.compare("imeCommitText") == 0) {
 			int browserId = int(webview_value_get_int(webview_value_get_list_value(values, 0)));
 			const auto text = webview_value_get_string(webview_value_get_list_value(values, 1));
+			// Commit ends the active composition.
+			setComposingForBrowser(browserId, false);
 			m_handler->imeCommitText(browserId, text);
 			result(1, nullptr);
 		} 
 		else if (name.compare("setClientFocus") == 0) {
 			int browserId = int(webview_value_get_int(webview_value_get_list_value(values, 0)));
 			if (m_renderers.find(browserId) != m_renderers.end() && m_renderers[browserId] != nullptr) {
-				m_renderers[browserId].get()->isFocused = webview_value_get_bool(webview_value_get_list_value(values, 1));
-				m_handler->setClientFocus(browserId, m_renderers[browserId].get()->isFocused);
+				bool focused = webview_value_get_bool(webview_value_get_list_value(values, 1));
+				m_renderers[browserId].get()->isFocused = focused;
+				// Losing focus ends any composition: the OS IME drops marked text,
+				// but CEF's SetFocus(false) does not blur the DOM node, so no
+				// FocusedNodeChanged fires to clear it — a stale flag would then
+				// mis-route the first keys after the webview is refocused.
+				if (!focused) {
+					m_renderers[browserId].get()->composing = false;
+				}
+				m_handler->setClientFocus(browserId, focused);
 			}
-			result(1, nullptr);
-		}
-		else if (name.compare("wasHidden") == 0) {
-			int browserId = int(webview_value_get_int(webview_value_get_list_value(values, 0)));
-			bool hidden = webview_value_get_bool(webview_value_get_list_value(values, 1));
-			m_handler->wasHidden(browserId, hidden);
 			result(1, nullptr);
 		}
 		else if(name.compare("setCookie") == 0){
@@ -545,6 +584,21 @@ namespace webview_cef {
 		}
 	}
 
+	void WebviewPlugin::imeSetCompositionNative(const std::wstring& text, int cursor)
+	{
+		m_handler->imeSetCompositionNative(text, cursor);
+	}
+
+	void WebviewPlugin::imeCommitTextNative(const std::wstring& text)
+	{
+		m_handler->imeCommitTextNative(text);
+	}
+
+	void WebviewPlugin::imeFinishCompositionNative()
+	{
+		m_handler->imeFinishComposition();
+	}
+
 	void WebviewPlugin::sendKeyEvent(CefKeyEvent& ev)
 	{
 		m_handler->sendKeyEvent(ev);
@@ -573,6 +627,46 @@ namespace webview_cef {
 			}
 		}
 		return false;
+	}
+
+	int WebviewPlugin::focusedBrowserId(){
+		for(auto& render : m_renderers){
+			if(render.second != nullptr && render.second->isFocused){
+				return render.first;
+			}
+		}
+		return -1;
+	}
+
+	bool WebviewPlugin::isEditableFocused(){
+		int id = focusedBrowserId();
+		if(id < 0){
+			return false;
+		}
+		auto it = m_renderers.find(id);
+		return it != m_renderers.end() && it->second && it->second->editableFocused;
+	}
+
+	bool WebviewPlugin::isComposing(){
+		int id = focusedBrowserId();
+		if(id < 0){
+			return false;
+		}
+		auto it = m_renderers.find(id);
+		return it != m_renderers.end() && it->second && it->second->composing;
+	}
+
+	void WebviewPlugin::setComposingForBrowser(int browserId, bool composing){
+		auto it = m_renderers.find(browserId);
+		if(it != m_renderers.end() && it->second){
+			it->second->composing = composing;
+		}
+	}
+
+	void WebviewPlugin::tickBeginFrame(){
+		if (m_handler) {
+			m_handler->sendExternalBeginFrame();
+		}
 	}
 	
 	int WebviewPlugin::cursorAction(WValue *args, std::string name) {
@@ -616,6 +710,14 @@ namespace webview_cef {
 #endif
 		// handler = new WebviewHandler();
 		app = new WebviewApp();
+#ifdef OS_MAC
+		// No bundled helper resolved → fall back to single-process so consumers
+		// that haven't added the CEF helper apps keep working (mode 3 appends
+		// the "single-process" switch in OnBeforeCommandLineProcessing).
+		if (g_macSubprocessPath.empty()) {
+			app->SetProcessMode(3);
+		}
+#endif
 		return CefExecuteProcess(mainArgs, app, nullptr);
 	}
 
@@ -633,7 +735,17 @@ namespace webview_cef {
 #ifdef OS_MAC
 		//cef message loop handle by MainApplication on mac
 		cefs.external_message_pump = true;
-		//CefString(&cefs.browser_subprocess_path) = "/Library/Chaches"; //the helper Program path
+		// Multi-process: point CEF at the bundled helper executable and the
+		// framework. The platform layer fills these from the app bundle.
+		if (!g_macSubprocessPath.empty()) {
+			CefString(&cefs.browser_subprocess_path) = g_macSubprocessPath;
+		}
+		if (!g_macFrameworkDirPath.empty()) {
+			CefString(&cefs.framework_dir_path) = g_macFrameworkDirPath;
+		}
+		if (!g_macMainBundlePath.empty()) {
+			CefString(&cefs.main_bundle_path) = g_macMainBundlePath;
+		}
 #else
 		//cef message run in another thread on windows/linux
 		cefs.multi_threaded_message_loop = true;

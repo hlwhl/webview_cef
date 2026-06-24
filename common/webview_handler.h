@@ -28,6 +28,12 @@ struct browser_info{
     bool is_dragging = false;
     CefRect prev_ime_position = CefRect();
     bool is_ime_commit = false;
+    // Focus the host requested (via setClientFocus) and whether it has been
+    // re-asserted after the first rendered frame. With external_begin_frame the
+    // browser isn't input/focus-ready until frames flow, so a SetFocus issued
+    // right after creation is lost; we re-apply it once the first frame lands.
+    bool wants_focus = false;
+    bool focus_reasserted = false;
 };
 
 class WebviewHandler : public CefClient,
@@ -37,8 +43,12 @@ public CefFocusHandler,
 public CefLoadHandler,
 public CefRenderHandler{
 public:
-    //Paint callback
+    //Paint callback (software off-screen rendering)
     std::function<void(int browserId, const void* buffer, int32_t width, int32_t height)> onPaintCallback;
+    //Accelerated paint callback (GPU shared texture). On Windows |sharedHandle|
+    //is the OnAcceleratedPaint shared-texture HANDLE; |format| is a
+    //cef_color_type_t. Only fired when shared textures are enabled.
+    std::function<void(int browserId, const void* sharedHandle, int32_t width, int32_t height, int32_t format)> onAcceleratedPaintCallback;
     //cef message event
     std::function<void(int browserId, std::string url)> onUrlChangedEvent;
     std::function<void(int browserId, std::string title)> onTitleChangedEvent;
@@ -46,7 +56,7 @@ public:
     std::function<void(int browserId, std::string text)> onTooltipEvent;
     std::function<void(int browserId, int level, std::string message, std::string source, int line)>onConsoleMessageEvent;
     std::function<void(int browserId, bool editable)> onFocusedNodeChangeMessage;
-    std::function<void(int browserId, int32_t x, int32_t y)> onImeCompositionRangeChangedMessage;
+    std::function<void(int browserId, int32_t x, int32_t y, int32_t height)> onImeCompositionRangeChangedMessage;
     //webpage message
     std::function<void(std::string, std::string, std::string, int browserId, std::string)> onJavaScriptChannelMessage;
     std::function<void(int browserId, std::string url)> onLoadStart;
@@ -98,9 +108,9 @@ public:
     virtual void OnBeforeClose(CefRefPtr<CefBrowser> browser) override;
     virtual bool OnBeforePopup(CefRefPtr<CefBrowser> browser,
                                CefRefPtr<CefFrame> frame,
-                               int popup_id, // Add this parameter
-                               const CefString &target_url,
-                               const CefString &target_frame_name,
+                               int popup_id,
+                               const CefString& target_url,
+                               const CefString& target_frame_name,
                                WindowOpenDisposition target_disposition,
                                bool user_gesture,
                                const CefPopupFeatures &popupFeatures,
@@ -130,6 +140,7 @@ public:
     // CefRenderHandler methods:
     virtual void GetViewRect(CefRefPtr<CefBrowser> browser, CefRect& rect) override;
     virtual void OnPaint(CefRefPtr<CefBrowser> browser, PaintElementType type, const RectList& dirtyRects, const void* buffer, int width, int height) override;
+    virtual void OnAcceleratedPaint(CefRefPtr<CefBrowser> browser, PaintElementType type, const RectList& dirtyRects, const CefAcceleratedPaintInfo& info) override;
     virtual bool GetScreenInfo(CefRefPtr<CefBrowser> browser, CefScreenInfo& screen_info) override;
     virtual bool StartDragging(CefRefPtr<CefBrowser> browser,
                                CefRefPtr<CefDragData> drag_data,
@@ -140,12 +151,18 @@ public:
 
     // Request that all existing browser windows close.
     void CloseAllBrowsers(bool force_close);
-    
-    // Returns true if the Chrome runtime is enabled.
-    static bool IsChromeRuntimeEnabled();
 
     void closeBrowser(int browserId);
     void createBrowser(std::string url, std::function<void(int)> callback);
+
+    // Drives one external BeginFrame for every live browser (GPU path only).
+    // Marshals to the CEF UI thread; safe to call from any thread.
+    void sendExternalBeginFrame();
+
+    // Diagnostic (GPU path): warn once if no accelerated-paint frame has arrived
+    // shortly after a browser is created — the symptom of an unavailable GPU
+    // shared texture, which would otherwise be a silent black webview.
+    void warnIfNoAcceleratedFrame();
 
     void sendScrollEvent(int browserId, int x, int y, int deltaX, int deltaY);
     void changeSize(int browserId, float a_dpi, int width, int height);
@@ -162,7 +179,13 @@ public:
     void imeSetComposition(int browserId, std::string text);
     void imeCommitText(int browserId, std::string text);
     void setClientFocus(int browserId, bool focus);
-    void wasHidden(int browserId, bool hidden);
+
+    // Native IME pipeline (Windows WM_IME_*): operate on the currently focused
+    // browser. |text| is UTF-16 read from the IMM composition string.
+    CefRefPtr<CefBrowser> getFocusedBrowser();
+    void imeSetCompositionNative(const std::wstring& text, int cursor);
+    void imeCommitTextNative(const std::wstring& text);
+    void imeFinishComposition();
 
     void setCookie(const std::string& domain, const std::string& key, const std::string& value);
     void deleteCookie(const std::string& domain, const std::string& key);
@@ -178,6 +201,15 @@ private:
     std::unordered_map<int, browser_info> browser_map_;
 
     std::unordered_map<std::string, std::function<void(CefRefPtr<CefValue>)>> js_callbacks_;
+
+#ifdef WEBVIEW_CEF_GPU_TEXTURE
+    // GPU diagnostic state: whether any accelerated-paint frame has arrived, and
+    // whether the "no GPU frame" warning was already logged (log it once).
+    // Only declared on GPU builds so non-GPU builds don't see unused fields.
+    bool received_accelerated_frame_ = false;
+    bool gpu_warning_logged_ = false;
+#endif
+
     // Include the default reference counting implementation.
     IMPLEMENT_REFCOUNTING(WebviewHandler);
 

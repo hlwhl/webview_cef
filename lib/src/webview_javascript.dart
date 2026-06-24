@@ -1,5 +1,4 @@
 /// A message that was sent by JavaScript code running in a [WebView].
-
 class JavascriptMessage {
   /// Constructs a JavaScript message object.
   ///
@@ -45,4 +44,4 @@ class JavascriptChannel {
 }
 
 /// Callback type for handling messages sent from Javascript running in a web view.
-typedef void JavascriptMessageHandler(JavascriptMessage message);
+typedef JavascriptMessageHandler = void Function(JavascriptMessage message);

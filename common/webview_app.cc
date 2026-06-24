@@ -103,23 +103,27 @@ void WebviewApp::OnBeforeCommandLineProcessing(const CefString &process_type, Ce
     // Pass additional command-line flags to the browser process.
 	if (process_type.empty())
 	{
+#ifndef WEBVIEW_CEF_GPU_TEXTURE
+		// The GPU shared-texture path (OnAcceleratedPaint) requires the GPU
+		// compositor; only allow disabling the GPU when it is not compiled in.
 		if (!m_bEnableGPU)
 		{
 			command_line->AppendSwitch("disable-gpu");
 			command_line->AppendSwitch("disable-gpu-compositing");
 		}
+#endif
 
 		command_line->AppendSwitch("disable-web-security");                                     //disable web security
 		command_line->AppendSwitch("allow-running-insecure-content");                           //allow running insecure content in secure pages
 		// Don't create a "GPUCache" directory when cache-path is unspecified.
 		command_line->AppendSwitch("disable-gpu-shader-disk-cache");                            //disable gpu shader disk cache
-        command_line->AppendSwitch("no-sanbox");                       
+        command_line->AppendSwitch("no-sandbox");
 
 		//http://www.chromium.org/developers/design-documents/process-models
 		if (m_uMode == 1)
 		{
 			command_line->AppendSwitch("process-per-site");                                     //each site in its own process
-			command_line->AppendSwitchWithValue("renderer-process-limit ", "8");              //limit renderer process count to decrease memory usage
+			command_line->AppendSwitchWithValue("renderer-process-limit", "8");              //limit renderer process count to decrease memory usage
 		}
 		else if (m_uMode == 2)
 		{
@@ -158,7 +162,9 @@ void WebviewApp::OnBeforeCommandLineProcessing(const CefString &process_type, Ce
 
 #ifdef __APPLE__
     command_line->AppendSwitch("use-mock-keychain");
-    command_line->AppendSwitch("single-process");
+    // macOS now runs multi-process via bundled CEF helper apps (see the
+    // example Runner's "Embed CEF Helpers" phase). The process model is
+    // selected by m_uMode above, like the other platforms.
 #endif
 #ifdef __linux__
 
@@ -316,6 +322,7 @@ void WebviewApp::OnFocusedNodeChanged(CefRefPtr<CefBrowser> browser, CefRefPtr<C
         CefRect rect = node->GetElementBounds();
         message->GetArgumentList()->SetInt(1, rect.x);
         message->GetArgumentList()->SetInt(2, rect.y + rect.height);
+        message->GetArgumentList()->SetInt(3, rect.height);
     }
     frame->SendProcessMessage(PID_BROWSER, message);
 }
