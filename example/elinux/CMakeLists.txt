@@ -87,6 +87,15 @@ if(PLUGIN_BUNDLED_LIBRARIES)
     COMPONENT Runtime)
 endif()
 
+# Copy CEF locales to bundle
+set(CEF_RESOURCE_DIR "${CMAKE_CURRENT_SOURCE_DIR}/../../third/cef/Resources")
+file(GLOB CEF_LOCALE_FILES "${CEF_RESOURCE_DIR}/locales/*.pak")
+foreach(LOCALE_FILE ${CEF_LOCALE_FILES})
+  install(FILES "${LOCALE_FILE}"
+          DESTINATION "${INSTALL_BUNDLE_LIB_DIR}/locales"
+          COMPONENT Runtime)
+endforeach()
+
 # Fully re-copy the assets directory on each build to avoid having stale files
 # from a previous install.
 set(FLUTTER_ASSET_DIR_NAME "flutter_assets")
