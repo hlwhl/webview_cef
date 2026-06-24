@@ -522,13 +522,10 @@ namespace webview_cef {
 				webview_value_unref(retValue);
 			});
 		}
-		else
-		{
-			// CRITICAL: Call the callback with 0 so the platform plugin knows it's unhandled
-			result(0, nullptr);
+		else {
+			result = 0;
 		}
 	}
-
 
 	void WebviewPlugin::imeSetCompositionNative(const std::wstring& text, int cursor)
 	{

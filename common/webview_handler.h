@@ -168,7 +168,6 @@ public:
     void changeSize(int browserId, float a_dpi, int width, int height);
     void cursorClick(int browserId, int x, int y, bool up);
     void cursorMove(int browserId, int x, int y, bool dragging);
-    void sendKeyEvent(int browserId, CefKeyEvent& ev);
     void sendKeyEvent(CefKeyEvent& ev);
     void loadUrl(int browserId, std::string url);
     void goForward(int browserId);
