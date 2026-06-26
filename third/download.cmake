@@ -6,7 +6,10 @@ set(CEF_VERSION "149.0.4+g2f1bfd8+chromium-149.0.7827.156")
 
 if(CMAKE_SYSTEM_NAME STREQUAL "Linux")
     message(WARNING "current system is Linux")
-    if(CMAKE_HOST_SYSTEM_PROCESSOR STREQUAL "aarch64")
+        if(CMAKE_SYSTEM_PROCESSOR STREQUAL "aarch64" OR
+           CMAKE_SYSTEM_PROCESSOR STREQUAL "arm64" OR
+           CMAKE_CXX_COMPILER_TARGET MATCHES "aarch64" OR
+           CMAKE_CXX_COMPILER_TARGET MATCHES "arm64")
         set(cef_prebuilt_version "cef_binary_${CEF_VERSION}_linuxarm64.tar.bz2")
     else()
         set(cef_prebuilt_version "cef_binary_${CEF_VERSION}_linux64.tar.bz2")
