@@ -458,6 +458,32 @@ namespace webview_cef {
 			m_handler->sendJavaScriptChannelCallBack(error, ret, callbackId, browserId, frameId);
 			result(1, nullptr);
 		}
+		else if (name.compare("sendKeyEvent") == 0) {
+			int type = int(webview_value_get_int(webview_value_get_list_value(values, 1)));
+			int keyCode = int(webview_value_get_int(webview_value_get_list_value(values, 2)));
+			int modifiers = int(webview_value_get_int(webview_value_get_list_value(values, 3)));
+			int character = int(webview_value_get_int(webview_value_get_list_value(values, 4)));
+			int unmodifiedCharacter = int(webview_value_get_int(webview_value_get_list_value(values, 5)));
+			
+			CefKeyEvent keyEvent;
+			keyEvent.type = static_cast<cef_key_event_type_t>(type);
+			keyEvent.windows_key_code = keyCode;
+			keyEvent.modifiers = modifiers;
+			keyEvent.character = character;
+			keyEvent.unmodified_character = unmodifiedCharacter;
+			
+			sendKeyEvent(keyEvent);
+			result(1, nullptr);
+		}
+		else if(name.compare("hasNativeKeySupport") == 0) {
+#ifdef HAS_GTK
+			// Desktop Linux has GTK native key support via processKeyEventForCEF
+			result(1, webview_value_new_bool(true));
+#else
+			// eLinux (no GTK), Windows, macOS: use Dart-side or platform-specific handling
+			result(1, webview_value_new_bool(false));
+#endif
+		}
 		else if(name.compare("executeJavaScript") == 0){
 			int browserId = int(webview_value_get_int(webview_value_get_list_value(values, 0)));
 			const auto code = webview_value_get_string(webview_value_get_list_value(values, 1));

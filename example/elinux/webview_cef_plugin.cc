@@ -82,39 +82,6 @@ void WebviewCefPlugin::HandleMethodCall(
       shared_result->Success(EncodeWValue(responseArgs));
     } else if (ret < 0) {
       shared_result->Error("error", "error", EncodeWValue(responseArgs));
-    } else if (method == "sendKeyEvent") {
-        // Handle sendKeyEvent separately if needed, but it seems common code might handle it if ret == 0?
-        // Actually the GTK implementation had special handling for sendKeyEvent when ret == 0.
-        // Let's check if we can replicate it.
-        if (webview_value_get_type(args) == Webview_Value_Type_Map) {
-            CefKeyEvent key_event;
-            WValue* browser_id_val = webview_value_get_by_string(args, "browserId");
-            WValue* type_val = webview_value_get_by_string(args, "type");
-            WValue* modifiers_val = webview_value_get_by_string(args, "modifiers");
-            WValue* windows_key_code_val = webview_value_get_by_string(args, "windows_key_code");
-            WValue* native_key_code_val = webview_value_get_by_string(args, "native_key_code");
-            WValue* is_system_key_val = webview_value_get_by_string(args, "is_system_key");
-            WValue* character_val = webview_value_get_by_string(args, "character");
-            WValue* unmodified_character_val = webview_value_get_by_string(args, "unmodified_character");
-
-            if (type_val) key_event.type = (cef_key_event_type_t)webview_value_get_int(type_val);
-            if (modifiers_val) key_event.modifiers = webview_value_get_int(modifiers_val);
-            if (windows_key_code_val) key_event.windows_key_code = webview_value_get_int(windows_key_code_val);
-            if (native_key_code_val) key_event.native_key_code = webview_value_get_int(native_key_code_val);
-            if (is_system_key_val) key_event.is_system_key = webview_value_get_bool(is_system_key_val);
-            if (character_val) key_event.character = webview_value_get_int(character_val);
-            if (unmodified_character_val) key_event.unmodified_character = webview_value_get_int(unmodified_character_val);
-
-            if (browser_id_val) {
-                int browser_id = webview_value_get_int(browser_id_val);
-                plugin_->sendKeyEvent(browser_id, key_event);
-            } else {
-                plugin_->sendKeyEvent(key_event);
-            }
-            shared_result->Success();
-        } else {
-            shared_result->Error("error", "Invalid arguments for sendKeyEvent");
-        }
     } else {
       shared_result->NotImplemented();
     }

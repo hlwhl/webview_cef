@@ -24,7 +24,16 @@ class WebviewManager extends ValueNotifier<bool> {
 
   int nextIndex = 1;
 
+  bool? _hasNativeKeySupport;
+
   get ready => _creatingCompleter.future;
+
+  /// Returns true if the platform has native key event handling (e.g., GTK on desktop Linux).
+  /// When false, Dart-side key handling should be used (e.g., eLinux).
+  Future<bool> get hasNativeKeySupport async {
+    _hasNativeKeySupport ??= await pluginChannel.invokeMethod<bool>('hasNativeKeySupport') ?? false;
+    return _hasNativeKeySupport!;
+  }
 
   WebViewController createWebView({
     Widget? loading,
