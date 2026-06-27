@@ -1,121 +1,139 @@
 #!/usr/bin/env bash
 #
-# Download the official CEF "Standard Distribution" for macOS and prepare
-# macos/third/cef for the CocoaPods build. This is the macOS counterpart of
-# the CMake `prepare_prebuilt_files` path used on Windows/Linux
-# (see third/download.cmake): nothing under macos/third/cef is tracked in git;
-# it is fetched/built on demand.
+# Downloads and installs the prebuilt CEF (Chromium Embedded Framework) binaries
+# for macOS into macos/third/cef so that `pod install` / the build can link them.
 #
-# It performs three steps that previously had to be done by hand (see README):
-#   1. download + extract the CEF distribution (provides include/ headers)
-#   2. lay the framework out as a versioned macOS bundle (Versions/A + symlinks)
-#   3. build libcef_dll_wrapper.a from the distribution's sources
+# This is invoked automatically from webview_cef.podspec, but can also be run by
+# hand. It mirrors the auto-download approach Windows already uses in
+# windows/cmake/Downloader.cmake.
 #
-# The CEF version is read from third/download.cmake so there is a single source
-# of truth shared with Windows/Linux. Re-running is cheap: if the destination is
-# already populated for the pinned version it exits immediately.
+# Architecture selection (highest priority first):
+#   1. WEBVIEW_CEF_MACOS_ARCH env var: "arm64" | "intel" | "universal"
+#   2. host architecture via `uname -m` (arm64 -> arm64, x86_64 -> intel)
 #
-# Override the wrapper build type with CEF_WRAPPER_BUILD_TYPE=Release (defaults
-# to Debug to match `flutter run` / `flutter build macos --debug`).
+# Examples:
+#   bash macos/scripts/download_cef.sh
+#   WEBVIEW_CEF_MACOS_ARCH=universal bash macos/scripts/download_cef.sh
+#
 set -euo pipefail
 
+# --- Configuration ----------------------------------------------------------
+
+CEF_VERSION="103.0.12"
+
+ARM64_URL="https://github.com/hlwhl/webview_cef/releases/download/prebuilt_cef_bin_mac_arm64/CEFbins-mac103.0.12-arm64.zip"
+INTEL_URL="https://github.com/hlwhl/webview_cef/releases/download/prebuilt_cef_bin_mac_intel/mac103.0.12-Intel.zip"
+UNIVERSAL_URL="https://github.com/hlwhl/webview_cef/releases/download/prebuilt_cef_bin_mac_universal/mac103.0.12-universal.zip"
+
+FRAMEWORK_NAME="Chromium Embedded Framework.framework"
+WRAPPER_NAME="libcef_dll_wrapper.a"
+
+# --- Paths ------------------------------------------------------------------
+
 SCRIPT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
-MACOS_DIR="$(cd "${SCRIPT_DIR}/.." && pwd)"          # .../macos
-REPO_ROOT="$(cd "${MACOS_DIR}/.." && pwd)"           # repo root
-DEST="${MACOS_DIR}/third/cef"                        # where the podspec looks
-DOWNLOAD_CMAKE="${REPO_ROOT}/third/download.cmake"
-BUILD_TYPE="${CEF_WRAPPER_BUILD_TYPE:-Debug}"
-CDN="https://cef-builds.spotifycdn.com"
+THIRD_DIR="$(cd "${SCRIPT_DIR}/.." && pwd)/third/cef"
+MARKER_FILE="${THIRD_DIR}/.cef_version"
 
-err() { echo "error: $*" >&2; exit 1; }
+# --- Helpers ----------------------------------------------------------------
 
-# --- resolve version (single source of truth: third/download.cmake) ----------
-[ -f "${DOWNLOAD_CMAKE}" ] || err "cannot find ${DOWNLOAD_CMAKE}"
-CEF_VERSION="$(sed -n 's/^[[:space:]]*set(CEF_VERSION[[:space:]]*"\(.*\)").*/\1/p' "${DOWNLOAD_CMAKE}" | head -1)"
-[ -n "${CEF_VERSION}" ] || err "could not parse CEF_VERSION from ${DOWNLOAD_CMAKE}"
+log()  { printf '[webview_cef] %s\n' "$*"; }
+fail() {
+  printf '[webview_cef] ERROR: %s\n' "$*" >&2
+  printf '[webview_cef] Falling back is possible: download the CEF zip manually and\n' >&2
+  printf '[webview_cef] unzip its contents into:\n  %s\n' "${THIRD_DIR}" >&2
+  printf '[webview_cef] See the macOS setup section of the README for the links.\n' >&2
+  exit 1
+}
 
-case "$(uname -m)" in
-  arm64)  CEF_ARCH="macosarm64"; PROJECT_ARCH="arm64" ;;
-  x86_64) CEF_ARCH="macosx64";   PROJECT_ARCH="x86_64" ;;
-  *)      err "unsupported arch: $(uname -m)" ;;
+# --- Resolve target architecture -------------------------------------------
+
+ARCH="${WEBVIEW_CEF_MACOS_ARCH:-}"
+if [ -z "${ARCH}" ]; then
+  case "$(uname -m)" in
+    arm64)  ARCH="arm64" ;;
+    x86_64) ARCH="intel" ;;
+    *)      fail "Unsupported host architecture '$(uname -m)'. Set WEBVIEW_CEF_MACOS_ARCH to arm64, intel, or universal." ;;
+  esac
+fi
+
+case "${ARCH}" in
+  arm64)     URL="${ARM64_URL}" ;;
+  intel)     URL="${INTEL_URL}" ;;
+  universal) URL="${UNIVERSAL_URL}" ;;
+  *)         fail "Invalid WEBVIEW_CEF_MACOS_ARCH='${ARCH}'. Expected arm64, intel, or universal." ;;
 esac
 
-PKG="cef_binary_${CEF_VERSION}_${CEF_ARCH}"
-STAMP="${DEST}/version.txt"
-WANT="${CEF_VERSION}_${CEF_ARCH}_${BUILD_TYPE}"
+EXPECTED_MARKER="${CEF_VERSION}-${ARCH}"
 
-# --- skip if already prepared for this exact version/arch/type ---------------
-if [ -f "${STAMP}" ] && [ "$(cat "${STAMP}" 2>/dev/null)" = "${WANT}" ] \
-   && [ -f "${DEST}/libcef_dll_wrapper.a" ] \
-   && [ -f "${DEST}/cef_helper" ] \
-   && [ -e "${DEST}/Chromium Embedded Framework.framework/Resources/Info.plist" ] \
-   && [ -f "${DEST}/include/cef_version.h" ]; then
-  echo "CEF ${WANT} already prepared in ${DEST} — nothing to do."
+# --- Skip if already installed and matching --------------------------------
+
+if [ -d "${THIRD_DIR}/${FRAMEWORK_NAME}" ] && \
+   [ -f "${THIRD_DIR}/${WRAPPER_NAME}" ] && \
+   [ -f "${MARKER_FILE}" ] && \
+   [ "$(cat "${MARKER_FILE}" 2>/dev/null)" = "${EXPECTED_MARKER}" ]; then
+  log "CEF ${EXPECTED_MARKER} already installed in third/cef — skipping download."
   exit 0
 fi
 
-command -v cmake >/dev/null || err "cmake not found (brew install cmake) — needed to build libcef_dll_wrapper"
-if command -v ninja >/dev/null && ninja --version >/dev/null 2>&1; then
-  GENERATOR="Ninja"; BUILD_TOOL=(ninja libcef_dll_wrapper)
-else
-  GENERATOR="Unix Makefiles"; BUILD_TOOL=(make -j"$(sysctl -n hw.ncpu)" libcef_dll_wrapper)
+command -v curl  >/dev/null 2>&1 || fail "'curl' is required but was not found."
+command -v unzip >/dev/null 2>&1 || fail "'unzip' is required but was not found."
+
+# --- Download & extract -----------------------------------------------------
+
+mkdir -p "${THIRD_DIR}"
+
+TMP_DIR="$(mktemp -d "${TMPDIR:-/tmp}/webview_cef_cef.XXXXXX")"
+cleanup() { rm -rf "${TMP_DIR}"; }
+trap cleanup EXIT
+
+ZIP_PATH="${TMP_DIR}/cef.zip"
+
+log "Downloading CEF ${CEF_VERSION} (${ARCH}) ..."
+log "  ${URL}"
+curl -L --fail --progress-bar -o "${ZIP_PATH}" "${URL}" \
+  || fail "Download failed from ${URL}"
+
+log "Extracting ..."
+unzip -q "${ZIP_PATH}" -d "${TMP_DIR}/extracted" \
+  || fail "Failed to unzip ${ZIP_PATH}"
+
+# These zips are created on macOS and carry a parallel __MACOSX/ tree of
+# AppleDouble (._*) resource-fork files, including a shadow copy of the
+# .framework directory. Remove it so the artifact search below cannot match the
+# hollow shadow instead of the real framework.
+find "${TMP_DIR}/extracted" -type d -name "__MACOSX" -prune -exec rm -rf {} + 2>/dev/null || true
+
+# The three release zips differ in internal nesting, so locate each artifact
+# wherever it landed in the extracted tree instead of assuming a fixed layout.
+SRC_FRAMEWORK="$(find "${TMP_DIR}/extracted" -path '*__MACOSX*' -prune -o -type d -name "${FRAMEWORK_NAME}" -print -quit || true)"
+SRC_WRAPPER="$(find "${TMP_DIR}/extracted" -path '*__MACOSX*' -prune -o -type f -name "${WRAPPER_NAME}" -print -quit || true)"
+SRC_INCLUDE="$(find "${TMP_DIR}/extracted" -path '*__MACOSX*' -prune -o -type d -name "include" -print -quit || true)"
+
+[ -n "${SRC_FRAMEWORK}" ] || fail "Could not find '${FRAMEWORK_NAME}' inside the downloaded archive."
+[ -n "${SRC_WRAPPER}" ]   || fail "Could not find '${WRAPPER_NAME}' inside the downloaded archive."
+
+# Install framework (replace any existing copy).
+log "Installing ${FRAMEWORK_NAME} ..."
+rm -rf "${THIRD_DIR:?}/${FRAMEWORK_NAME}"
+mv "${SRC_FRAMEWORK}" "${THIRD_DIR}/${FRAMEWORK_NAME}"
+
+# Install wrapper static library.
+log "Installing ${WRAPPER_NAME} ..."
+rm -f "${THIRD_DIR}/${WRAPPER_NAME}"
+mv "${SRC_WRAPPER}" "${THIRD_DIR}/${WRAPPER_NAME}"
+
+# Headers are committed to the repo, so only install them when missing (e.g. a
+# CEF version bump or a partial checkout). Avoids needlessly churning tracked files.
+if [ -n "${SRC_INCLUDE}" ] && [ ! -d "${THIRD_DIR}/include" ]; then
+  log "Installing CEF headers (include/) ..."
+  mv "${SRC_INCLUDE}" "${THIRD_DIR}/include"
 fi
 
-WORK="$(mktemp -d "${TMPDIR:-/tmp}/cef_dl.XXXXXX")"
-trap 'rm -rf "${WORK}"' EXIT
-TARBALL="${WORK}/${PKG}.tar.bz2"
-# CDN requires '+' percent-encoded as %2B.
-URL="${CDN}/$(printf '%s' "${PKG}.tar.bz2" | sed 's/+/%2B/g')"
+# Sanity-check the install: a hollow .framework (no Mach-O binary) links fine at
+# pod install time but fails the app at runtime, so verify the binary is present.
+FRAMEWORK_BINARY="${THIRD_DIR}/${FRAMEWORK_NAME}/Chromium Embedded Framework"
+[ -f "${FRAMEWORK_BINARY}" ] || fail "Installed framework is missing its Mach-O binary at '${FRAMEWORK_BINARY}'. The archive layout may have changed."
 
-echo "==> Downloading ${PKG}.tar.bz2"
-curl -L --fail --connect-timeout 30 -o "${TARBALL}" "${URL}"
+printf '%s' "${EXPECTED_MARKER}" > "${MARKER_FILE}"
 
-echo "==> Extracting"
-tar -xjf "${TARBALL}" -C "${WORK}"
-SRC="${WORK}/${PKG}"
-[ -d "${SRC}" ] || err "extracted dir ${SRC} not found"
-
-echo "==> Building libcef_dll_wrapper (${BUILD_TYPE}, ${PROJECT_ARCH})"
-cmake -S "${SRC}" -B "${SRC}/build" -G "${GENERATOR}" \
-  -DPROJECT_ARCH="${PROJECT_ARCH}" -DCMAKE_BUILD_TYPE="${BUILD_TYPE}" \
-  -DCMAKE_OSX_DEPLOYMENT_TARGET=12.0 >/dev/null
-( cd "${SRC}/build" && "${BUILD_TOOL[@]}" >/dev/null )
-WRAPPER="${SRC}/build/libcef_dll_wrapper/libcef_dll_wrapper.a"
-[ -f "${WRAPPER}" ] || err "libcef_dll_wrapper.a was not produced"
-
-echo "==> Installing into ${DEST}"
-rm -rf "${DEST}/include" "${DEST}/Chromium Embedded Framework.framework" \
-       "${DEST}/libcef_dll_wrapper.a" "${STAMP}"
-mkdir -p "${DEST}"
-cp -R "${SRC}/include" "${DEST}/include"
-cp "${WRAPPER}" "${DEST}/libcef_dll_wrapper.a"
-
-# Lay the framework out as a versioned macOS bundle (Xcode embed/sign requires
-# Versions/Current/Resources/Info.plist; CEF ships a flat bundle).
-FW_SRC="${SRC}/Release/Chromium Embedded Framework.framework"
-FW_DST="${DEST}/Chromium Embedded Framework.framework"
-mkdir -p "${FW_DST}/Versions/A"
-cp -R "${FW_SRC}/Chromium Embedded Framework" "${FW_DST}/Versions/A/"
-cp -R "${FW_SRC}/Libraries" "${FW_DST}/Versions/A/"
-cp -R "${FW_SRC}/Resources" "${FW_DST}/Versions/A/"
-ln -sfn A "${FW_DST}/Versions/Current"
-ln -sfn "Versions/Current/Chromium Embedded Framework" "${FW_DST}/Chromium Embedded Framework"
-ln -sfn Versions/Current/Libraries "${FW_DST}/Libraries"
-ln -sfn Versions/Current/Resources "${FW_DST}/Resources"
-
-# Build the standalone CEF helper executable used by the multi-process helper
-# bundles (embed_cef_helpers.sh clones this into the 5 named .app bundles).
-# It links the wrapper statically; the framework is dlopen'd at runtime
-# (LoadInHelper), so it does not link the framework here.
-echo "==> Building CEF helper executable"
-clang++ -std=c++20 -stdlib=libc++ -mmacosx-version-min=12.0 -w \
-  -I "${DEST}" -I "${REPO_ROOT}/common" \
-  "${MACOS_DIR}/helper/cef_helper_main.mm" \
-  "${DEST}/libcef_dll_wrapper.a" \
-  -framework Foundation -framework AppKit \
-  -Wl,-ObjC \
-  -o "${DEST}/cef_helper"
-[ -f "${DEST}/cef_helper" ] || err "cef_helper was not produced"
-
-echo "${WANT}" > "${STAMP}"
-echo "==> Done: CEF ${CEF_VERSION} (${CEF_ARCH}, wrapper ${BUILD_TYPE}) ready in ${DEST}"
+log "Done. CEF ${EXPECTED_MARKER} installed into third/cef."

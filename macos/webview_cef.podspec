@@ -4,26 +4,29 @@
 #
 Pod::Spec.new do |s|
   s.name             = 'webview_cef'
-  s.version          = '0.2.3'
+  s.version          = '0.0.8'
   s.summary          = 'Flutter webview backed by CEF (Chromium Embedded Framework)'
   s.description      = <<-DESC
-Flutter webview backed by CEF (Chromium Embedded Framework)
+Flutter Desktop WebView backed by CEF (Chromium Embedded Framework).
                        DESC
-  s.homepage         = 'http://example.com'
+  s.homepage         = 'https://github.com/hlwhl/webview_cef'
   s.license          = { :file => '../LICENSE' }
-  s.author           = { 'Your Company' => 'email@example.com' }
+  s.author           = { 'webview_cef' => 'https://github.com/hlwhl/webview_cef' }
 
   s.source           = { :path => '.' }
   s.source_files     = 'Classes/**/*'
   s.dependency 'FlutterMacOS'
-  # GPU zero-copy path: blit CEF's shared IOSurface into our own CVPixelBuffer.
-  s.frameworks = 'Metal', 'CoreVideo', 'IOSurface'
 
-  # CEF is not tracked in git for macOS (mirrors the Windows/Linux CMake
-  # download path in third/download.cmake). It is fetched and the wrapper built
-  # on demand into third/cef. Runs on every `pod install`; a no-op once the
-  # pinned version is present. Override build type via CEF_WRAPPER_BUILD_TYPE.
-  s.prepare_command = 'bash scripts/download_cef.sh'
+  # Ensure the prebuilt CEF binaries are present before the vendored artifacts
+  # below are evaluated. CocoaPods' `prepare_command` is skipped for path /
+  # development pods (how Flutter plugins install), so the download is triggered
+  # here from the podspec itself. The script is idempotent and a no-op once CEF
+  # is installed. Override the architecture with WEBVIEW_CEF_MACOS_ARCH.
+  cef_framework = File.join(File.dirname(__FILE__), 'third', 'cef', 'Chromium Embedded Framework.framework')
+  unless File.directory?(cef_framework)
+    system('bash', File.join(File.dirname(__FILE__), 'scripts', 'download_cef.sh')) or
+      raise 'webview_cef: failed to download the macOS CEF binaries. See the macOS setup section of the README for the manual fallback.'
+  end
 
   s.vendored_frameworks = 'third/cef/Chromium Embedded Framework.framework'
   s.vendored_libraries = 'third/cef/libcef_dll_wrapper.a'

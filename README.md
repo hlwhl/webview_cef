@@ -189,15 +189,26 @@ A full-featured example (navigation bar, cookies, JS bridge, DevTools) lives in 
 
 ## Usage
 
-### Lifecycle
+No manual binary setup is required. The prebuilt CEF framework is downloaded and
+placed into `macos/third/cef` automatically on the first `pod install` (i.e. the
+first time you build or run a macOS app that depends on `webview_cef`).
 
-```dart
-await WebviewManager().initialize(userAgent: 'my-app/1.0'); // once per app
-final controller = WebviewManager().createWebView(loading: const Text('…'));
-await controller.initialize('https://example.com');
-// …
-controller.dispose();
-WebviewManager().quit(); // on app shutdown
+By default the binary matching your host architecture is fetched (Apple Silicon →
+arm64, Intel → x86_64). To build a **mac-universal** app, force the universal
+binary by exporting an environment variable before building:
+
+```sh
+export WEBVIEW_CEF_MACOS_ARCH=universal
+flutter run -d macos
+# or: cd example && flutter run -d macos
+```
+
+Accepted values for `WEBVIEW_CEF_MACOS_ARCH` are `arm64`, `intel`, and `universal`.
+
+<details>
+<summary>Manual / offline fallback</summary>
+To use the plugin in macOS, you'll need to clone the repository onto your project location, prefereably inside a `packages/` folder on the root of your project. 
+Update your `pubspec.yaml` file to accomodate the change.
 ```
 
 ### Navigation
@@ -222,36 +233,17 @@ controller.setWebviewListener(WebviewEventsListener(
 ));
 ```
 
-### JavaScript bridge
+If the automatic download fails (e.g. air-gapped CI), download the prebuilt CEF
+bundle yourself and unzip its contents directly into `macos/third/cef`:
 
-```dart
-// Dart -> JS
-controller.executeJavaScript("document.title = 'set from Dart'");
-final result = await controller.evaluateJavascript("1 + 1"); // "2"
+- [arm64](https://github.com/hlwhl/webview_cef/releases/download/prebuilt_cef_bin_mac_arm64/CEFbins-mac103.0.12-arm64.zip)
+- [intel](https://github.com/hlwhl/webview_cef/releases/download/prebuilt_cef_bin_mac_intel/mac103.0.12-Intel.zip)
+- [universal](https://github.com/hlwhl/webview_cef/releases/download/prebuilt_cef_bin_mac_universal/mac103.0.12-universal.zip) (see [#30](/../../issues/30), thanks to [@okiabrian123](https://github.com/okiabrian123))
 
-// JS -> Dart
-controller.setJavaScriptChannels({
-  JavascriptChannel(
-    name: 'Print',
-    onMessageReceived: (msg) {
-      debugPrint(msg.message);
-      controller.sendJavaScriptChannelCallBack(
-          false, "{'code':'200'}", msg.callbackId, msg.frameId);
-    },
-  ),
-});
-```
+The download logic lives in [`macos/scripts/download_cef.sh`](macos/scripts/download_cef.sh).
 
-### Cookies
-
-```dart
-await WebviewManager().setCookie('example.com', 'key', 'value');
-await WebviewManager().deleteCookie('example.com', 'key');
-final all = await WebviewManager().visitAllCookies();
-final some = await WebviewManager().visitUrlCookies('example.com', false);
-```
-
-### User-script injection
+</details>
+2. Unzip the archive and put all files into `macos/third/cef`. (Inside the cloned repository, not your project)
 
 ```dart
 final scripts = InjectUserScripts()
@@ -276,7 +268,19 @@ These CMake options can be set on the plugin target (defaults shown):
 
 The CEF/Chromium version is pinned in one place — `CEF_VERSION` in [`third/download.cmake`](third/download.cmake). Bump it to update CEF on all three platforms: Windows and Linux download it automatically, and macOS reads the same `CEF_VERSION` (via `macos/scripts/download_cef.sh`, run by the podspec's `prepare_command`) and re-downloads on the next `pod install` — no manual placement needed. The only extra step is keeping the hardcoded `CEF_VERSION` in [`.github/workflows/test_macos.yaml`](.github/workflows/test_macos.yaml) in sync.
 
----
+- [x] Windows support
+- [x] macOS support
+- [x] Linux support
+- [x] Multi instance support
+- [x] IME support(Only support Third party IME on Linux and Windows, Microsoft IME on Windows, and only tested Chinese input methods)
+- [x] Mouse events support
+- [x] JS bridge support
+- [x] Cookie manipulation support
+- [x] Release to pub
+- [x] Trackpad support
+- [x] Better macOS binary distribution
+- [ ] Easier way to integrate macOS helper bundles(multi process)
+- [x] devTools support
 
 ## Demo
 
