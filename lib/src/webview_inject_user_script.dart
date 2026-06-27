@@ -1,3 +1,6 @@
+// Public enum values use SCREAMING_CAPS to preserve the existing API surface.
+// ignore_for_file: constant_identifier_names
+
 enum ScriptInjectTime { LOAD_START, LOAD_END }
 
 class UserScript {

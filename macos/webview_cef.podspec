@@ -36,7 +36,28 @@ Flutter Desktop WebView backed by CEF (Chromium Embedded Framework).
   s.xcconfig = { "HEADER_SEARCH_PATHS" => $dir}
   # s.private_header_files = '../common/simple_app.h', '../common/simple_handler.h'
 
-  s.platform = :osx, '10.11'
-  s.pod_target_xcconfig = { 'DEFINES_MODULE' => 'YES' }
+  # CEF ships separate per-architecture macOS binaries; scripts/download_cef.sh
+  # fetches the one matching the build host (arm64 -> macosarm64, x86_64 ->
+  # macosx64). Exclude the other architecture so a default (universal)
+  # `flutter build macos` doesn't try to link a slice the CEF framework/wrapper
+  # doesn't provide — that fails with "symbol(s) not found for architecture
+  # x86_64". A universal app would require a lipo'd CEF, which is out of scope.
+  host_arch = `uname -m`.strip
+  non_host_arch = (host_arch == 'arm64') ? 'x86_64' : 'arm64'
+
+  s.platform = :osx, '12.0'
+  # CEF 149 public headers require C++20.
+  s.pod_target_xcconfig = {
+    'DEFINES_MODULE' => 'YES',
+    'CLANG_CXX_LANGUAGE_STANDARD' => 'c++20',
+    "EXCLUDED_ARCHS[sdk=macosx*]" => non_host_arch,
+    # Zero-copy GPU rendering: CEF delivers frames as a shared-texture IOSurface
+    # via OnAcceleratedPaint instead of a software CPU buffer (OnPaint). The IME
+    # and frame plumbing key off this define in the shared common/ sources.
+    'GCC_PREPROCESSOR_DEFINITIONS' => '$(inherited) WEBVIEW_CEF_GPU_TEXTURE=1',
+  }
+  # The app target links the CEF framework/wrapper too, so it must drop the same
+  # architecture or its slice fails to link.
+  s.user_target_xcconfig = { "EXCLUDED_ARCHS[sdk=macosx*]" => non_host_arch }
   s.swift_version = '5.0'
 end

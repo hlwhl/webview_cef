@@ -1,7 +1,4 @@
-cmake
-Debug
-libcef_dll
-libcef_dll_wrapper
-Release
-Resources
-version.txt
+# The entire CEF distribution is fetched by ../download.cmake on Windows/Linux
+# (and placed manually for macOS, see README). None of it is tracked.
+*
+!.gitignore
