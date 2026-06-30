@@ -27,8 +27,9 @@ A Flutter **desktop** WebView backed by [CEF](https://bitbucket.org/chromiumembe
 | Platform | Minimum version | Architectures |
 | --- | --- | --- |
 | Windows | Windows 10 | x64 |
-| macOS | macOS 12.0 | arm64 or x86_64 (host arch only — no universal build) |
-| Linux | — | x64, arm64 |
+| macOS  | macOS 12.0 | arm64 or x86_64 (host arch only — no universal build) |
+| Linux  | — | x64, arm64 |
+| eLinux | — | x64, arm64 |
 
 ## Requirements
 
@@ -260,6 +261,40 @@ final scripts = InjectUserScripts()
 
 final controller = WebviewManager().createWebView(injectUserScripts: scripts);
 ```
+
+### eLinux 🐧
+
+For eLinux, this plugin supports **Wayland** and **DRM-GBM** backends using a decoupled architecture that avoids GTK/X11 dependencies.
+
+#### Runtime Dependencies
+
+Ensure the target eLinux system has the following libraries installed:
+
+- `libnss3`
+- `libnspr4`
+- `libfontconfig1`
+- `libasound2`
+
+#### CEF Binary Compatibility
+
+- **Sandbox**: CEF's sandbox is disabled by default (`--no-sandbox`) to avoid SUID permission issues common on embedded filesystems.
+- **Architecture**: While this project supports x64, ensure you have the correct CEF binaries for your target architecture (ARM64 support requires corresponding CEF builds).
+
+#### Setup
+
+1. Ensure your eLinux toolchain is correctly configured.
+2. Use the `flutter-elinux` SDK to build your application.
+3. The plugin will automatically use the `elinux/` port which implements an efficient pixel buffer rendering pipeline.
+
+#### TO RUN
+
+`cd example/`
+`flutter-elinux pub get`
+`flutter-elinux build elinux --release`
+
+`cp -r ~/exploration/flutter/browser/webview_cef/third/cef/Resources/locales   build/elinux/x64/release/bundle/lib/`
+
+`./build/elinux/x64/release/bundle/webview_cef_example -b .`
 
 ---
 

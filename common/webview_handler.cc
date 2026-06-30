@@ -796,5 +796,3 @@ void WebviewHandler::OnAcceleratedPaint(CefRefPtr<CefBrowser> browser, CefRender
     }
 #endif
 }
-
-
