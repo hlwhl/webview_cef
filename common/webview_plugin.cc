@@ -479,8 +479,11 @@ namespace webview_cef {
 #ifdef HAS_GTK
 			// Desktop Linux has GTK native key support via processKeyEventForCEF
 			result(1, webview_value_new_bool(true));
+#elif defined(OS_WIN) || defined(OS_MAC)
+            // Windows (WM_KEYDOWN) and macOS (NSEventMaskKeyDown) have native key delivery
+            result(1, webview_value_new_bool(true));
 #else
-			// eLinux (no GTK), Windows, macOS: use Dart-side or platform-specific handling
+			// eLinux (no GTK): use Dart-side handling
 			result(1, webview_value_new_bool(false));
 #endif
 		}

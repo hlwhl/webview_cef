@@ -125,7 +125,7 @@ static WValue* decode_to_wvalue(const flutter::EncodableValue& val) {
 
 class WebviewCefPlugin : public flutter::Plugin {
  public:
-  static void RegisterWithRegistrar(flutter::PluginRegistrar* registrar) {
+  static void RegisterWithRegistrar(flutter::PluginRegistrar* registrar, int64_t window_id) {
     auto channel = std::make_unique<flutter::MethodChannel<flutter::EncodableValue>>(
         registrar->messenger(), "webview_cef",
         &flutter::StandardMethodCodec::GetInstance());
@@ -133,6 +133,8 @@ class WebviewCefPlugin : public flutter::Plugin {
     auto plugin = std::make_unique<WebviewCefPlugin>(
         registrar->texture_registrar(), std::move(channel));
 
+    // Populate the map and set the window_id_
+    plugin->SetWindowId(window_id);
     registrar->AddPlugin(std::move(plugin));
   }
 
@@ -209,9 +211,14 @@ class WebviewCefPlugin : public flutter::Plugin {
 
 void webview_cef_plugin_register_with_registrar(
     FlutterDesktopPluginRegistrarRef registrar) {
+      
+  // Get the view handle to use as a unique window ID
+  int64_t window_id = reinterpret_cast<int64_t>(FlutterDesktopPluginRegistrarGetView(registrar));
+
   WebviewCefPlugin::RegisterWithRegistrar(
       flutter::PluginRegistrarManager::GetInstance()
-          ->GetRegistrar<flutter::PluginRegistrar>(registrar));
+          ->GetRegistrar<flutter::PluginRegistrar>(registrar),
+      window_id);
 }
 
 FLUTTER_PLUGIN_EXPORT int initCEFProcesses(int argc, char** argv) {

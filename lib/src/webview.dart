@@ -431,7 +431,8 @@ class WebViewState extends State<WebView> with WebeViewTextInput {
 
   KeyEventResult _onKeyEvent(FocusNode node, KeyEvent event) {
     // Only handle keys on platforms without native key support (eLinux)
-    if (_hasNativeKeySupport == true) {
+    // Treat null as "don't handle yet" to prevent double-delivery during async gap
+    if (_hasNativeKeySupport != false) {
       return KeyEventResult.ignored;
     }
 
@@ -473,6 +474,16 @@ class WebViewState extends State<WebView> with WebeViewTextInput {
       character?.codeUnitAt(0) ?? 0,
     );
     
+    // Send CHAR event after RAWKEYDOWN when character is present (required for text entry)
+    if (event is KeyDownEvent && character != null) {
+      _controller.sendKeyEvent(
+        KEYEVENT_CHAR,
+        keyCode,
+        modifiers,
+        character.codeUnitAt(0),
+        character.codeUnitAt(0),
+      );
+    }
     return KeyEventResult.handled;
   }
 
