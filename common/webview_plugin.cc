@@ -476,16 +476,17 @@ namespace webview_cef {
 			result(1, nullptr);
 		}
 		else if(name.compare("hasNativeKeySupport") == 0) {
-#ifdef HAS_GTK
-			// Desktop Linux has GTK native key support via processKeyEventForCEF
-			result(1, webview_value_new_bool(true));
-#elif defined(OS_WIN) || defined(OS_MAC)
-			// Windows (WM_KEYDOWN) and macOS (NSEventMaskKeyDown) have native key delivery
-			result(1, webview_value_new_bool(true));
+#if defined(HAS_GTK) || defined(OS_WIN) || defined(OS_MAC)
+			// Desktop Linux (GTK via processKeyEventForCEF), Windows (WM_KEYDOWN)
+			// and macOS (NSEventMaskKeyDown) all deliver keys to CEF natively.
+			bool hasNativeKeySupport = true;
 #else
-			// eLinux (no GTK): use Dart-side handling
-			result(1, webview_value_new_bool(false));
+			// eLinux (no GTK): use Dart-side handling.
+			bool hasNativeKeySupport = false;
 #endif
+			WValue* ret = webview_value_new_bool(hasNativeKeySupport);
+			result(1, ret);
+			webview_value_unref(ret);
 		}
 		else if(name.compare("executeJavaScript") == 0){
 			int browserId = int(webview_value_get_int(webview_value_get_list_value(values, 0)));
