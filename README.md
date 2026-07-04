@@ -292,8 +292,6 @@ Ensure the target eLinux system has the following libraries installed:
 `flutter-elinux pub get`
 `flutter-elinux build elinux --release`
 
-`cp -r ~/exploration/flutter/browser/webview_cef/third/cef/Resources/locales   build/elinux/x64/release/bundle/lib/`
-
 `./build/elinux/x64/release/bundle/webview_cef_example -b .`
 
 ---
