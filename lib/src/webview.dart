@@ -11,25 +11,25 @@ import 'webview_textinput.dart';
 import 'webview_tooltip.dart';
 
 // CEF key event types
-const int KEYEVENT_RAWKEYDOWN = 0;
-const int KEYEVENT_KEYDOWN = 1;
-const int KEYEVENT_KEYUP = 2;
-const int KEYEVENT_CHAR = 3;
+const int keyEventRawKeyDown = 0;
+const int keyEventKeyDown = 1;
+const int keyEventKeyUp = 2;
+const int keyEventChar = 3;
 
 // CEF event flags
-const int EVENTFLAG_NONE = 0;
-const int EVENTFLAG_CAPS_LOCK_ON = 1 << 0;
-const int EVENTFLAG_SHIFT_DOWN = 1 << 1;
-const int EVENTFLAG_CONTROL_DOWN = 1 << 2;
-const int EVENTFLAG_ALT_DOWN = 1 << 3;
-const int EVENTFLAG_LEFT_MOUSE_BUTTON = 1 << 4;
-const int EVENTFLAG_MIDDLE_MOUSE_BUTTON = 1 << 5;
-const int EVENTFLAG_RIGHT_MOUSE_BUTTON = 1 << 6;
-const int EVENTFLAG_COMMAND_DOWN = 1 << 7;
-const int EVENTFLAG_NUM_LOCK_ON = 1 << 8;
-const int EVENTFLAG_IS_KEY_PAD = 1 << 9;
-const int EVENTFLAG_IS_LEFT = 1 << 10;
-const int EVENTFLAG_IS_RIGHT = 1 << 11;
+const int eventFlagNone = 0;
+const int eventFlagCapsLockOn = 1 << 0;
+const int eventFlagShiftDown = 1 << 1;
+const int eventFlagControlDown = 1 << 2;
+const int eventFlagAltDown = 1 << 3;
+const int eventFlagLeftMouseButton = 1 << 4;
+const int eventFlagMiddleMouseButton = 1 << 5;
+const int eventFlagRightMouseButton = 1 << 6;
+const int eventFlagCommandDown = 1 << 7;
+const int eventFlagNumLockOn = 1 << 8;
+const int eventFlagIsKeyPad = 1 << 9;
+const int eventFlagIsLeft = 1 << 10;
+const int eventFlagIsRight = 1 << 11;
 
 class WebViewController extends ValueNotifier<bool> {
   WebViewController(this._pluginChannel, this._index, {Widget? loading})
@@ -446,21 +446,21 @@ class WebViewState extends State<WebView> with WebeViewTextInput {
     // Build modifiers
     int modifiers = 0;
     if (HardwareKeyboard.instance.isShiftPressed) {
-      modifiers |= EVENTFLAG_SHIFT_DOWN;
+      modifiers |= eventFlagShiftDown;
     }
     if (HardwareKeyboard.instance.isControlPressed) {
-      modifiers |= EVENTFLAG_CONTROL_DOWN;
+      modifiers |= eventFlagControlDown;
     }
     if (HardwareKeyboard.instance.isAltPressed) {
-      modifiers |= EVENTFLAG_ALT_DOWN;
+      modifiers |= eventFlagAltDown;
     }
     
     // Determine event type
     int type;
     if (event is KeyDownEvent) {
-      type = KEYEVENT_RAWKEYDOWN;
+      type = keyEventRawKeyDown;
     } else if (event is KeyUpEvent) {
-      type = KEYEVENT_KEYUP;
+      type = keyEventKeyUp;
     } else {
       return KeyEventResult.ignored;
     }
@@ -477,7 +477,7 @@ class WebViewState extends State<WebView> with WebeViewTextInput {
     // Send CHAR event after RAWKEYDOWN when character is present (required for text entry)
     if (event is KeyDownEvent && character != null) {
       _controller.sendKeyEvent(
-        KEYEVENT_CHAR,
+        keyEventChar,
         keyCode,
         modifiers,
         character.codeUnitAt(0),
