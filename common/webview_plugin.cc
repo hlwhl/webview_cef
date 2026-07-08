@@ -469,8 +469,8 @@ namespace webview_cef {
 			keyEvent.type = static_cast<cef_key_event_type_t>(type);
 			keyEvent.windows_key_code = keyCode;
 			keyEvent.modifiers = modifiers;
-			keyEvent.character = character;
-			keyEvent.unmodified_character = unmodifiedCharacter;
+			keyEvent.character = static_cast<char16_t>(character);
+			keyEvent.unmodified_character = static_cast<char16_t>(unmodifiedCharacter);
 			
 			sendKeyEvent(keyEvent);
 			result(1, nullptr);
