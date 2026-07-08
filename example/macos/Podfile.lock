@@ -1,6 +1,6 @@
 PODS:
   - FlutterMacOS (1.0.0)
-  - webview_cef (0.0.1):
+  - webview_cef (0.0.8):
     - FlutterMacOS
 
 DEPENDENCIES:
@@ -14,9 +14,9 @@ EXTERNAL SOURCES:
     :path: Flutter/ephemeral/.symlinks/plugins/webview_cef/macos
 
 SPEC CHECKSUMS:
-  FlutterMacOS: ae6af50a8ea7d6103d888583d46bd8328a7e9811
-  webview_cef: 526e35f55e668d1781e81189cfa6a5b498324ca1
+  FlutterMacOS: d0db08ddef1a9af05a5ec4b724367152bb0500b1
+  webview_cef: ef43b137728c4576fdd4455218c09a29f7ce07c7
 
-PODFILE CHECKSUM: 6eac6b3292e5142cfc23bdeb71848a40ec51c14c
+PODFILE CHECKSUM: de782d66259fd7a3caa00b0d30232a493cb5b668
 
-COCOAPODS: 1.11.3
+COCOAPODS: 1.16.2

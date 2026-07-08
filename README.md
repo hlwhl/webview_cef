@@ -274,7 +274,7 @@ These CMake options can be set on the plugin target (defaults shown):
 
 ## Updating CEF
 
-The CEF/Chromium version is pinned in one place — `CEF_VERSION` in [`third/download.cmake`](third/download.cmake). Bump it to update CEF on all three platforms: Windows and Linux download it automatically, and macOS reads the same `CEF_VERSION` (via `macos/scripts/download_cef.sh`, run by the podspec's `prepare_command`) and re-downloads on the next `pod install` — no manual placement needed. The only extra step is keeping the hardcoded `CEF_VERSION` in [`.github/workflows/test_macos.yaml`](.github/workflows/test_macos.yaml) in sync.
+The CEF/Chromium version is pinned in one place — `CEF_VERSION` in [`third/download.cmake`](third/download.cmake). Bump it to update CEF on all three platforms: Windows and Linux download it automatically, and macOS reads the same `CEF_VERSION` (via `macos/scripts/download_cef.sh`, run by the podspec's `prepare_command`) and re-downloads on the next `pod install` — no manual placement needed.
 
 ---
 
