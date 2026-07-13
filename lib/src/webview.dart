@@ -10,6 +10,27 @@ import 'webview_javascript.dart';
 import 'webview_textinput.dart';
 import 'webview_tooltip.dart';
 
+// CEF key event types
+const int keyEventRawKeyDown = 0;
+const int keyEventKeyDown = 1;
+const int keyEventKeyUp = 2;
+const int keyEventChar = 3;
+
+// CEF event flags
+const int eventFlagNone = 0;
+const int eventFlagCapsLockOn = 1 << 0;
+const int eventFlagShiftDown = 1 << 1;
+const int eventFlagControlDown = 1 << 2;
+const int eventFlagAltDown = 1 << 3;
+const int eventFlagLeftMouseButton = 1 << 4;
+const int eventFlagMiddleMouseButton = 1 << 5;
+const int eventFlagRightMouseButton = 1 << 6;
+const int eventFlagCommandDown = 1 << 7;
+const int eventFlagNumLockOn = 1 << 8;
+const int eventFlagIsKeyPad = 1 << 9;
+const int eventFlagIsLeft = 1 << 10;
+const int eventFlagIsRight = 1 << 11;
+
 class WebViewController extends ValueNotifier<bool> {
   WebViewController(this._pluginChannel, this._index, {Widget? loading})
       : super(false) {
@@ -157,6 +178,23 @@ class WebViewController extends ValueNotifier<bool> {
     return _pluginChannel.invokeMethod('setClientFocus', [_browserId, focus]);
   }
 
+  /// Sends a key event to CEF. Used on platforms without native key support (eLinux).
+  Future<void> sendKeyEvent(int type, int keyCode, int modifiers, int character,
+      int unmodifiedCharacter) async {
+    if (_isDisposed) {
+      return;
+    }
+    assert(value);
+    return _pluginChannel.invokeMethod('sendKeyEvent', [
+      _browserId,
+      type,
+      keyCode,
+      modifiers,
+      character,
+      unmodifiedCharacter
+    ]);
+  }
+
   Future<void> setJavaScriptChannels(Set<JavascriptChannel> channels) async {
     if (_isDisposed) {
       return;
@@ -292,6 +330,7 @@ class WebViewState extends State<WebView> with WebeViewTextInput {
   bool isPrimaryFocus = false;
   WebviewTooltip? _tooltip;
   MouseCursor _mouseType = SystemMouseCursors.basic;
+  bool? _hasNativeKeySupport;
 
   WebViewController get _controller => widget.controller;
 
@@ -380,9 +419,120 @@ class WebViewState extends State<WebView> with WebeViewTextInput {
       setState(() {});
     };
 
+    // Check if platform has native key support (e.g., GTK on desktop Linux)
+    WebviewManager().hasNativeKeySupport.then((value) {
+      _hasNativeKeySupport = value;
+    });
+
     // Report initial surface size
     WidgetsBinding.instance
         .addPostFrameCallback((_) => _reportSurfaceSize(context));
+  }
+
+  KeyEventResult _onKeyEvent(FocusNode node, KeyEvent event) {
+    // Only handle keys on platforms without native key support (eLinux)
+    // Treat null as "don't handle yet" to prevent double-delivery during async gap
+    if (_hasNativeKeySupport != false) {
+      return KeyEventResult.ignored;
+    }
+
+    // Map Flutter key event to CEF key event
+    final logicalKey = event.logicalKey;
+    final character = event.character;
+    
+    // Convert logical key to Windows keycode
+    int keyCode = _logicalKeyToWindowsKeyCode(logicalKey);
+    
+    // Build modifiers
+    int modifiers = 0;
+    if (HardwareKeyboard.instance.isShiftPressed) {
+      modifiers |= eventFlagShiftDown;
+    }
+    if (HardwareKeyboard.instance.isControlPressed) {
+      modifiers |= eventFlagControlDown;
+    }
+    if (HardwareKeyboard.instance.isAltPressed) {
+      modifiers |= eventFlagAltDown;
+    }
+    
+    // Determine event type
+    int type;
+    if (event is KeyDownEvent) {
+      type = keyEventRawKeyDown;
+    } else if (event is KeyUpEvent) {
+      type = keyEventKeyUp;
+    } else {
+      return KeyEventResult.ignored;
+    }
+    
+    // Send key event to CEF
+    _controller.sendKeyEvent(
+      type,
+      keyCode,
+      modifiers,
+      character?.codeUnitAt(0) ?? 0,
+      character?.codeUnitAt(0) ?? 0,
+    );
+    
+    // Send CHAR event after RAWKEYDOWN when character is present (required for text entry)
+    if (event is KeyDownEvent && character != null) {
+      _controller.sendKeyEvent(
+        keyEventChar,
+        keyCode,
+        modifiers,
+        character.codeUnitAt(0),
+        character.codeUnitAt(0),
+      );
+    }
+    return KeyEventResult.handled;
+  }
+
+  int _logicalKeyToWindowsKeyCode(LogicalKeyboardKey key) {
+    // Map Flutter logical keys to Windows key codes
+    // This is a simplified mapping - may need to be expanded
+    if (key == LogicalKeyboardKey.f12) return 0x7B;
+    if (key == LogicalKeyboardKey.f1) return 0x70;
+    if (key == LogicalKeyboardKey.f2) return 0x71;
+    if (key == LogicalKeyboardKey.f3) return 0x72;
+    if (key == LogicalKeyboardKey.f4) return 0x73;
+    if (key == LogicalKeyboardKey.f5) return 0x74;
+    if (key == LogicalKeyboardKey.f6) return 0x75;
+    if (key == LogicalKeyboardKey.f7) return 0x76;
+    if (key == LogicalKeyboardKey.f8) return 0x77;
+    if (key == LogicalKeyboardKey.f9) return 0x78;
+    if (key == LogicalKeyboardKey.f10) return 0x79;
+    if (key == LogicalKeyboardKey.f11) return 0x7A;
+    if (key == LogicalKeyboardKey.enter) return 0x0D;
+    if (key == LogicalKeyboardKey.escape) return 0x1B;
+    if (key == LogicalKeyboardKey.tab) return 0x09;
+    if (key == LogicalKeyboardKey.backspace) return 0x08;
+    if (key == LogicalKeyboardKey.delete) return 0x2E;
+    if (key == LogicalKeyboardKey.insert) return 0x2D;
+    if (key == LogicalKeyboardKey.home) return 0x24;
+    if (key == LogicalKeyboardKey.end) return 0x23;
+    if (key == LogicalKeyboardKey.pageUp) return 0x21;
+    if (key == LogicalKeyboardKey.pageDown) return 0x22;
+    if (key == LogicalKeyboardKey.arrowUp) return 0x26;
+    if (key == LogicalKeyboardKey.arrowDown) return 0x28;
+    if (key == LogicalKeyboardKey.arrowLeft) return 0x25;
+    if (key == LogicalKeyboardKey.arrowRight) return 0x27;
+    
+    // For alphanumeric keys, use the key label
+    final keyLabel = key.keyLabel;
+    if (keyLabel.length == 1) {
+      final charCode = keyLabel.codeUnitAt(0);
+      if (charCode >= 0x41 && charCode <= 0x5A) {
+        // A-Z
+        return charCode;
+      }
+      if (charCode >= 0x30 && charCode <= 0x39) {
+        // 0-9
+        return charCode;
+      }
+    }
+    
+    // Default fallback
+    return 0;
   }
 
   @override
@@ -406,6 +556,7 @@ class WebViewState extends State<WebView> with WebeViewTextInput {
           }
         }
       },
+      onKeyEvent: _onKeyEvent,
       child: SizedBox.expand(key: _key, child: _buildInner()),
     );
   }

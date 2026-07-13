@@ -26,3 +26,5 @@ flutter:
         pluginClass: WebviewCefPluginCApi
       linux:
         pluginClass: WebviewCefPlugin
+      elinux:
+        pluginClass: WebviewCefPlugin

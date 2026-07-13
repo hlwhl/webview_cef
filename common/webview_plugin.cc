@@ -458,6 +458,36 @@ namespace webview_cef {
 			m_handler->sendJavaScriptChannelCallBack(error, ret, callbackId, browserId, frameId);
 			result(1, nullptr);
 		}
+		else if (name.compare("sendKeyEvent") == 0) {
+			int type = int(webview_value_get_int(webview_value_get_list_value(values, 1)));
+			int keyCode = int(webview_value_get_int(webview_value_get_list_value(values, 2)));
+			int modifiers = int(webview_value_get_int(webview_value_get_list_value(values, 3)));
+			int character = int(webview_value_get_int(webview_value_get_list_value(values, 4)));
+			int unmodifiedCharacter = int(webview_value_get_int(webview_value_get_list_value(values, 5)));
+			
+			CefKeyEvent keyEvent;
+			keyEvent.type = static_cast<cef_key_event_type_t>(type);
+			keyEvent.windows_key_code = keyCode;
+			keyEvent.modifiers = modifiers;
+			keyEvent.character = static_cast<char16_t>(character);
+			keyEvent.unmodified_character = static_cast<char16_t>(unmodifiedCharacter);
+			
+			sendKeyEvent(keyEvent);
+			result(1, nullptr);
+		}
+		else if(name.compare("hasNativeKeySupport") == 0) {
+#if defined(HAS_GTK) || defined(OS_WIN) || defined(OS_MAC)
+			// Desktop Linux (GTK via processKeyEventForCEF), Windows (WM_KEYDOWN)
+			// and macOS (NSEventMaskKeyDown) all deliver keys to CEF natively.
+			bool hasNativeKeySupport = true;
+#else
+			// eLinux (no GTK): use Dart-side handling.
+			bool hasNativeKeySupport = false;
+#endif
+			WValue* ret = webview_value_new_bool(hasNativeKeySupport);
+			result(1, ret);
+			webview_value_unref(ret);
+		}
 		else if(name.compare("executeJavaScript") == 0){
 			int browserId = int(webview_value_get_int(webview_value_get_list_value(values, 0)));
 			const auto code = webview_value_get_string(webview_value_get_list_value(values, 1));
