@@ -351,8 +351,8 @@ Inspired by [**`flutter_webview_windows`**](https://github.com/jnschulze/flutter
 
 <a href="https://www.star-history.com/?repos=hlwhl%2Fwebview_cef&type=date&legend=top-left">
  <picture>
-   <source media="(prefers-color-scheme: dark)" srcset="https://api.star-history.com/chart?repos=hlwhl/webview_cef&type=date&theme=dark&legend=top-left" />
-   <source media="(prefers-color-scheme: light)" srcset="https://api.star-history.com/chart?repos=hlwhl/webview_cef&type=date&legend=top-left" />
-   <img alt="Star History Chart" src="https://api.star-history.com/chart?repos=hlwhl/webview_cef&type=date&legend=top-left" />
+   <source media="(prefers-color-scheme: dark)" srcset="https://api.star-history.com/chart?repos=hlwhl/webview_cef&type=date&theme=dark&legend=top-left&sealed_token=36cUYlIAsJhOcNnN3neJnDQAcumIMjtFYau6ocPNnkLDMWmw7ePDGypaleDftCKR60NGvFRODL7lcmCy7RMsbcGnccCA7bq8oHCRwnsYbe9IFj8vVu_hl9sIR_Rrs-eergCjkREudRIfEPs0attqrIRMaC--c-ovTxfnAabP9dPc2yGUz3hrhtJqSWqF" />
+   <source media="(prefers-color-scheme: light)" srcset="https://api.star-history.com/chart?repos=hlwhl/webview_cef&type=date&legend=top-left&sealed_token=36cUYlIAsJhOcNnN3neJnDQAcumIMjtFYau6ocPNnkLDMWmw7ePDGypaleDftCKR60NGvFRODL7lcmCy7RMsbcGnccCA7bq8oHCRwnsYbe9IFj8vVu_hl9sIR_Rrs-eergCjkREudRIfEPs0attqrIRMaC--c-ovTxfnAabP9dPc2yGUz3hrhtJqSWqF" />
+   <img alt="Star History Chart" src="https://api.star-history.com/chart?repos=hlwhl/webview_cef&type=date&legend=top-left&sealed_token=36cUYlIAsJhOcNnN3neJnDQAcumIMjtFYau6ocPNnkLDMWmw7ePDGypaleDftCKR60NGvFRODL7lcmCy7RMsbcGnccCA7bq8oHCRwnsYbe9IFj8vVu_hl9sIR_Rrs-eergCjkREudRIfEPs0attqrIRMaC--c-ovTxfnAabP9dPc2yGUz3hrhtJqSWqF" />
  </picture>
 </a>
