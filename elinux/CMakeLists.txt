@@ -45,21 +45,6 @@ add_library(${PLUGIN_NAME} SHARED
   "${CMAKE_CURRENT_SOURCE_DIR}/../common/webview_cookieVisitor.h"
 )
 
-# Include the C++ client wrapper.
-set(FLUTTER_CPP_CLIENT_WRAPPER "${CMAKE_CURRENT_SOURCE_DIR}/../example/elinux/flutter/ephemeral/cpp_client_wrapper")
-target_include_directories(${PLUGIN_NAME} PRIVATE "${FLUTTER_CPP_CLIENT_WRAPPER}/include")
-# Add ephemeral dir so <flutter_elinux/flutter_elinux.h> resolves correctly
-target_include_directories(${PLUGIN_NAME} PRIVATE "${CMAKE_CURRENT_SOURCE_DIR}/../example/elinux/flutter/ephemeral")
-target_include_directories(${PLUGIN_NAME} PRIVATE 
-  "${CMAKE_CURRENT_SOURCE_DIR}/../example/elinux/flutter/ephemeral"
-  "../third/cef"
-)
-target_sources(${PLUGIN_NAME} PRIVATE
-  "${FLUTTER_CPP_CLIENT_WRAPPER}/standard_codec.cc"
-  "${FLUTTER_CPP_CLIENT_WRAPPER}/plugin_registrar.cc"
-  "${FLUTTER_CPP_CLIENT_WRAPPER}/engine_method_result.cc"
-)
-
 apply_standard_settings(${PLUGIN_NAME})
 
 set_target_properties(${PLUGIN_NAME} PROPERTIES
@@ -69,9 +54,10 @@ target_compile_definitions(${PLUGIN_NAME} PRIVATE FLUTTER_PLUGIN_IMPL)
 target_include_directories(${PLUGIN_NAME} INTERFACE
   "${CMAKE_CURRENT_SOURCE_DIR}/include")
 target_link_libraries(${PLUGIN_NAME} PRIVATE 
-  flutter
-  libcef_dll_wrapper
-  ${CEF_LIB_DEPS}
+      flutter
+      flutter_wrapper_plugin
+      libcef_dll_wrapper
+      ${CEF_LIB_DEPS}
 )
 # The flutter target here refers to the library provided by the elinux toolchain
 # which is automatically configured in the example/elinux build.
