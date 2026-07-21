@@ -113,27 +113,63 @@ void WebviewApp::OnBeforeCommandLineProcessing(const CefString &process_type, Ce
 		}
 #endif
 
-		command_line->AppendSwitch("disable-web-security");                                     //disable web security
-		command_line->AppendSwitch("allow-running-insecure-content");                           //allow running insecure content in secure pages
+        // General Switches
+        command_line->AppendSwitchWithValue("user-agent-product", "test/userAgent");
+        command_line->AppendSwitchWithValue("lang", "en-US");
+        command_line->AppendSwitch("no-sandbox");
+
+        // Platform & Graphics
+        command_line->AppendSwitchWithValue("ozone-platform", "wayland");
+        command_line->AppendSwitchWithValue("use-angle", "gles-egl");
+        command_line->AppendSwitch("enable-zero-copy");
+        command_line->AppendSwitch("enable-touch-events");
+
+        // Performance & Optimization
+        command_line->AppendSwitch("enable-low-end-device-mode");
+        command_line->AppendSwitch("disable-sync");
+        command_line->AppendSwitch("disable-translate");
+        command_line->AppendSwitch("disable-extensions");
+
+        // GPU & Video
+        command_line->AppendSwitch("disable-gpu-sandbox");
+        command_line->AppendSwitch("enable-gles2-interface");
+        command_line->AppendSwitch("all-hw-video-decode-backends");
+        command_line->AppendSwitch("disable-gpu-memory-buffer-video-frames");
+        command_line->AppendSwitch("disable-gpu-memory-buffer-compositor-resources");
+        command_line->AppendSwitch("disable-gpu-shader-disk-cache");
+
+        // User Agent
+        command_line->AppendSwitchWithValue("user-agent", "Mozilla/5.0 (Linux; Android 14) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/120.0.6099.43 Mobile Safari/537.36");
+
+        // Security
+        command_line->AppendSwitch("disable-web-security");
+        command_line->AppendSwitch("allow-running-insecure-content");
+
+        // Media
+        command_line->AppendSwitchWithValue("autoplay-policy", "no-user-gesture-required"); // autoplay policy for media
+
+        // Features (Enable/Disable)
+        command_line->AppendSwitchWithValue("disable-features", "EnableHangWatcher,SameSiteByDefaultCookies,CookiesWithoutSameSiteMustBeSecure,CalculateNativeWinOcclusion,TranslateUI,MediaRouter,OptimizationGuideModelDownloading");
+        command_line->AppendSwitchWithValue("enable-features", "UseOzonePlatform");
+
 		// Don't create a "GPUCache" directory when cache-path is unspecified.
-		command_line->AppendSwitch("disable-gpu-shader-disk-cache");                            //disable gpu shader disk cache
+		command_line->AppendSwitch("disable-gpu-shader-disk-cache"); //disable gpu shader disk cache
         command_line->AppendSwitch("no-sandbox");
 
 		//http://www.chromium.org/developers/design-documents/process-models
 		if (m_uMode == 1)
 		{
-			command_line->AppendSwitch("process-per-site");                                     //each site in its own process
-			command_line->AppendSwitchWithValue("renderer-process-limit", "8");              //limit renderer process count to decrease memory usage
+			command_line->AppendSwitch("process-per-site"); //each site in its own process
+			command_line->AppendSwitchWithValue("renderer-process-limit", "2"); //limit renderer process count to decrease memory usage
 		}
 		else if (m_uMode == 2)
 		{
-			command_line->AppendSwitch("process-per-tab");                                      //each tab in its own process
+			command_line->AppendSwitch("process-per-tab"); //each tab in its own process
 		}
 		else if (m_uMode == 3)
 		{
-			command_line->AppendSwitch("single-process");                                     //all in one process
+			command_line->AppendSwitch("single-process"); //all in one process
 		}
-		command_line->AppendSwitchWithValue("autoplay-policy", "no-user-gesture-required");     //autoplay policy for media
 
         //Support cross domain requests
         std::string values = command_line->GetSwitchValue("disable-features");
@@ -154,7 +190,7 @@ void WebviewApp::OnBeforeCommandLineProcessing(const CefString &process_type, Ce
         // for unsafe domain, add domain to whitelist
 		if (!m_strFilterDomain.empty())
 		{
-			command_line->AppendSwitch("ignore-certificate-errors");                            //ignore certificate errors
+			command_line->AppendSwitch("ignore-certificate-errors"); //ignore certificate errors
 			command_line->AppendSwitchWithValue("unsafely-treat-insecure-origin-as-secure",
                 m_strFilterDomain);
 		}

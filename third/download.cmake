@@ -2,7 +2,8 @@
 # (https://cef-builds.spotifycdn.com). All platforms are kept on the same
 # CEF/Chromium version. To bump CEF, change CEF_VERSION below.
 set(CEF_CDN "https://cef-builds.spotifycdn.com")
-set(CEF_VERSION "149.0.4+g2f1bfd8+chromium-149.0.7827.156")
+set(CEF_VERSION "133.4.8+g99a2ab1+chromium-133.0.6943.142")
+# set(CEF_VERSION "149.0.4+g2f1bfd8+chromium-149.0.7827.156")
 
 if(CMAKE_SYSTEM_NAME STREQUAL "Linux")
     message(WARNING "current system is Linux")
