@@ -230,7 +230,7 @@ private:
         return false;
     }
 
-    CefKeyEvent keyEvent;
+    CefKeyEvent keyEvent = {};
     
     NSString* s = [event characters];
     

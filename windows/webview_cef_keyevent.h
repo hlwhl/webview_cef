@@ -90,7 +90,7 @@ int GetCefKeyboardModifiers(WPARAM wparam, LPARAM lparam)
 
 CefKeyEvent getCefKeyEvent(UINT message, WPARAM wparam, LPARAM lparam)
 {
-    CefKeyEvent event;
+    CefKeyEvent event = {};
     event.windows_key_code = (int)wparam;
     event.native_key_code = (int)lparam;
     event.is_system_key = message == WM_SYSCHAR || message == WM_SYSKEYDOWN ||
