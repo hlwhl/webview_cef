@@ -104,6 +104,7 @@ initialize() → createWebView() → [使用中] → dispose() / quit()
 | `loadUrl(String url)` | 加载指定 URL |
 | `reload()` | 刷新当前页面 |
 | `goBack()` / `goForward()` | 前进/后退 |
+| `canGoBack()` / `canGoForward()` | 查询是否有前进/后退历史，返回 `Future<bool>` |
 | `openDevTools()` | 打开 Chrome DevTools |
 
 ### JavaScript

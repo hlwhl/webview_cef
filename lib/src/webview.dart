@@ -144,6 +144,28 @@ class WebViewController extends ValueNotifier<bool> {
     return _pluginChannel.invokeMethod('goBack', _browserId);
   }
 
+  /// Returns whether the browser can navigate backward.
+  Future<bool> canGoBack() async {
+    if (_isDisposed) {
+      return false;
+    }
+    assert(value);
+    return _pluginChannel
+        .invokeMethod<bool>('canGoBack', _browserId)
+        .then((v) => v ?? false);
+  }
+
+  /// Returns whether the browser can navigate forward.
+  Future<bool> canGoForward() async {
+    if (_isDisposed) {
+      return false;
+    }
+    assert(value);
+    return _pluginChannel
+        .invokeMethod<bool>('canGoForward', _browserId)
+        .then((v) => v ?? false);
+  }
+
   Future<void> openDevTools() async {
     if (_isDisposed) {
       return;

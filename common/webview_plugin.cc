@@ -341,6 +341,16 @@ namespace webview_cef {
 			m_handler->goBack(browserId);
 			result(1, nullptr);
 		}
+		else if (name.compare("canGoBack") == 0) {
+			int browserId = int(webview_value_get_int(values));
+			bool val = m_handler->canGoBack(browserId);
+			result(1, webview_value_new_bool(val));
+		}
+		else if (name.compare("canGoForward") == 0) {
+			int browserId = int(webview_value_get_int(values));
+			bool val = m_handler->canGoForward(browserId);
+			result(1, webview_value_new_bool(val));
+		}
 		else if (name.compare("reload") == 0) {
 			int browserId = int(webview_value_get_int(values));
 			m_handler->reload(browserId);

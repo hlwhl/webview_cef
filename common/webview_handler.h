@@ -172,6 +172,8 @@ public:
     void loadUrl(int browserId, std::string url);
     void goForward(int browserId);
     void goBack(int browserId);
+    bool canGoBack(int browserId);
+    bool canGoForward(int browserId);
     void reload(int browserId);
     void openDevTools(int browserId);
 

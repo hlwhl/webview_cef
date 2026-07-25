@@ -15,8 +15,7 @@ class MyApp extends StatefulWidget {
   State<MyApp> createState() => _MyAppState();
 }
 
-class _MyAppState extends State<MyApp>
-    with SingleTickerProviderStateMixin {
+class _MyAppState extends State<MyApp> with SingleTickerProviderStateMixin {
   late WebViewController _controller;
   final _textController = TextEditingController();
   String title = "";
@@ -195,8 +194,10 @@ class _MyAppState extends State<MyApp>
               SizedBox(
                 height: 48,
                 child: MaterialButton(
-                  onPressed: () {
-                    _controller.goBack();
+                  onPressed: () async {
+                    if (await _controller.canGoBack()) {
+                      _controller.goBack();
+                    }
                   },
                   child: const Icon(Icons.arrow_left),
                 ),
@@ -204,8 +205,10 @@ class _MyAppState extends State<MyApp>
               SizedBox(
                 height: 48,
                 child: MaterialButton(
-                  onPressed: () {
-                    _controller.goForward();
+                  onPressed: () async {
+                    if (await _controller.canGoForward()) {
+                      _controller.goForward();
+                    }
                   },
                   child: const Icon(Icons.arrow_right),
                 ),

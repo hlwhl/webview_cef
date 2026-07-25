@@ -460,6 +460,22 @@ void WebviewHandler::goBack(int browserId) {
     }
 }
 
+bool WebviewHandler::canGoBack(int browserId) {
+    auto it = browser_map_.find(browserId);
+    if (it != browser_map_.end()) {
+        return it->second.browser->CanGoBack();
+    }
+    return false;
+}
+
+bool WebviewHandler::canGoForward(int browserId) {
+    auto it = browser_map_.find(browserId);
+    if (it != browser_map_.end()) {
+        return it->second.browser->CanGoForward();
+    }
+    return false;
+}
+
 void WebviewHandler::reload(int browserId) {
     auto it = browser_map_.find(browserId);
     if (it != browser_map_.end()) {
