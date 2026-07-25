@@ -7,6 +7,7 @@
 
 | 文档 | 内容 |
 |------|------|
+| [白话理解](chapter/0-白话理解.md) | **推荐先读** — 口语化讲解核心方案、关键链路和设计决策，附带大量举例 |
 | [架构概览](chapter/1-架构概览.md) | 分层架构、进程模型、数据流、关键设计决策 |
 | [Dart 层 API](chapter/2-Dart层API.md) | WebviewManager、WebViewController、WebView widget、事件监听、JS 通道、IME、用户脚本 |
 | [通用 C++ 层](chapter/3-通用C++层.md) | WebviewPlugin、WebviewHandler、WebviewApp、WValue、WebviewTexture |
@@ -28,9 +29,10 @@
 
 ## 阅读顺序建议
 
-1. 先读 [架构概览](chapter/1-架构概览.md) 建立全局认知
-2. 再读 [Dart 层 API](chapter/2-Dart层API.md) 了解对外接口
-3. 然后读 [通用 C++ 层](chapter/3-通用C++层.md) 了解核心实现
-4. [JSBridge 详解](chapter/4-JSBridge详解.md) 是最复杂的子系统，建议在理解前两者后阅读
-5. [渲染管线](chapter/5-渲染管线.md) 和 [平台输入处理](chapter/6-平台输入处理.md) 可按需查阅
-6. [构建与集成](chapter/7-构建与集成.md) 在需要了解编译配置时查阅
+1. **先读** [白话理解](chapter/0-白话理解.md) — 用大白话和举例讲清楚整体方案，不需要技术背景
+2. 再读 [架构概览](chapter/1-架构概览.md) 建立全局认知
+3. 再读 [Dart 层 API](chapter/2-Dart层API.md) 了解对外接口
+4. 然后读 [通用 C++ 层](chapter/3-通用C++层.md) 了解核心实现
+5. [JSBridge 详解](chapter/4-JSBridge详解.md) 是最复杂的子系统，建议在理解前两者后阅读
+6. [渲染管线](chapter/5-渲染管线.md) 和 [平台输入处理](chapter/6-平台输入处理.md) 可按需查阅
+7. [构建与集成](chapter/7-构建与集成.md) 在需要了解编译配置时查阅
