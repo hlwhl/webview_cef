@@ -16,6 +16,7 @@
 #import "../../common/webview_plugin.h"
 #import "../../common/webview_value.h"
 #import <CoreVideo/CoreVideo.h>
+#import <objc/runtime.h>
 #include <thread>
 
 static NSTimer* _timer;
@@ -29,6 +30,26 @@ NSMapTable* webviewPlugins = [NSMapTable weakToWeakObjectsMapTable];
 // Fires on a high-priority background thread once per display refresh. Hop to
 // the main thread (the CEF UI thread under external_message_pump) to deliver the
 // frame produced by the previous tick and request the next one.
+// CEF on macOS with external_message_pump may call -[NSApplication isHandlingSendEvent]
+// when routing events to a native popup window (e.g. DevTools). That selector belongs
+// to NSWindow, not NSApplication, so it would crash with an unrecognized-selector
+// exception. Provide a no-op implementation on NSApplication as a workaround.
+@interface NSApplication (CEFWorkaround)
+- (BOOL)isHandlingSendEvent;
+- (void)setHandlingSendEvent:(BOOL)handlingSendEvent;
+@end
+
+@implementation NSApplication (CEFWorkaround)
+- (BOOL)isHandlingSendEvent {
+    NSNumber *value = objc_getAssociatedObject(self, @selector(setHandlingSendEvent:));
+    return value ? [value boolValue] : NO;
+}
+- (void)setHandlingSendEvent:(BOOL)handlingSendEvent {
+    objc_setAssociatedObject(self, @selector(setHandlingSendEvent:),
+                             @(handlingSendEvent), OBJC_ASSOCIATION_RETAIN);
+}
+@end
+
 static CVReturn WebviewDisplayLinkCallback(CVDisplayLinkRef displayLink,
                                            const CVTimeStamp* now,
                                            const CVTimeStamp* outputTime,

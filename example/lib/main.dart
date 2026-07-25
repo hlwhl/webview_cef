@@ -1,4 +1,5 @@
 import 'dart:async';
+import 'dart:io';
 
 import 'package:flutter/material.dart';
 import 'package:webview_cef/webview_cef.dart';
@@ -135,6 +136,18 @@ class _MyAppState extends State<MyApp>
     if (!mounted) return;
   }
 
+  void _loadLocalHtml() {
+    final file = File(
+      '${Directory.current.path}'
+      '${Platform.pathSeparator}..'
+      '${Platform.pathSeparator}web-playground'
+      '${Platform.pathSeparator}bridge.html',
+    ).absolute;
+    final fileUrl = file.uri.toString();
+    _controller.loadUrl(fileUrl);
+    _textController.text = fileUrl;
+  }
+
   void _showInfoAlert(BuildContext context) {
     showDialog(
       context: context,
@@ -215,6 +228,13 @@ class _MyAppState extends State<MyApp>
                     },
                     child: const Icon(Icons.info_outline),
                   ),
+                ),
+              ),
+              SizedBox(
+                height: 48,
+                child: MaterialButton(
+                  onPressed: _loadLocalHtml,
+                  child: const Icon(Icons.file_open),
                 ),
               ),
               Expanded(

@@ -1,0 +1,111 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <title>JSBridge Test</title>
+  <style>
+    * { margin: 0; padding: 0; box-sizing: border-box; }
+    body {
+      font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', sans-serif;
+      background: #1a1a2e;
+      color: #e0e0e0;
+      display: flex; justify-content: center; align-items: center;
+      min-height: 100vh; padding: 20px;
+    }
+    .card {
+      background: #16213e; border-radius: 12px;
+      padding: 40px; max-width: 480px; width: 100%;
+      box-shadow: 0 8px 32px rgba(0,0,0,0.4);
+    }
+    h1 { font-size: 1.6rem; color: #e94560; margin-bottom: 8px; }
+    .subtitle { font-size: 0.85rem; color: #a0a0b0; margin-bottom: 28px; }
+    .btn-group { display: flex; flex-direction: column; gap: 12px; }
+    button {
+      padding: 12px 20px; border: none; border-radius: 8px;
+      font-size: 0.95rem; cursor: pointer; font-weight: 600;
+      transition: opacity 0.2s;
+    }
+    button:hover { opacity: 0.85; }
+    button:active { opacity: 0.7; }
+    .btn-console   { background: #533483; color: #fff; }
+    .btn-channel   { background: #e94560; color: #fff; }
+    .btn-eval      { background: #0f3460; color: #fff; }
+    .btn-clear     { background: #2a2a4a; color: #a0a0b0; }
+    #log-area {
+      margin-top: 24px; background: #0d0d1a; border-radius: 8px;
+      padding: 14px; max-height: 260px; overflow-y: auto;
+      font-family: 'SF Mono', 'Fira Code', monospace; font-size: 0.78rem;
+      line-height: 1.6; white-space: pre-wrap; word-break: break-all;
+    }
+    .log-line { border-bottom: 1px solid #1a1a2e; padding: 3px 0; }
+  </style>
+</head>
+<body>
+  <div class="card">
+    <h1>&#x26A1; JSBridge Sanity Check</h1>
+    <p class="subtitle">CEF WebView — console &middot; channel &middot; eval</p>
+
+    <div class="btn-group">
+      <button class="btn-console" onclick="testConsole()">
+        &#x1F4AC; 1. console.log
+      </button>
+      <button class="btn-channel" onclick="testChannel()">
+        &#x1F4E8; 2. Print Channel
+      </button>
+      <button class="btn-eval" onclick="testEval()">
+        &#x26A1; 3. evaluateJavascript
+      </button>
+      <button class="btn-clear" onclick="clearLog()">
+        &#x1F5D1; Clear Log
+      </button>
+    </div>
+
+    <div id="log-area"></div>
+  </div>
+
+  <script>
+    const logArea = document.getElementById('log-area');
+
+    function appendLog(tag, msg) {
+      const t = new Date().toLocaleTimeString();
+      logArea.innerHTML += `<div class="log-line">[${t}] <b>${tag}</b>: ${msg}</div>`;
+      logArea.scrollTop = logArea.scrollHeight;
+    }
+
+    function clearLog() {
+      logArea.innerHTML = '';
+      appendLog('UI', 'Log cleared');
+    }
+
+    // ── 1. console.log ──────────────────────────────
+    function testConsole() {
+      console.log('hello_from_console_log');
+      appendLog('Console', '<code>console.log("hello_from_console_log")</code> sent');
+    }
+
+    // ── 2. Print JavaScriptChannel ──────────────────
+    function testChannel() {
+      if (typeof Print !== 'undefined') {
+        Print.postMessage(JSON.stringify({ msg: 'hello_from_print_channel' }));
+        appendLog('Channel', '<code>Print.postMessage(...)</code> sent');
+      } else {
+        appendLog('Channel', '<span style="color:#e94560">Print channel NOT registered</span>');
+      }
+    }
+
+    // ── 3. evaluateJavascript (abc function) ────────
+    function testEval() {
+      if (typeof abc === 'function') {
+        var result = abc('bridge_test');
+        appendLog('Eval', '<code>abc("bridge_test")</code> → <b>' + result + '</b>');
+      } else {
+        appendLog('Eval', '<span style="color:#e94560">abc() NOT defined</span>');
+      }
+    }
+
+    // Boot log
+    appendLog('Init', 'bridge.html loaded');
+    console.log('bridge.html ready');
+  </script>
+</body>
+</html>
