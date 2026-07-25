@@ -54,8 +54,8 @@ class WebViewController extends ValueNotifier<bool> {
   final Map<String, JavascriptChannel> _javascriptChannels =
       <String, JavascriptChannel>{};
   Map<String, JavascriptChannel> get javascriptChannels => _javascriptChannels;
-  WebviewEventsListener? _listener;
-  WebviewEventsListener? get listener => _listener;
+  WebViewEventsListener? _listener;
+  WebViewEventsListener? get listener => _listener;
 
   get onJavascriptChannelMessage => (final String channelName,
           final String message, final String callbackId, final String frameId) {
@@ -95,7 +95,7 @@ class WebViewController extends ValueNotifier<bool> {
     return _creatingCompleter.future;
   }
 
-  setWebviewListener(WebviewEventsListener listener) {
+  setWebviewListener(WebViewEventsListener listener) {
     _listener = listener;
   }
 
@@ -172,6 +172,24 @@ class WebViewController extends ValueNotifier<bool> {
     }
     assert(value);
     return _pluginChannel.invokeMethod('openDevTools', _browserId);
+  }
+
+  /// Returns the current page title, or `null` if unavailable.
+  Future<String?> getTitle() async {
+    if (_isDisposed) {
+      return null;
+    }
+    assert(value);
+    return _pluginChannel.invokeMethod<String>('getTitle', _browserId);
+  }
+
+  /// Stops the current page load.
+  Future<void> stopLoading() async {
+    if (_isDisposed) {
+      return;
+    }
+    assert(value);
+    return _pluginChannel.invokeMethod('stopLoading', _browserId);
   }
 
   Future<void> imeSetComposition(String composingText) async {

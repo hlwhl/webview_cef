@@ -6,6 +6,7 @@ import 'package:flutter/widgets.dart';
 import 'package:webview_cef/src/webview_inject_user_script.dart';
 
 import 'webview.dart';
+import 'webview_events_listener.dart';
 
 class WebviewManager extends ValueNotifier<bool> {
   static final WebviewManager _instance = WebviewManager._internal();
@@ -92,20 +93,6 @@ class WebviewManager extends ValueNotifier<bool> {
 
   Future<void> methodCallhandler(MethodCall call) async {
     switch (call.method) {
-      case "urlChanged":
-        int browserId = call.arguments["browserId"] as int;
-        _webViews[browserId]
-            ?.listener
-            ?.onUrlChanged
-            ?.call(call.arguments["url"] as String);
-        return;
-      case "titleChanged":
-        int browserId = call.arguments["browserId"] as int;
-        _webViews[browserId]
-            ?.listener
-            ?.onTitleChanged
-            ?.call(call.arguments["title"] as String);
-        return;
       case "onConsoleMessage":
         int browserId = call.arguments["browserId"] as int;
         _webViews[browserId]?.listener?.onConsoleMessage?.call(
@@ -152,7 +139,7 @@ class WebviewManager extends ValueNotifier<bool> {
 
         WebViewController controller =
         _webViews[browserId] as WebViewController;
-        _webViews[browserId]?.listener?.onLoadStart?.call(controller, urlId);
+        _webViews[browserId]?.listener?.onPageStarted?.call(controller, urlId);
         return;
       case 'onLoadEnd':
         int browserId = call.arguments["browserId"] as int;
@@ -162,7 +149,28 @@ class WebviewManager extends ValueNotifier<bool> {
 
         WebViewController controller =
         _webViews[browserId] as WebViewController;
-        _webViews[browserId]?.listener?.onLoadEnd?.call(controller, urlId);
+        _webViews[browserId]?.listener?.onPageFinished?.call(controller, urlId);
+        return;
+      case 'onBeforeBrowse':
+        int browserId = call.arguments['browserId'] as int;
+        String url = call.arguments['url'] as String;
+        WebViewController ctrl = _webViews[browserId] as WebViewController;
+        _webViews[browserId]?.listener?.onNavigateRequest?.call(ctrl, url);
+        return;
+      case 'onLoadingProgressChange':
+        int browserId = call.arguments['browserId'] as int;
+        double progress = (call.arguments['progress'] as num).toDouble();
+        WebViewController ctrl2 = _webViews[browserId] as WebViewController;
+        _webViews[browserId]?.listener?.onProgressUpdated?.call(ctrl2, progress);
+        return;
+      case 'onLoadError':
+        int browserId = call.arguments['browserId'] as int;
+        String errorUrl = call.arguments['url'] as String;
+        int errorCode = call.arguments['errorCode'] as int;
+        String errorText = call.arguments['errorText'] as String;
+        WebViewController ctrl3 = _webViews[browserId] as WebViewController;
+        final error = WebViewError(errorCode, errorText, {'url': errorUrl});
+        _webViews[browserId]?.listener?.onPageFailed?.call(ctrl3, errorUrl, error);
         return;
       default:
     }

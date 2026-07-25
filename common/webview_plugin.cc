@@ -245,6 +245,54 @@ namespace webview_cef {
                 }
             };
 
+            m_handler->onBeforeBrowseCallback = [=, this](int nBrowserId, std::string url) {
+                if (m_invokeFunc) {
+                    WValue* bId = webview_value_new_int(nBrowserId);
+                    WValue* uId = webview_value_new_string(const_cast<char*>(url.c_str()));
+                    WValue* retMap = webview_value_new_map();
+                    webview_value_set_string(retMap, "browserId", bId);
+                    webview_value_set_string(retMap, "url", uId);
+                    m_invokeFunc("onBeforeBrowse", retMap);
+                    webview_value_unref(bId);
+                    webview_value_unref(uId);
+                    webview_value_unref(retMap);
+                }
+            };
+
+            m_handler->onLoadingProgressChangeCallback = [=, this](int nBrowserId, double progress) {
+                if (m_invokeFunc) {
+                    WValue* bId = webview_value_new_int(nBrowserId);
+                    WValue* prog = webview_value_new_double(progress);
+                    WValue* retMap = webview_value_new_map();
+                    webview_value_set_string(retMap, "browserId", bId);
+                    webview_value_set_string(retMap, "progress", prog);
+                    m_invokeFunc("onLoadingProgressChange", retMap);
+                    webview_value_unref(bId);
+                    webview_value_unref(prog);
+                    webview_value_unref(retMap);
+                }
+            };
+
+            m_handler->onLoadErrorCallback = [=, this](int nBrowserId, int errorCode, std::string errorText, std::string failedUrl) {
+                if (m_invokeFunc) {
+                    WValue* bId = webview_value_new_int(nBrowserId);
+                    WValue* code = webview_value_new_int(errorCode);
+                    WValue* text = webview_value_new_string(const_cast<char*>(errorText.c_str()));
+                    WValue* url = webview_value_new_string(const_cast<char*>(failedUrl.c_str()));
+                    WValue* retMap = webview_value_new_map();
+                    webview_value_set_string(retMap, "browserId", bId);
+                    webview_value_set_string(retMap, "errorCode", code);
+                    webview_value_set_string(retMap, "errorText", text);
+                    webview_value_set_string(retMap, "url", url);
+                    m_invokeFunc("onLoadError", retMap);
+                    webview_value_unref(bId);
+                    webview_value_unref(code);
+                    webview_value_unref(text);
+                    webview_value_unref(url);
+                    webview_value_unref(retMap);
+                }
+            };
+
 			m_init = true;
 		}
 	}
@@ -260,6 +308,9 @@ namespace webview_cef {
 		m_handler->onJavaScriptChannelMessage = nullptr;
 		m_handler->onFocusedNodeChangeMessage = nullptr;
 		m_handler->onImeCompositionRangeChangedMessage = nullptr;
+		m_handler->onBeforeBrowseCallback = nullptr;
+		m_handler->onLoadingProgressChangeCallback = nullptr;
+		m_handler->onLoadErrorCallback = nullptr;
 		m_init = false;
 	}
 
@@ -354,6 +405,18 @@ namespace webview_cef {
 		else if (name.compare("reload") == 0) {
 			int browserId = int(webview_value_get_int(values));
 			m_handler->reload(browserId);
+			result(1, nullptr);
+		}
+		else if (name.compare("getTitle") == 0) {
+			int browserId = int(webview_value_get_int(values));
+			std::string title = m_handler->getTitle(browserId);
+			WValue* ret = webview_value_new_string(title.c_str());
+			result(1, ret);
+			webview_value_unref(ret);
+		}
+		else if (name.compare("stopLoading") == 0) {
+			int browserId = int(webview_value_get_int(values));
+			m_handler->stopLoading(browserId);
 			result(1, nullptr);
 		}
 		else if (name.compare("openDevTools") == 0) {			

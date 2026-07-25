@@ -80,42 +80,20 @@ class _MyAppState extends State<MyApp> with SingleTickerProviderStateMixin {
     String url = "www.baidu.com";
     _textController.text = url;
     //unified interface for all platforms set user agent
-    _controller.setWebviewListener(WebviewEventsListener(
-      onTitleChanged: (t) {
-        setState(() {
-          title = t;
-        });
-      },
-      onUrlChanged: (url) {
-        _textController.text = url;
-        final Set<JavascriptChannel> jsChannels = {
-          JavascriptChannel(
-              name: 'Print',
-              onMessageReceived: (JavascriptMessage message) {
-                debugPrint(message.message);
-                _controller.sendJavaScriptChannelCallBack(
-                    false,
-                    "{'code':'200','message':'print succeed!'}",
-                    message.callbackId,
-                    message.frameId);
-              }),
-        };
-        //normal JavaScriptChannels
-        _controller.setJavaScriptChannels(jsChannels);
-        //also you can build your own jssdk by execute JavaScript code to CEF
-        _controller.executeJavaScript("function abc(e){return 'abc:'+ e}");
-        _controller
-            .evaluateJavascript("abc('test')")
-            .then((value) => debugPrint(value));
-      },
-      onLoadStart: (controller, url) {
-        debugPrint("onLoadStart => $url");
+    _controller.setWebviewListener(WebViewEventsListener(
+      onPageStarted: (controller, url) {
+        debugPrint("onPageStarted => $url");
         _progress = 0;
         _showProgress = true;
         _progressAnimController.forward(from: 0);
       },
-      onLoadEnd: (controller, url) {
-        debugPrint("onLoadEnd => $url");
+      onPageFinished: (controller, url) {
+        debugPrint("onPageFinished => $url");
+        controller.getTitle().then((t) {
+          if (t != null && mounted) {
+            setState(() => title = t);
+          }
+        });
         _progressAnimController.forward(from: 0).then((_) {
           if (mounted) {
             setState(() {
@@ -124,6 +102,29 @@ class _MyAppState extends State<MyApp> with SingleTickerProviderStateMixin {
             });
           }
         });
+      },
+      onNavigateRequest: (controller, url) {
+        debugPrint("onNavigateRequest => $url");
+        // Example: block navigation to certain domains
+        if (url.contains('spam.com')) {
+          debugPrint("Navigation to '$url' blocked.");
+          controller.stopLoading();
+          return NavigationPolicy.cancel;
+        }
+        return NavigationPolicy.allow;
+      },
+      onProgressUpdated: (controller, progress) {
+        debugPrint("onProgressUpdated => ${(progress * 100).toStringAsFixed(0)}%");
+        // Update a progress indicator with the 0.0-1.0 value.
+        _progressAnimController.value = progress;
+      },
+      onPageFailed: (controller, url, error) {
+        debugPrint(
+            "onPageFailed => url: $url, code: ${error.code}, "
+            "message: ${error.message}");
+        // Hide progress on error.
+        _showProgress = false;
+        _progress = 0;
       },
     ));
 

@@ -102,8 +102,11 @@ bool WebviewHandler::OnProcessMessageReceived(
 
 void WebviewHandler::OnTitleChange(CefRefPtr<CefBrowser> browser,
                                   const CefString& title) {
-    //todo: title change
-    if(onTitleChangedEvent) {
+    auto it = browser_map_.find(browser->GetIdentifier());
+    if (it != browser_map_.end()) {
+        it->second.title = title.ToString();
+    }
+    if (onTitleChangedEvent) {
         onTitleChangedEvent(browser->GetIdentifier(), title);
     }
 }
@@ -111,7 +114,7 @@ void WebviewHandler::OnTitleChange(CefRefPtr<CefBrowser> browser,
 void WebviewHandler::OnAddressChange(CefRefPtr<CefBrowser> browser,
                              CefRefPtr<CefFrame> frame,
                      const CefString& url) {
-    if(onUrlChangedEvent) {
+    if (onUrlChangedEvent) {
         onUrlChangedEvent(browser->GetIdentifier(), url);
     }
 }
@@ -120,7 +123,7 @@ bool WebviewHandler::OnCursorChange(CefRefPtr<CefBrowser> browser,
                             CefCursorHandle cursor,
                             cef_cursor_type_t type,
                             const CefCursorInfo& custom_cursor_info){
-    if(onCursorChangedEvent) {
+    if (onCursorChangedEvent) {
         onCursorChangedEvent(browser->GetIdentifier(), type);
         return true;
     }
@@ -128,7 +131,7 @@ bool WebviewHandler::OnCursorChange(CefRefPtr<CefBrowser> browser,
 }
 
 bool WebviewHandler::OnTooltip(CefRefPtr<CefBrowser> browser, CefString& text) {
-    if(onTooltipEvent) {
+    if (onTooltipEvent) {
         onTooltipEvent(browser->GetIdentifier(), text);
         return true;
     }
@@ -206,15 +209,29 @@ void WebviewHandler::OnLoadError(CefRefPtr<CefBrowser> browser,
     // Don't display an error for downloaded files.
     if (errorCode == ERR_ABORTED)
         return;
-    
-    // Display a load error message using a data: URI.
-    std::stringstream ss;
-    ss << "<html><body bgcolor=\"white\">"
-    "<h2>Failed to load URL "
-    << std::string(failedUrl) << " with error " << std::string(errorText)
-    << " (" << errorCode << ").</h2></body></html>";
-    
-    frame->LoadURL(GetDataURI(ss.str(), "text/html"));
+
+    // Notify Dart so the app can show its own error UI.
+    if (onLoadErrorCallback) {
+        onLoadErrorCallback(browser->GetIdentifier(),
+                            static_cast<int>(errorCode),
+                            errorText.ToString(),
+                            failedUrl.ToString());
+    }
+
+    // The built-in error page is intentionally disabled — it interferes with
+    // goBack/goForward navigation. The Dart listener (onPageFailed) owns error
+    // display now. Uncomment the block below to restore the default error page
+    // when no listener is set:
+    //
+    // if (!onLoadErrorCallback) {
+    //     std::stringstream ss;
+    //     ss << "<html><body bgcolor=\"white\">"
+    //        << "<h2>Failed to load URL "
+    //        << std::string(failedUrl) << " with error "
+    //        << std::string(errorText) << " (" << errorCode
+    //        << ").</h2></body></html>";
+    //     frame->LoadURL(GetDataURI(ss.str(), "text/html"));
+    // }
 }
 
 void WebviewHandler::OnLoadStart(CefRefPtr<CefBrowser> browser, CefRefPtr<CefFrame> frame,
@@ -231,6 +248,27 @@ void WebviewHandler::OnLoadEnd(CefRefPtr<CefBrowser> browser, CefRefPtr<CefFrame
         onLoadEnd(browser->GetIdentifier(), frame->GetURL());
     }
     return;
+}
+
+void WebviewHandler::OnLoadingProgressChange(CefRefPtr<CefBrowser> browser,
+                                              double progress) {
+    if (onLoadingProgressChangeCallback) {
+        onLoadingProgressChangeCallback(browser->GetIdentifier(), progress);
+    }
+}
+
+bool WebviewHandler::OnBeforeBrowse(CefRefPtr<CefBrowser> browser,
+                                     CefRefPtr<CefFrame> frame,
+                                     CefRefPtr<CefRequest> request,
+                                     bool user_gesture,
+                                     bool is_redirect) {
+    // Always allow the navigation; notify Dart asynchronously so it can
+    // call stopLoading() if the user wants to cancel.
+    if (onBeforeBrowseCallback) {
+        onBeforeBrowseCallback(browser->GetIdentifier(),
+                               request->GetURL().ToString());
+    }
+    return false; // false = allow navigation
 }
 
 void WebviewHandler::CloseAllBrowsers(bool force_close) {
@@ -481,6 +519,21 @@ void WebviewHandler::reload(int browserId) {
     if (it != browser_map_.end()) {
         it->second.browser->GetMainFrame()->GetBrowser()->Reload();
     }
+}
+
+void WebviewHandler::stopLoading(int browserId) {
+    auto it = browser_map_.find(browserId);
+    if (it != browser_map_.end()) {
+        it->second.browser->StopLoad();
+    }
+}
+
+std::string WebviewHandler::getTitle(int browserId) {
+    auto it = browser_map_.find(browserId);
+    if (it != browser_map_.end()) {
+        return it->second.title;
+    }
+    return "";
 }
 
 void WebviewHandler::openDevTools(int browserId) {
