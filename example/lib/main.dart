@@ -102,6 +102,27 @@ class _MyAppState extends State<MyApp> with SingleTickerProviderStateMixin {
             });
           }
         });
+
+        final Set<JavascriptChannel> jsChannels = {
+          JavascriptChannel(
+              name: 'Print',
+              onMessageReceived: (JavascriptMessage message) {
+                debugPrint(message.message);
+                _controller.sendJavaScriptChannelCallBack(
+                    false,
+                    "{'code':'200','message':'print succeed!'}",
+                    message.callbackId,
+                    message.frameId);
+              }),
+        };
+
+        //normal JavaScriptChannels
+        _controller.setJavaScriptChannels(jsChannels);
+        //also you can build your own jssdk by execute JavaScript code to CEF
+        _controller.executeJavaScript("function abc(e){return 'abc:'+ e}");
+        _controller
+            .evaluateJavascript("abc('test')")
+            .then((value) => debugPrint(value));
       },
       onNavigateRequest: (controller, url) {
         debugPrint("onNavigateRequest => $url");
@@ -114,13 +135,13 @@ class _MyAppState extends State<MyApp> with SingleTickerProviderStateMixin {
         return NavigationPolicy.allow;
       },
       onProgressUpdated: (controller, progress) {
-        debugPrint("onProgressUpdated => ${(progress * 100).toStringAsFixed(0)}%");
+        debugPrint(
+            "onProgressUpdated => ${(progress * 100).toStringAsFixed(0)}%");
         // Update a progress indicator with the 0.0-1.0 value.
         _progressAnimController.value = progress;
       },
       onPageFailed: (controller, url, error) {
-        debugPrint(
-            "onPageFailed => url: $url, code: ${error.code}, "
+        debugPrint("onPageFailed => url: $url, code: ${error.code}, "
             "message: ${error.message}");
         // Hide progress on error.
         _showProgress = false;

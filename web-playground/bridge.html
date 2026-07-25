@@ -85,11 +85,11 @@
 
     // ── 2. Print JavaScriptChannel ──────────────────
     function testChannel() {
-      if (typeof Print !== 'undefined') {
-        Print.postMessage(JSON.stringify({ msg: 'hello_from_print_channel' }));
-        appendLog('Channel', '<code>Print.postMessage(...)</code> sent');
+      if (typeof $cef !== 'undefined' && typeof $cef.Print !== 'undefined') {
+        $cef.Print.postMessage(JSON.stringify({ msg: 'hello_from_print_channel' }));
+        appendLog('Channel', '<code>$cef.Print.postMessage(...)</code> sent');
       } else {
-        appendLog('Channel', '<span style="color:#e94560">Print channel NOT registered</span>');
+        appendLog('Channel', '<span style="color:#e94560">$cef.Print channel NOT registered</span>');
       }
     }
 
