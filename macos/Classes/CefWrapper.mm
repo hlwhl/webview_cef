@@ -206,6 +206,12 @@ private:
 // versus navigation/control keys and shortcuts (which CEF handles as raw key
 // events). Returning YES means "let the IME have it"; NO means "send to CEF".
 + (BOOL)isImeRoutableKeyEvent:(NSEvent*)event {
+    // NSEventTypeFlagsChanged events (modifier-key presses like Ctrl, Opt, Shift,
+    // Cmd, CapsLock, Fn) carry no characters. |charactersIgnoringModifiers| is
+    // only valid for KeyDown / KeyUp and throws on macOS 26+ for FlagsChanged.
+    if ([event type] == NSEventTypeFlagsChanged) {
+        return NO;
+    }
     NSEventModifierFlags flags = [event modifierFlags];
     // Shortcuts / control sequences (⌘/⌃ chords) go straight to CEF.
     if (flags & (NSEventModifierFlagCommand | NSEventModifierFlagControl)) {
@@ -252,31 +258,63 @@ private:
     }
 
     CefKeyEvent keyEvent = {};
-    
-    NSString* s = [event characters];
-    
-    if ([s length] != 0){
-        keyEvent.character = [s characterAtIndex:0];
+
+    // |characters| and |charactersIgnoringModifiers| are only valid for
+    // NSEventTypeKeyDown and NSEventTypeKeyUp. On macOS 26+, calling them on
+    // an NSEventTypeFlagsChanged event throws an ObjC exception. Extract
+    // characters first for key-down/up events, then let the FlagsChanged
+    // branch below zero them out.
+    if ([event type] != NSEventTypeFlagsChanged) {
+        NSString* s = [event characters];
+        if ([s length] != 0){
+            keyEvent.character = [s characterAtIndex:0];
+        }
+
+        s = [event charactersIgnoringModifiers];
+        if ([s length] > 0){
+            keyEvent.unmodified_character = [s characterAtIndex:0];
+        }
     }
 
-    s = [event charactersIgnoringModifiers];
-    if ([s length] > 0){
-        keyEvent.unmodified_character = [s characterAtIndex:0];
-    }
-    
-    if ([event type] == NSEventTypeFlagsChanged){
-        keyEvent.character = 0;
-        keyEvent.unmodified_character = 0;
-    }
-        
     keyEvent.native_key_code = [event keyCode];
-    
+
     keyEvent.modifiers = [CefWrapper getModifiersForEvent:event];
 
-//    if(keyEvent.native_key_code == 51){
-//        keyEvent.character = 0;
-//        keyEvent.unmodified_character = 0;
-//    }
+    // FlagsChanged (modifier keys like Cmd/Shift/Option/Ctrl) does not
+    // distinguish press vs release — determine it from the new modifier state.
+    // Must handle this BEFORE the KeyDown/KeyUp check so modifier state changes
+    // are consumed and never leak through to Flutter's HardwareKeyboard.
+    if ([event type] == NSEventTypeFlagsChanged) {
+        bool isPress = false;
+        switch ([event keyCode]) {
+            case 54: // Command Right
+            case 55: // Command Left
+                isPress = ([event modifierFlags] & NSEventModifierFlagCommand) != 0;
+                break;
+            case 56: // Shift Left
+            case 60: // Shift Right
+                isPress = ([event modifierFlags] & NSEventModifierFlagShift) != 0;
+                break;
+            case 59: // Control Left
+            case 62: // Control Right
+                isPress = ([event modifierFlags] & NSEventModifierFlagControl) != 0;
+                break;
+            case 58: // Option Left
+            case 61: // Option Right
+                isPress = ([event modifierFlags] & NSEventModifierFlagOption) != 0;
+                break;
+            case 63: // Function
+                isPress = ([event modifierFlags] & NSEventModifierFlagFunction) != 0;
+                break;
+            default:
+                isPress = true;
+                break;
+        }
+        keyEvent.type = isPress ? KEYEVENT_RAWKEYDOWN : KEYEVENT_KEYUP;
+        currentPlugin->_plugin->sendKeyEvent(keyEvent);
+        return true;
+    }
+
     if([event type] == NSEventTypeKeyDown){
         keyEvent.type = KEYEVENT_RAWKEYDOWN;
         currentPlugin->_plugin->sendKeyEvent(keyEvent);
@@ -450,14 +488,7 @@ private:
     if(isCefMessageLoop == NO){
         _timer = [NSTimer timerWithTimeInterval:0.016f target:self selector:@selector(doMessageLoopWork) userInfo:nil repeats:YES];
         [[NSRunLoop mainRunLoop] addTimer: _timer forMode:NSRunLoopCommonModes];
-        [NSEvent addLocalMonitorForEventsMatchingMask:NSEventMaskKeyDown handler:^NSEvent * _Nullable(NSEvent * _Nonnull event) {
-            if([CefWrapper processKeyboardEvent:event]){
-                return nil;
-            }
-            return event;
-        }];
-            
-        [NSEvent addLocalMonitorForEventsMatchingMask:NSEventMaskKeyUp handler:^NSEvent * _Nullable(NSEvent * _Nonnull event) {
+        [NSEvent addLocalMonitorForEventsMatchingMask:(NSEventMaskKeyDown | NSEventMaskKeyUp | NSEventMaskFlagsChanged) handler:^NSEvent * _Nullable(NSEvent * _Nonnull event) {
             if([CefWrapper processKeyboardEvent:event]){
                 return nil;
             }
