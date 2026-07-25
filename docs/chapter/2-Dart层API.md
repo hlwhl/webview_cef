@@ -16,7 +16,7 @@ WebviewManager (单例, ValueNotifier<bool>)
   │                         │                      └── WebViewState
   │                         │                           + WebeViewTextInput (mixin)
   │                         │
-  │                         ├── setWebviewListener() ──► WebviewEventsListener
+  │                         ├── setWebviewListener() ──► WebViewEventsListener
   │                         ├── setJavaScriptChannels() ──► Set<JavascriptChannel>
   │                         └── executeJavaScript() / evaluateJavascript()
   │
@@ -53,16 +53,17 @@ initialize() → createWebView() → [使用中] → dispose() / quit()
 
 `methodCallhandler(MethodCall call)` 处理来自原生端的所有事件回调。事件通过**两条路径**路由：
 
-- **WebviewEventsListener**（用户通过 `setWebviewListener` 注册）：页面生命周期和导航事件
+- **WebViewEventsListener**（用户通过 `setWebviewListener` 注册）：页面生命周期和导航事件
 - **WebViewController 直接回调**：JS 通道、输入、焦点等内部事件
 
 | 方法名 | 路由路径 | 终点 |
 |--------|----------|------|
-| `urlChanged` | listener | `WebviewEventsListener.onUrlChanged` |
-| `titleChanged` | listener | `WebviewEventsListener.onTitleChanged` |
-| `onConsoleMessage` | listener | `WebviewEventsListener.onConsoleMessage` |
-| `onLoadStart` | listener | `WebviewEventsListener.onLoadStart` + 注入 LOAD_START 脚本 |
-| `onLoadEnd` | listener | `WebviewEventsListener.onLoadEnd` + 注入 LOAD_END 脚本 |
+| `onConsoleMessage` | listener | `WebViewEventsListener.onConsoleMessage` |
+| `onLoadStart` | listener | `WebViewEventsListener.onPageStarted` + 注入 LOAD_START 脚本 |
+| `onLoadEnd` | listener | `WebViewEventsListener.onPageFinished` + 注入 LOAD_END 脚本 |
+| `onBeforeBrowse` | listener | `WebViewEventsListener.onNavigateRequest` |
+| `onLoadingProgressChange` | listener | `WebViewEventsListener.onProgressUpdated` |
+| `onLoadError` | listener | `WebViewEventsListener.onPageFailed` |
 | `javascriptChannelMessage` | controller | `onJavascriptChannelMessage` → `JavascriptChannel.onMessageReceived` |
 | `onTooltip` | controller | `onToolTip` → `WebviewTooltip` |
 | `onCursorChanged` | controller | `onCursorChanged` → `MouseRegion` cursor |
@@ -106,6 +107,8 @@ initialize() → createWebView() → [使用中] → dispose() / quit()
 | `goBack()` / `goForward()` | 前进/后退 |
 | `canGoBack()` / `canGoForward()` | 查询是否有前进/后退历史，返回 `Future<bool>` |
 | `openDevTools()` | 打开 Chrome DevTools |
+| `stopLoading()` | 中止当前页面加载 |
+| `getTitle()` | 获取当前页面标题，返回 `Future<String?>` |
 
 ### JavaScript
 
@@ -184,21 +187,41 @@ Focus (焦点管理, autofocus: true)
 
 ---
 
-## WebviewEventsListener
+## WebViewEventsListener
 
 **文件**：`lib/src/webview_events_listener.dart`
 
-可选回调接口：
+所有回调均为可选，通过 `WebViewController.setWebviewListener()` 注册：
 
 ```dart
-WebviewEventsListener({
-  onTitleChanged: (String title) {},
-  onUrlChanged: (String url) {},
+WebViewEventsListener(
   onConsoleMessage: (int level, String message, String source, int line) {},
-  onLoadStart: (WebViewController controller, String url) {},
-  onLoadEnd: (WebViewController controller, String url) {},
-})
+  onNavigateRequest: (WebViewController controller, String url) {
+    // 返回 NavigationPolicy.cancel 以阻止导航，需调用 controller.stopLoading()
+    return NavigationPolicy.allow;
+  },
+  onPageStarted: (WebViewController controller, String url) {},
+  onPageFinished: (WebViewController controller, String url) {},
+  onProgressUpdated: (WebViewController controller, double progress) {},
+  onPageFailed: (WebViewController controller, String url, WebViewError error) {},
+)
 ```
+
+### 回调说明
+
+| 回调 | 类型 | CEF 触发源 | 说明 |
+|------|------|-----------|------|
+| `onConsoleMessage` | `PageConsoleCallback` | `OnConsoleMessage` | 页面 console 日志 |
+| `onNavigateRequest` | `PageNavigationDelegate` | `OnBeforeBrowse` | 导航拦截（返回 `cancel` + 调 `stopLoading()` 中止） |
+| `onPageStarted` | `PageStartedCallback` | `OnLoadStart` | 页面开始加载 |
+| `onPageFinished` | `PageFinishedCallback` | `OnLoadEnd` | 页面加载完成 |
+| `onProgressUpdated` | `PageProgressCallback` | `OnLoadingProgressChange` | 加载进度 0.0–1.0 |
+| `onPageFailed` | `PageErrorCallback` | `OnLoadError` | 加载失败，携带 `WebViewError` |
+
+### 辅助类型
+
+- **`NavigationPolicy`**：枚举 `cancel` / `allow`
+- **`WebViewError`**：`{ int code, String message, Map<String, dynamic>? extraInfo }`，`extraInfo["url"]` 为失败 URL
 
 ---
 
