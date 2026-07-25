@@ -195,6 +195,35 @@ void WebviewApp::SetUnSafelyTreatInsecureOriginAsSecure(const CefString &strFilt
     m_strFilterDomain = strFilterDomain;
 }
 
+
+// Register V8 extension, wire JS ↔ C++ bridge
+//
+// Call chain:
+//   Print.postMessage(json)          // JS call (injected by setJavaScriptChannels)
+//     → external.JavaScriptChannel('Print', json)
+//       → external.StartRequest(reqID, 'Print', '', json)
+//         → [V8 native function] → CefJSHandler::Execute("StartRequest")
+//           → CefJSBridge::StartRequest()
+//             → frame->SendProcessMessage(PID_BROWSER)  ← cross-process
+//               → WebviewHandler::OnProcessMessageReceived
+//                 → onJavaScriptChannelMessage → Flutter Dart
+//
+// @example
+// ```javascript
+//   // Fire-and-forget
+//   Print.postMessage(JSON.stringify({msg: 'hello'}));
+//
+//   // With callback: callback(error, result)
+//   Print.postMessage(JSON.stringify({msg: 'hello'}), function(err, res) {
+//     console.log('reply:', res);
+//   });
+// ```
+//
+// external namespace:
+//   JavaScriptChannel(n, e, r) — n=channel name, e=payload, r=optional callback
+//   StartRequest(...)           — V8 native function, sends cross-process message
+//   GetNextReqID()              — monotonic request ID generator
+//   EvaluateCallback(id, val)   — callback channel for evaluateJavascript
 void WebviewApp::OnWebKitInitialized()
 {
     //inject js function for jssdk

@@ -664,9 +664,9 @@ void WebviewHandler::setJavaScriptChannels(int browserId, const std::vector<std:
     for(auto& channel : channels)
     {
         extensionCode += channel;
-        extensionCode += " = (e,r) => {external.JavaScriptChannel('";
+        extensionCode += " = {postMessage: (e,r) => {external.JavaScriptChannel('";
         extensionCode += channel;
-        extensionCode += "',e,r)};";
+        extensionCode += "',e,r)}};";
     }
     extensionCode += "}catch(e){console.log(e);}";
     executeJavaScript(browserId, extensionCode);
