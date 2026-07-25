@@ -732,8 +732,8 @@ void WebviewHandler::setJavaScriptChannels(int browserId, const std::vector<std:
     std::string extensionCode = "try{";
     for(auto& channel : channels)
     {
-        extensionCode += channel;
-        extensionCode += " = {postMessage: (e,r) => {external.JavaScriptChannel('";
+        extensionCode += "$cef." + channel;
+        extensionCode += " = {postMessage: (e,r) => {$cef.JavaScriptChannel('";
         extensionCode += channel;
         extensionCode += "',e,r)}};";
     }
@@ -784,7 +784,7 @@ void WebviewHandler::executeJavaScript(int browserId, const std::string code, st
                 if(callback != nullptr){
                     std::string callbackId = GetCallbackId();
 
-                    finalCode = "external.EvaluateCallback('";
+                    finalCode = "$cef.EvaluateCallback('";
                     finalCode += callbackId;
                     finalCode += "',(function(){return ";
                     finalCode += code;

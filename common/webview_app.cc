@@ -200,8 +200,8 @@ void WebviewApp::SetUnSafelyTreatInsecureOriginAsSecure(const CefString &strFilt
 //
 // Call chain:
 //   Print.postMessage(json)          // JS call (injected by setJavaScriptChannels)
-//     → external.JavaScriptChannel('Print', json)
-//       → external.StartRequest(reqID, 'Print', '', json)
+//     → $cef.JavaScriptChannel('Print', json)
+//       → $cef.StartRequest(reqID, 'Print', '', json)
 //         → [V8 native function] → CefJSHandler::Execute("StartRequest")
 //           → CefJSBridge::StartRequest()
 //             → frame->SendProcessMessage(PID_BROWSER)  ← cross-process
@@ -219,7 +219,7 @@ void WebviewApp::SetUnSafelyTreatInsecureOriginAsSecure(const CefString &strFilt
 //   });
 // ```
 //
-// external namespace:
+// $cef namespace:
 //   JavaScriptChannel(n, e, r) — n=channel name, e=payload, r=optional callback
 //   StartRequest(...)           — V8 native function, sends cross-process message
 //   GetNextReqID()              — monotonic request ID generator
@@ -228,7 +228,7 @@ void WebviewApp::OnWebKitInitialized()
 {
     //inject js function for jssdk
     std::string extensionCode = R"(
-			var external = {};
+			var $cef = {};
 			var clientSdk = {};
 			(() => {
 				clientSdk.jsCmd = (functionName, arg1, arg2, arg3) => {
@@ -256,7 +256,7 @@ void WebviewApp::OnWebKitInitialized()
 					}
 				};
 
-                external.JavaScriptChannel = (n,e,r) => {
+                $cef.JavaScriptChannel = (n,e,r) => {
                     var a; 
                     null == r ? a = '' : (a = '_' + new Date + (1e3 + Math.floor(8999 * Math.random())), window[a] = function (n, e) { 
                         return function () { 
@@ -268,22 +268,22 @@ void WebviewApp::OnWebKitInitialized()
                         } 
                     }(a, r)); 
                     try {
-                        external.StartRequest(external.GetNextReqID(), n, a, JSON.stringify(e || {}), '') 
+                        $cef.StartRequest($cef.GetNextReqID(), n, a, JSON.stringify(e || {}), '') 
                     } catch (l) {
                         console.log('messeage send')
                     }
                 }
 
-                external.EvaluateCallback = (nReqID, result) => {
+                $cef.EvaluateCallback = (nReqID, result) => {
                     native function EvaluateCallback();
                     EvaluateCallback(nReqID, result);
                 }
 
-				external.StartRequest  = (nReqID, strCmd, strCallBack, strArgs, strLog) => {
+				$cef.StartRequest  = (nReqID, strCmd, strCallBack, strArgs, strLog) => {
 					native function StartRequest();
 					StartRequest(nReqID, strCmd, strCallBack, strArgs, strLog);
 				};
-				external.GetNextReqID  = () => {
+				$cef.GetNextReqID  = () => {
 				  native function GetNextReqID();
 				  return GetNextReqID();
 				};

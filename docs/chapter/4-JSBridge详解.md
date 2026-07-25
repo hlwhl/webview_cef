@@ -6,8 +6,8 @@ JSBridge 是 `webview_cef` 中最复杂的子系统，实现 JavaScript ↔ Dart
 
 | 路径 | JS 入口 | 方向 | 特点 |
 |------|---------|------|------|
-| JavaScriptChannel（无回调） | `Print.postMessage(json)` | JS → Dart | 单向消息 |
-| JavaScriptChannel（有回调） | `Print.postMessage(json, callback)` | JS → Dart → JS | 请求-响应模式 |
+| JavaScriptChannel（无回调） | `$cef.Print.postMessage(json)` | JS → Dart | 单向消息 |
+| JavaScriptChannel（有回调） | `$cef.Print.postMessage(json, callback)` | JS → Dart → JS | 请求-响应模式 |
 | evaluateJavascript | Dart 侧调用 | Dart → JS → Dart | 执行 JS 并返回值 |
 
 涉及的关键文件：
@@ -29,16 +29,16 @@ JSBridge 是 `webview_cef` 中最复杂的子系统，实现 JavaScript ↔ Dart
 ```
 bridge.html                          setJavaScriptChannels               V8 扩展
 ──────────                           ──────────────────                  ────────
-Print.postMessage(msg [, cb]) ──►    Print.postMessage = (e,r) => {      external.JavaScriptChannel
-                                         external.JavaScriptChannel      external.StartRequest
-                                             ('Print', e, r)             external.GetNextReqID
-                                     }                                  external.EvaluateCallback
+$cef.Print.postMessage(msg [, cb]) ──►    $cef.Print.postMessage = (e,r) => {      $cef.JavaScriptChannel
+                                         $cef.JavaScriptChannel      $cef.StartRequest
+                                             ('Print', e, r)             $cef.GetNextReqID
+                                     }                                  $cef.EvaluateCallback
 ```
 
 ```
 外部 (JS)                           V8 原生函数                          C++ 渲染进程
 ───────                             ────────────                         ────────────
-external.StartRequest(...)    →     native function StartRequest()  →    CefJSHandler::Execute("StartRequest")
+$cef.StartRequest(...)    →     native function StartRequest()  →    CefJSHandler::Execute("StartRequest")
                                                                          CefJSBridge::StartRequest()
                                                                            → frame->SendProcessMessage(PID_BROWSER)
 ```
@@ -60,19 +60,19 @@ WebviewHandler::OnProcessMessageReceived
 
 **位置**：`WebviewApp::OnWebKitInitialized()` (`common/webview_app.cc`)
 
-CEF 在每个渲染进程启动时调用此方法一次。它通过 `CefRegisterExtension` 将 JS 代码注入到每个页面的 V8 上下文中，创建 `external` 和 `clientSdk` 两个全局命名空间。
+CEF 在每个渲染进程启动时调用此方法一次。它通过 `CefRegisterExtension` 将 JS 代码注入到每个页面的 V8 上下文中，创建 `$cef` 和 `clientSdk` 两个全局命名空间。
 
 注入的 JS 核心结构：
 
 ```javascript
-var external = {};
+var $cef = {};
 var clientSdk = {};
 
-// ── external.JavaScriptChannel(n, e, r) ──
+// ── $cef.JavaScriptChannel(n, e, r) ──
 // n = 通道名（如 "Print"）
 // e = 消息体（会被 JSON.stringify 序列化）
 // r = 可选回调 function(error, result)
-external.JavaScriptChannel = (n, e, r) => {
+$cef.JavaScriptChannel = (n, e, r) => {
     var a;
     // 如果传了回调，生成唯一函数名存入 window[a]，等待原生侧回调
     null == r
@@ -85,23 +85,23 @@ external.JavaScriptChannel = (n, e, r) => {
                }
            }(a, r));
     // 发送请求：reqID 取负数，以便与 jsCmd 的正数 ID 区分
-    external.StartRequest(external.GetNextReqID(), n, a, JSON.stringify(e || {}), '');
+    $cef.StartRequest($cef.GetNextReqID(), n, a, JSON.stringify(e || {}), '');
 };
 
-// ── external.StartRequest ── V8 原生函数 → CefJSHandler::Execute("StartRequest")
-external.StartRequest = (nReqID, strCmd, strCallBack, strArgs, strLog) => {
+// ── $cef.StartRequest ── V8 原生函数 → CefJSHandler::Execute("StartRequest")
+$cef.StartRequest = (nReqID, strCmd, strCallBack, strArgs, strLog) => {
     native function StartRequest();
     StartRequest(nReqID, strCmd, strCallBack, strArgs, strLog);
 };
 
-// ── external.GetNextReqID ── 原子递增的请求 ID
-external.GetNextReqID = () => {
+// ── $cef.GetNextReqID ── 原子递增的请求 ID
+$cef.GetNextReqID = () => {
     native function GetNextReqID();
     return GetNextReqID();
 };
 
-// ── external.EvaluateCallback ── evaluateJavascript 的回调出口
-external.EvaluateCallback = (nReqID, result) => {
+// ── $cef.EvaluateCallback ── evaluateJavascript 的回调出口
+$cef.EvaluateCallback = (nReqID, result) => {
     native function EvaluateCallback();
     EvaluateCallback(nReqID, result);
 };
@@ -123,7 +123,7 @@ void WebviewHandler::setJavaScriptChannels(int browserId,
     std::string extensionCode = "try{";
     for (auto& channel : channels) {
         extensionCode += channel;
-        extensionCode += " = {postMessage: (e,r) => {external.JavaScriptChannel('";
+        extensionCode += " = {postMessage: (e,r) => {$cef.JavaScriptChannel('";
         extensionCode += channel;
         extensionCode += "',e,r)}};";
     }
@@ -136,7 +136,7 @@ void WebviewHandler::setJavaScriptChannels(int browserId,
 
 ```javascript
 try {
-    Print = {postMessage: (e, r) => { external.JavaScriptChannel('Print', e, r); }};
+    $cef.Print = {postMessage: (e, r) => { $cef.JavaScriptChannel('Print', e, r); }};
 } catch(e) { console.log(e); }
 ```
 
@@ -309,11 +309,11 @@ Dart: controller.evaluateJavascript("1 + 1")
       │
       │ 生成唯一 callbackId（纳秒时间戳）
       │ 包装代码：
-      │   external.EvaluateCallback(callbackId, (function(){ return 1+1; })())
+      │   $cef.EvaluateCallback(callbackId, (function(){ return 1+1; })())
       │ js_callbacks_[callbackId] = callback  ← 保存 Dart 侧 Future 的 completer
       │
       ▼ frame->ExecuteJavaScript(wrappedCode)
-JS 执行 → external.EvaluateCallback(callbackId, 2)
+JS 执行 → $cef.EvaluateCallback(callbackId, 2)
   → [V8 native] CefJSHandler::Execute("EvaluateCallback")
     → CefJSBridge::EvaluateCallback(callbackId, jsValue)
       → SendProcessMessage(PID_BROWSER, kEvaluateCallbackMessage)

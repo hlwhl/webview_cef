@@ -249,10 +249,10 @@ JavascriptChannel(
 
 ```javascript
 // 只发送消息
-Print.postMessage(JSON.stringify({msg: 'hello'}));
+$cef.Print.postMessage(JSON.stringify({msg: 'hello'}));
 
 // 发送消息并接收回调
-Print.postMessage(JSON.stringify({msg: 'hello'}), function(err, res) {
+$cef.Print.postMessage(JSON.stringify({msg: 'hello'}), function(err, res) {
   console.log('reply:', res);
 });
 ```
