@@ -91,11 +91,42 @@ TARBALL="${WORK}/${PKG}.tar.bz2"
 # CDN requires '+' percent-encoded as %2B.
 URL="${CDN}/$(printf '%s' "${PKG}.tar.bz2" | sed 's/+/%2B/g')"
 
-echo "==> Downloading ${PKG}.tar.bz2"
-curl -L --fail --connect-timeout 30 -o "${TARBALL}" "${URL}"
+echo "==> Downloading ${PKG}.tar.bz2 (from ${CDN})"
+# curl --retry does NOT cover error 18 (partial transfer) by default,
+# so we implement a bash-level retry loop with resume (-C -) support.
+# The server supports Range requests, so each attempt appends to the partial
+# file. This is critical when the CDN connection is unstable: even if every
+# attempt delivers only a few MB before being cut off, enough attempts will
+# eventually complete the download.
+MAX_ATTEMPTS=3
+RETRY_DELAY_SEC=5
+attempt=1
+while [ $attempt -le $MAX_ATTEMPTS ]; do
+  if [ -f "${TARBALL}" ]; then
+    downloaded=$(stat -f%z "${TARBALL}" 2>/dev/null || echo 0)
+    echo "  [${attempt}/${MAX_ATTEMPTS}] Resuming from ${downloaded} bytes ($(( downloaded * 100 / 280729682 ))%)"
+  else
+    echo "  [${attempt}/${MAX_ATTEMPTS}] Starting download..."
+  fi
+  if curl -L --fail --connect-timeout 30 --max-time 1800 \
+       --retry-all-errors --retry 3 --retry-delay 5 \
+       -C - -o "${TARBALL}" "${URL}"; then
+    echo "==> Download complete"
+    break
+  fi
+  rc=$?
+  echo "  curl exited with code ${rc}"
+  if [ $attempt -ge $MAX_ATTEMPTS ]; then
+    err "Download failed after ${MAX_ATTEMPTS} attempts"
+  fi
+  sleep $RETRY_DELAY_SEC
+  attempt=$((attempt + 1))
+done
 
 echo "==> Extracting"
-tar -xjf "${TARBALL}" -C "${WORK}"
+if ! tar -xjf "${TARBALL}" -C "${WORK}"; then
+  err "Extraction failed — the downloaded archive may be corrupted. Try removing any cached partial download and re-run."
+fi
 SRC="${WORK}/${PKG}"
 [ -d "${SRC}" ] || err "extracted dir ${SRC} not found"
 
