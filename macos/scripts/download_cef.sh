@@ -44,6 +44,30 @@ PKG="cef_binary_${CEF_VERSION}_${CEF_ARCH}"
 STAMP="${DEST}/version.txt"
 WANT="${CEF_VERSION}_${CEF_ARCH}_${BUILD_TYPE}"
 
+# --- compute source-content hash for the helper's dependencies ----------------
+# When any source file compiled into cef_helper changes, the hash embedded in
+# the stamp won't match and the helper (together with the wrapper) is rebuilt on
+# the next pod install. This prevents stale renderer-process binaries that would
+# still run old V8 extension code (e.g. the retired |external| namespace) after
+# devs edit common/*.cc.
+HELPER_SOURCES=(
+  "${MACOS_DIR}/helper/cef_helper_main.mm"
+  "${REPO_ROOT}/common/webview_app.h"
+  "${REPO_ROOT}/common/webview_app.cc"
+  "${REPO_ROOT}/common/webview_handler.h"
+  "${REPO_ROOT}/common/webview_handler.cc"
+  "${REPO_ROOT}/common/webview_cookieVisitor.h"
+  "${REPO_ROOT}/common/webview_cookieVisitor.cc"
+  "${REPO_ROOT}/common/webview_js_handler.h"
+  "${REPO_ROOT}/common/webview_js_handler.cc"
+  "${REPO_ROOT}/common/webview_plugin.h"
+  "${REPO_ROOT}/common/webview_plugin.cc"
+  "${REPO_ROOT}/common/webview_value.h"
+  "${REPO_ROOT}/common/webview_value.cc"
+)
+SOURCE_HASH=$(cat "${HELPER_SOURCES[@]}" 2>/dev/null | shasum -a 256 | cut -d' ' -f1)
+WANT="${WANT}_${SOURCE_HASH}"
+
 # --- skip if already prepared for this exact version/arch/type ---------------
 if [ -f "${STAMP}" ] && [ "$(cat "${STAMP}" 2>/dev/null)" = "${WANT}" ] \
    && [ -f "${DEST}/libcef_dll_wrapper.a" ] \
