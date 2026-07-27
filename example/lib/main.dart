@@ -61,7 +61,9 @@ class _MyAppState extends State<MyApp> with SingleTickerProviderStateMixin {
     });
 
     WebviewManager()
-        .initialize(userAgent: "test/userAgent")
+        .initialize(
+            userAgent: "test/userAgent",
+            processMode: ProcessMode.processPerSite)
         .then((value) async {
       _controller = WebviewManager().createWebView(
           loading: const Text("not initialized"),

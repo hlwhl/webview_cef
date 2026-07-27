@@ -509,4 +509,37 @@ private:
    }
     webview_value_unref(encodeArgs);
 }
+
+- (void)dealloc {
+    // Destroy the plugin first — ~WebviewPlugin calls CloseAllBrowsers(true)
+    // to close every live browser before we tear down CEF itself.
+    _plugin = nullptr;
+
+    // NSMapTable is weak-to-weak, so this wrapper has already been
+    // auto-removed by the runtime by the time dealloc executes.
+    // If no wrappers remain, stop the global CEF machinery.
+    if ([[webviewPlugins objectEnumerator] allObjects].count == 0) {
+        // Stop the CVDisplayLink (vsync-driven frame clock for GPU path).
+        if (_displayLinkActive && _displayLink) {
+            CVDisplayLinkStop(_displayLink);
+            _displayLinkActive = NO;
+        }
+        if (_displayLink) {
+            CVDisplayLinkRelease(_displayLink);
+            _displayLink = NULL;
+        }
+
+        // Stop the message-pump timer (software path fallback).
+        if (_timer) {
+            [_timer invalidate];
+            _timer = nil;
+        }
+
+        // Shutdown CEF — terminates the browser process and all subprocesses
+        // (renderer, GPU, network, etc.).
+        webview_cef::stopCEF();
+        isCefMessageLoop = NO;
+    }
+}
+
 @end

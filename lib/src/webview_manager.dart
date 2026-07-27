@@ -8,6 +8,38 @@ import 'package:webview_cef/src/webview_inject_user_script.dart';
 import 'webview.dart';
 import 'webview_events_listener.dart';
 
+/// CEF process model.
+///
+/// Chromium runs web content in separate, sandboxed processes by default for
+/// security and stability. Choose the model that fits your use case.
+enum ProcessMode {
+  /// Each unique site (eTLD+1) gets its own renderer process. Other processes
+  /// (GPU, network, audio, etc.) remain separate. Strikes a balance between
+  /// isolation and resource usage — typically **5–8 processes** total.
+  ///
+  /// Recommended for production apps that load arbitrary web content.
+  processPerSite(1),
+
+  /// Each browser tab gets its own renderer process. Maximises isolation at the
+  /// cost of higher memory overhead when many tabs are open.
+  processPerTab(2),
+
+  /// Everything — browser, renderer, GPU, network — runs inside a single
+  /// process. Minimal resource footprint (**~1 process**) but no sandbox
+  /// isolation: a renderer crash kills the whole app.
+  ///
+  /// Best for:
+  /// - embedded / kiosk apps that load known, trusted content
+  /// - development and debugging (quick iteration with fewer processes)
+  ///
+  /// Avoid in production if loading untrusted third-party pages.
+  singleProcess(3);
+
+  final int value;
+
+  const ProcessMode(this.value);
+}
+
 class WebviewManager extends ValueNotifier<bool> {
   static final WebviewManager _instance = WebviewManager._internal();
 
@@ -57,14 +89,33 @@ class WebviewManager extends ValueNotifier<bool> {
 
   WebviewManager._internal() : super(false);
 
-  Future<void> initialize({String? userAgent}) async {
+  /// Initialize the CEF engine.
+  ///
+  /// Must be called once before creating any web views. Safe to call multiple
+  /// times — subsequent calls are no-ops.
+  ///
+  /// [userAgent] overrides the default User-Agent string sent with HTTP
+  /// requests.
+  ///
+  /// [processMode] controls the Chromium process model:
+  /// - [ProcessMode.processPerSite] (default) — one renderer per unique site,
+  ///   ~5–8 processes. Best for production with arbitrary web content.
+  /// - [ProcessMode.processPerTab] — one renderer per tab, maximum isolation
+  ///   but higher memory use.
+  /// - [ProcessMode.singleProcess] — everything in one process (~1 process
+  ///   total). Great for debugging, embedded/kiosk apps, or trusted content.
+  ///   No sandbox — avoid with untrusted third-party pages.
+  Future<void> initialize({
+    String? userAgent,
+    ProcessMode processMode = ProcessMode.processPerSite,
+  }) async {
     _creatingCompleter = Completer<void>();
     try {
+      final args = <String, dynamic>{'processMode': processMode.value};
       if (userAgent != null && userAgent.isNotEmpty) {
-        await pluginChannel.invokeMethod('init', userAgent);
-      } else {
-        await pluginChannel.invokeMethod('init');
+        args['userAgent'] = userAgent;
       }
+      await pluginChannel.invokeMethod('init', args);
       pluginChannel.setMethodCallHandler(methodCallhandler);
       // Wait for the platform to complete initialization.
       await Future.delayed(const Duration(milliseconds: 300));

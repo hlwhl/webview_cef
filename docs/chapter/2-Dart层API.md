@@ -43,7 +43,7 @@ initialize() → createWebView() → [使用中] → dispose() / quit()
 
 | 方法 | 说明 |
 |------|------|
-| `initialize({String? userAgent})` | 启动 CEF 进程，设置 `methodCallhandler`，等待 300ms 确保初始化完成 |
+| `initialize({String? userAgent, ProcessMode processMode = ProcessMode.processPerSite})` | 启动 CEF 进程，设置 `methodCallhandler`，等待 300ms 确保初始化完成 |
 | `createWebView({Widget? loading, InjectUserScripts? injectUserScripts})` | 创建 WebViewController，暂存到 `_tempWebViews` |
 | `onBrowserCreated(browserIndex, browserId)` | CEF 浏览器创建完成后，将 controller 从临时表迁至 `_webViews` |
 | `dispose()` | 清理 channel handler 和 webview 映射 |
@@ -78,6 +78,18 @@ initialize() → createWebView() → [使用中] → dispose() / quit()
 | `deleteCookie(domain, key)` | 删除 Cookie |
 | `visitAllCookies()` | 遍历所有 Cookie，返回 `Map<String, Map<String, String>>` |
 | `visitUrlCookies(domain, isHttpOnly)` | 遍历指定域名的 Cookie |
+
+### ProcessMode 枚举
+
+通过 `initialize()` 的 `processMode` 参数控制 CEF 进程模型：
+
+| 枚举值 | 含义 | 进程数 | 适用场景 |
+|--------|------|--------|----------|
+| `ProcessMode.processPerSite` | 按站点隔离（默认） | ~5-8 | 生产环境、加载任意网页 |
+| `ProcessMode.processPerTab` | 按标签隔离 | 更多 | 需要最大隔离 |
+| `ProcessMode.singleProcess` | 单进程 | ~1 | 调试、嵌入式/Kiosk、受信内容 |
+
+> **注意**：单进程模式下无沙箱隔离，渲染进程崩溃会导致整个应用退出，不建议用于加载不受信第三方页面。
 
 ---
 

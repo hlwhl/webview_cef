@@ -319,7 +319,20 @@ namespace webview_cef {
 		if (name.compare("init") == 0){
 			if(!isCefInitialized){
 				if(values != nullptr){
-					userAgent = CefString(webview_value_get_string(values));
+					if (webview_value_get_type(values) == Webview_Value_Type_Map) {
+						// New API: init args are a map with named keys.
+						WValue* pm = webview_value_get_by_string(values, "processMode");
+						if (pm != nullptr && webview_value_get_type(pm) == Webview_Value_Type_Int) {
+							app->SetProcessMode(static_cast<uint32_t>(webview_value_get_int(pm)));
+						}
+						WValue* ua = webview_value_get_by_string(values, "userAgent");
+						if (ua != nullptr && webview_value_get_type(ua) == Webview_Value_Type_String) {
+							userAgent = CefString(webview_value_get_string(ua));
+						}
+					} else {
+						// Old API: init arg is a bare string (userAgent).
+						userAgent = CefString(webview_value_get_string(values));
+					}
 				}
 				startCEF();
 			}
