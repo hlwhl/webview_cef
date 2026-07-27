@@ -101,7 +101,7 @@ initialize() → createWebView() → [使用中] → dispose() / quit()
 
 | 方法 | 说明 |
 |------|------|
-| `initialize(String url)` | 创建底层 CEF 浏览器，获取 browserId 和 textureId |
+| `initialize({String url = "about:blank"})` | 创建底层 CEF 浏览器，获取 browserId 和 textureId，完成后 `value` 变为 `true` |
 | `loadUrl(String url)` | 加载指定 URL |
 | `reload()` | 刷新当前页面 |
 | `goBack()` / `goForward()` | 前进/后退 |
@@ -206,6 +206,8 @@ WebViewEventsListener(
   onPageFailed: (WebViewController controller, String url, WebViewError error) {},
 )
 ```
+
+> **时序保证**：所有页面事件回调（`onPageStarted`、`onPageFinished`、`onNavigateRequest`、`onProgressUpdated`、`onPageFailed`）均在 `WebViewController` 初始化完成后触发，回调内可安全调用 `getTitle()`、`loadUrl()` 等 API。
 
 ### 回调说明
 

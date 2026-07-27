@@ -125,7 +125,7 @@ class _MyAppState extends State<MyApp> with SingleTickerProviderStateMixin {
 
       // Must initialize the browser before setting channels or marking ready.
       _textController.text = "www.baidu.com";
-      await _controller!.initialize(_textController.text);
+      await _controller!.initialize(url: _textController.text);
 
       setState(() {
         _webViewInitialized = true;

@@ -135,42 +135,55 @@ class WebviewManager extends ValueNotifier<bool> {
         int browserId = call.arguments["browserId"] as int;
         String urlId = call.arguments["urlId"] as String;
 
+        final controller = _webViews[browserId];
+        if (controller == null) return;
+        await controller.ready;
+
         await _injectUserScriptIfNeeds(browserId, _injectUserScripts[browserId]?.retrieveLoadStartInjectScripts() ?? []);
 
-        WebViewController controller =
-        _webViews[browserId] as WebViewController;
-        _webViews[browserId]?.listener?.onPageStarted?.call(controller, urlId);
+        controller.listener?.onPageStarted?.call(controller, urlId);
         return;
       case 'onLoadEnd':
         int browserId = call.arguments["browserId"] as int;
         String urlId = call.arguments["urlId"] as String;
 
+        final controller = _webViews[browserId];
+        if (controller == null) return;
+        await controller.ready;
+
         await _injectUserScriptIfNeeds(browserId, _injectUserScripts[browserId]?.retrieveLoadEndInjectScripts() ?? []);
 
-        WebViewController controller =
-        _webViews[browserId] as WebViewController;
-        _webViews[browserId]?.listener?.onPageFinished?.call(controller, urlId);
+        controller.listener?.onPageFinished?.call(controller, urlId);
         return;
       case 'onBeforeBrowse':
         int browserId = call.arguments['browserId'] as int;
         String url = call.arguments['url'] as String;
-        WebViewController ctrl = _webViews[browserId] as WebViewController;
-        _webViews[browserId]?.listener?.onNavigateRequest?.call(ctrl, url);
+        final controller = _webViews[browserId];
+        if (controller == null) return;
+
+        await controller.ready;
+        controller.listener?.onNavigateRequest?.call(controller, url);
         return;
       case 'onLoadingProgressChange':
         int browserId = call.arguments['browserId'] as int;
         double progress = (call.arguments['progress'] as num).toDouble();
-        WebViewController ctrl2 = _webViews[browserId] as WebViewController;
-        _webViews[browserId]?.listener?.onProgressUpdated?.call(ctrl2, progress);
+        final controller = _webViews[browserId];
+        if (controller == null) return;
+
+        await controller.ready;
+        controller.listener?.onProgressUpdated?.call(controller, progress);
         return;
       case 'onLoadError':
         int browserId = call.arguments['browserId'] as int;
         String errorUrl = call.arguments['url'] as String;
         int errorCode = call.arguments['errorCode'] as int;
         String errorText = call.arguments['errorText'] as String;
-        WebViewController ctrl3 = _webViews[browserId] as WebViewController;
+        final controller = _webViews[browserId];
+        if (controller == null) return;
+
+        await controller.ready;
         final error = WebViewError(errorCode, errorText, {'url': errorUrl});
-        _webViews[browserId]?.listener?.onPageFailed?.call(ctrl3, errorUrl, error);
+        controller.listener?.onPageFailed?.call(controller, errorUrl, error);
         return;
       default:
     }

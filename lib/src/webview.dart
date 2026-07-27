@@ -74,7 +74,7 @@ class WebViewController extends ValueNotifier<bool> {
       _onImeCompositionRangeChangedMessage;
 
   /// Initializes the underlying platform view.
-  Future<void> initialize(String url) async {
+  Future<void> initialize({String url = "about:blank"}) async {
     if (_isDisposed) {
       return Future<void>.value();
     }
