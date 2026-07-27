@@ -68,77 +68,92 @@ CEF 在每个渲染进程启动时调用此方法一次。它通过 `CefRegister
 var $cef = {};
 var clientSdk = {};
 
-// ── $cef.JavaScriptChannel(n, e, r) ──
-// n = 通道名（如 "Print"）
-// e = 消息体（会被 JSON.stringify 序列化）
-// r = 可选回调 function(error, result)
-$cef.JavaScriptChannel = (n, e, r) => {
-    var a;
-    // 如果传了回调，生成唯一函数名存入 window[a]，等待原生侧回调
-    null == r
-        ? a = ''
-        : (a = '_' + new Date + (1e3 + Math.floor(8999 * Math.random())),
-           window[a] = function(n, e) {
-               return function() {
-                   try { e && e.call && e.call(null, arguments[1]); }
-                   finally { delete window[n]; }  // 自清理
-               }
-           }(a, r));
-    // 发送请求：reqID 取负数，以便与 jsCmd 的正数 ID 区分
-    $cef.StartRequest($cef.GetNextReqID(), n, a, JSON.stringify(e || {}), '');
-};
+(() => {
+    // ── $cef.JavaScriptChannel(n, e, r) ──
+    // n = 通道名（如 "Print"）
+    // e = 消息体（会被 JSON.stringify 序列化）
+    // r = 可选回调 function(error, result)
+    $cef.JavaScriptChannel = (n, e, r) => {
+        var a;
+        // 如果传了回调，生成唯一函数名存入 window[a]，等待原生侧回调
+        null == r
+            ? a = ''
+            : (a = '_' + new Date + (1e3 + Math.floor(8999 * Math.random())),
+               window[a] = function(n, e) {
+                   return function() {
+                       try { e && e.call && e.call(null, arguments[1]); }
+                       finally { delete window[n]; }  // 自清理
+                   }
+               }(a, r));
+        // 发送请求：reqID 取负数，以便与 jsCmd 的正数 ID 区分
+        $cef.StartRequest($cef.GetNextReqID(), n, a, JSON.stringify(e || {}), '');
+    };
 
-// ── $cef.StartRequest ── V8 原生函数 → CefJSHandler::Execute("StartRequest")
-$cef.StartRequest = (nReqID, strCmd, strCallBack, strArgs, strLog) => {
-    native function StartRequest();
-    StartRequest(nReqID, strCmd, strCallBack, strArgs, strLog);
-};
+    // ── $cef.StartRequest ── V8 原生函数 → CefJSHandler::Execute("StartRequest")
+    $cef.StartRequest = (nReqID, strCmd, strCallBack, strArgs, strLog) => {
+        native function StartRequest();
+        StartRequest(nReqID, strCmd, strCallBack, strArgs, strLog);
+    };
 
-// ── $cef.GetNextReqID ── 原子递增的请求 ID
-$cef.GetNextReqID = () => {
-    native function GetNextReqID();
-    return GetNextReqID();
-};
+    // ── $cef.GetNextReqID ── 原子递增的请求 ID
+    $cef.GetNextReqID = () => {
+        native function GetNextReqID();
+        return GetNextReqID();
+    };
 
-// ── $cef.EvaluateCallback ── evaluateJavascript 的回调出口
-$cef.EvaluateCallback = (nReqID, result) => {
-    native function EvaluateCallback();
-    EvaluateCallback(nReqID, result);
-};
+    // ── $cef.EvaluateCallback ── evaluateJavascript 的回调出口
+    $cef.EvaluateCallback = (nReqID, result) => {
+        native function EvaluateCallback();
+        EvaluateCallback(nReqID, result);
+    };
+
+    // ── Proxy 包装 ──
+    // 任何对 $cef 的未知属性访问（如 $cef.Print、$cef.MyChannel）
+    // 自动返回 {postMessage} 对象，无需 executeJavaScript 注入。
+    // 通道从页面加载第一刻即可用，并跨所有导航持久存在。
+    $cef = new Proxy($cef, {
+        get: function(target, prop, receiver) {
+            if (prop in target) {
+                return Reflect.get(target, prop, receiver);
+            }
+            if (typeof prop === 'string') {
+                return {
+                    postMessage: function(e, r) {
+                        $cef.JavaScriptChannel(prop, e, r);
+                    }
+                };
+            }
+            return Reflect.get(target, prop, receiver);
+        }
+    });
+})();
 ```
 
 **C++ 侧**：`CefRegisterExtension("v8/extern", extensionCode, handler)` 将 `CefJSHandler` 绑定为 V8 原生函数的处理器。JS 中声明的 `native function` 会自动路由到 `CefJSHandler::Execute()`。
 
 ---
 
-## 第 2 步：setJavaScriptChannels — 创建通道入口
+## 第 2 步：setJavaScriptChannels — 通道注册
 
 **位置**：`WebviewHandler::setJavaScriptChannels()` (`common/webview_handler.cc`)
 
-当 Dart 调用 `controller.setJavaScriptChannels({JavascriptChannel(name: 'Print')})` 时，C++ 端生成 JS 代码并执行：
+当 Dart 调用 `controller.setJavaScriptChannels({JavascriptChannel(name: 'Print')})` 时，C++ 端**不再需要生成或注入任何 JS 代码**。V8 扩展中的 Proxy 会自动为 `$cef.Print` 创建 `{postMessage}` 对象。
 
 ```cpp
 void WebviewHandler::setJavaScriptChannels(int browserId,
     const std::vector<std::string> channels) {
-    std::string extensionCode = "try{";
-    for (auto& channel : channels) {
-        extensionCode += channel;
-        extensionCode += " = {postMessage: (e,r) => {$cef.JavaScriptChannel('";
-        extensionCode += channel;
-        extensionCode += "',e,r)}};";
-    }
-    extensionCode += "}catch(e){console.log(e);}";
-    executeJavaScript(browserId, extensionCode);
+    // No-op: V8 扩展中的 $cef Proxy 自动处理所有通道名。
+    // 无需 executeJavaScript 注入，无需 OnLoadEnd 重新注入。
+    (void)browserId;
+    (void)channels;
 }
 ```
 
-对于通道 `"Print"`，执行结果：
+**为什么是空操作？** V8 扩展在 `OnWebKitInitialized` 中注册了 `$cef` 的 Proxy 包装器。当页面 JS 访问 `$cef.Print` 时，Proxy 的 `get` 陷阱自动返回一个 `{postMessage}` 对象，该对象内部调用 `$cef.JavaScriptChannel('Print', e, r)`。因此：
 
-```javascript
-try {
-    $cef.Print = {postMessage: (e, r) => { $cef.JavaScriptChannel('Print', e, r); }};
-} catch(e) { console.log(e); }
-```
+- 通道从页面加载的第一刻起就可调用
+- 通道在页面导航后仍然存活（V8 扩展会被重新注入到每个 V8 上下文中）
+- Dart 侧的 `_javascriptChannels` map 仍然用于将收到的消息分发到正确的回调函数
 
 ---
 

@@ -16,7 +16,8 @@ class MyApp extends StatefulWidget {
 }
 
 class _MyAppState extends State<MyApp> with SingleTickerProviderStateMixin {
-  late WebViewController _controller;
+  WebViewController? _controller;
+  bool _webViewInitialized = false;
   final _textController = TextEditingController();
   String title = "";
   Map allCookies = {};
@@ -59,102 +60,103 @@ class _MyAppState extends State<MyApp> with SingleTickerProviderStateMixin {
       });
     });
 
-    _controller = WebviewManager().createWebView(
-        loading: const Text("not initialized"),
-        injectUserScripts: injectUserScripts);
+    WebviewManager()
+        .initialize(userAgent: "test/userAgent")
+        .then((value) async {
+      _controller = WebviewManager().createWebView(
+          loading: const Text("not initialized"),
+          injectUserScripts: injectUserScripts);
+
+      // Register event listener before initialize so that onPageStarted,
+      // onPageFinished, etc. are captured from the very first navigation.
+      _controller!.setWebviewListener(WebViewEventsListener(
+        onPageStarted: (controller, url) {
+          debugPrint("onPageStarted => $url");
+          _progress = 0;
+          _showProgress = true;
+          _progressAnimController.forward(from: 0);
+        },
+        onPageFinished: (controller, url) {
+          debugPrint("onPageFinished => $url");
+          controller.getTitle().then((t) {
+            if (t != null && mounted) {
+              setState(() => title = t);
+            }
+          });
+          _progressAnimController.forward(from: 0).then((_) {
+            if (mounted) {
+              setState(() {
+                _showProgress = false;
+                _progress = 0;
+              });
+            }
+          });
+
+          //also you can build your own jssdk by execute JavaScript code to CEF
+          _controller!.executeJavaScript("function abc(e){return 'abc:'+ e}");
+          _controller!
+              .evaluateJavascript("abc('test')")
+              .then((value) => debugPrint(value));
+        },
+        onNavigateRequest: (controller, url) {
+          debugPrint("onNavigateRequest => $url");
+          // Example: block navigation to certain domains
+          if (url.contains('spam.com')) {
+            debugPrint("Navigation to '$url' blocked.");
+            controller.stopLoading();
+            return NavigationPolicy.cancel;
+          }
+          return NavigationPolicy.allow;
+        },
+        onProgressUpdated: (controller, progress) {
+          debugPrint(
+              "onProgressUpdated => ${(progress * 100).toStringAsFixed(0)}%");
+          // Update a progress indicator with the 0.0-1.0 value.
+          _progressAnimController.value = progress;
+        },
+        onPageFailed: (controller, url, error) {
+          debugPrint("onPageFailed => url: $url, code: ${error.code}, "
+              "message: ${error.message}");
+          // Hide progress on error.
+          _showProgress = false;
+          _progress = 0;
+        },
+      ));
+
+      // Must initialize the browser before setting channels or marking ready.
+      _textController.text = "www.baidu.com";
+      await _controller!.initialize(_textController.text);
+
+      setState(() {
+        _webViewInitialized = true;
+      });
+
+      final Set<JavascriptChannel> jsChannels = {
+        JavascriptChannel(
+            name: 'Print',
+            onMessageReceived: (JavascriptMessage message) {
+              debugPrint(message.message);
+              _controller!.sendJavaScriptChannelCallBack(
+                  false,
+                  "{'code':'200','message':'print succeed!'}",
+                  message.callbackId,
+                  message.frameId);
+            }),
+      };
+
+      //normal JavaScriptChannels
+      await _controller!.setJavaScriptChannels(jsChannels);
+    });
+
     super.initState();
-    initPlatformState();
   }
 
   @override
   void dispose() {
     _progressAnimController.dispose();
-    _controller.dispose();
+    _controller?.dispose();
     WebviewManager().quit();
     super.dispose();
-  }
-
-  // Platform messages are asynchronous, so we initialize in an async method.
-  Future<void> initPlatformState() async {
-    await WebviewManager().initialize(userAgent: "test/userAgent");
-    String url = "www.baidu.com";
-    _textController.text = url;
-    //unified interface for all platforms set user agent
-    _controller.setWebviewListener(WebViewEventsListener(
-      onPageStarted: (controller, url) {
-        debugPrint("onPageStarted => $url");
-        _progress = 0;
-        _showProgress = true;
-        _progressAnimController.forward(from: 0);
-      },
-      onPageFinished: (controller, url) {
-        debugPrint("onPageFinished => $url");
-        controller.getTitle().then((t) {
-          if (t != null && mounted) {
-            setState(() => title = t);
-          }
-        });
-        _progressAnimController.forward(from: 0).then((_) {
-          if (mounted) {
-            setState(() {
-              _showProgress = false;
-              _progress = 0;
-            });
-          }
-        });
-
-        final Set<JavascriptChannel> jsChannels = {
-          JavascriptChannel(
-              name: 'Print',
-              onMessageReceived: (JavascriptMessage message) {
-                debugPrint(message.message);
-                _controller.sendJavaScriptChannelCallBack(
-                    false,
-                    "{'code':'200','message':'print succeed!'}",
-                    message.callbackId,
-                    message.frameId);
-              }),
-        };
-
-        //normal JavaScriptChannels
-        _controller.setJavaScriptChannels(jsChannels);
-        //also you can build your own jssdk by execute JavaScript code to CEF
-        _controller.executeJavaScript("function abc(e){return 'abc:'+ e}");
-        _controller
-            .evaluateJavascript("abc('test')")
-            .then((value) => debugPrint(value));
-      },
-      onNavigateRequest: (controller, url) {
-        debugPrint("onNavigateRequest => $url");
-        // Example: block navigation to certain domains
-        if (url.contains('spam.com')) {
-          debugPrint("Navigation to '$url' blocked.");
-          controller.stopLoading();
-          return NavigationPolicy.cancel;
-        }
-        return NavigationPolicy.allow;
-      },
-      onProgressUpdated: (controller, progress) {
-        debugPrint(
-            "onProgressUpdated => ${(progress * 100).toStringAsFixed(0)}%");
-        // Update a progress indicator with the 0.0-1.0 value.
-        _progressAnimController.value = progress;
-      },
-      onPageFailed: (controller, url, error) {
-        debugPrint("onPageFailed => url: $url, code: ${error.code}, "
-            "message: ${error.message}");
-        // Hide progress on error.
-        _showProgress = false;
-        _progress = 0;
-      },
-    ));
-
-    await _controller.initialize(_textController.text);
-
-    // If the widget was removed from the tree while the asynchronous platform
-    // message was in flight, we want to discard the reply rather than calling
-    // setState to update our non-existent appearance.
-    if (!mounted) return;
   }
 
   void _loadLocalHtml() {
@@ -165,7 +167,7 @@ class _MyAppState extends State<MyApp> with SingleTickerProviderStateMixin {
       '${Platform.pathSeparator}bridge.html',
     ).absolute;
     final fileUrl = file.uri.toString();
-    _controller.loadUrl(fileUrl);
+    _controller?.loadUrl(fileUrl);
     _textController.text = fileUrl;
   }
 
@@ -208,7 +210,7 @@ class _MyAppState extends State<MyApp> with SingleTickerProviderStateMixin {
                 height: 48,
                 child: MaterialButton(
                   onPressed: () {
-                    _controller.reload();
+                    _controller?.reload();
                   },
                   child: const Icon(Icons.refresh),
                 ),
@@ -217,8 +219,8 @@ class _MyAppState extends State<MyApp> with SingleTickerProviderStateMixin {
                 height: 48,
                 child: MaterialButton(
                   onPressed: () async {
-                    if (await _controller.canGoBack()) {
-                      _controller.goBack();
+                    if (await _controller!.canGoBack()) {
+                      _controller!.goBack();
                     }
                   },
                   child: const Icon(Icons.arrow_left),
@@ -228,8 +230,8 @@ class _MyAppState extends State<MyApp> with SingleTickerProviderStateMixin {
                 height: 48,
                 child: MaterialButton(
                   onPressed: () async {
-                    if (await _controller.canGoForward()) {
-                      _controller.goForward();
+                    if (await _controller!.canGoForward()) {
+                      _controller!.goForward();
                     }
                   },
                   child: const Icon(Icons.arrow_right),
@@ -239,7 +241,7 @@ class _MyAppState extends State<MyApp> with SingleTickerProviderStateMixin {
                 height: 48,
                 child: MaterialButton(
                   onPressed: () {
-                    _controller.openDevTools();
+                    _controller!.openDevTools();
                   },
                   child: const Icon(Icons.developer_mode),
                 ),
@@ -266,7 +268,7 @@ class _MyAppState extends State<MyApp> with SingleTickerProviderStateMixin {
                 child: TextField(
                   controller: _textController,
                   onSubmitted: (url) {
-                    _controller.loadUrl(url);
+                    _controller!.loadUrl(url);
                     WebviewManager().visitAllCookies().then((value) {
                       allCookies = Map.of(value);
                       if (url == "baidu.com") {
@@ -288,14 +290,18 @@ class _MyAppState extends State<MyApp> with SingleTickerProviderStateMixin {
             children: [
               Row(
                 children: [
-                  ValueListenableBuilder(
-                    valueListenable: _controller,
-                    builder: (context, value, child) {
-                      return _controller.value
-                          ? Expanded(child: _controller.webviewWidget)
-                          : _controller.loadingWidget;
-                    },
-                  ),
+                  // ValueListenableBuilder(
+                  //   valueListenable: _controller!,
+                  //   builder: (context, value, child) {
+                  //     return _controller!.value
+                  //         ? Expanded(child: _controller!.webviewWidget)
+                  //         : _controller!.loadingWidget;
+                  //   },
+                  // ),
+                  Expanded(
+                      child: _webViewInitialized
+                          ? _controller!.webviewWidget
+                          : Container()),
                 ],
               ),
               // Progress bar overlay on z-axis above the WebView

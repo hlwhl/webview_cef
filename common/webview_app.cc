@@ -199,7 +199,7 @@ void WebviewApp::SetUnSafelyTreatInsecureOriginAsSecure(const CefString &strFilt
 // Register V8 extension, wire JS ↔ C++ bridge
 //
 // Call chain:
-//   Print.postMessage(json)          // JS call (injected by setJavaScriptChannels)
+//   $cef.Print.postMessage(json)       // JS call — Proxy auto-creates channel object
 //     → $cef.JavaScriptChannel('Print', json)
 //       → $cef.StartRequest(reqID, 'Print', '', json)
 //         → [V8 native function] → CefJSHandler::Execute("StartRequest")
@@ -208,13 +208,18 @@ void WebviewApp::SetUnSafelyTreatInsecureOriginAsSecure(const CefString &strFilt
 //               → WebviewHandler::OnProcessMessageReceived
 //                 → onJavaScriptChannelMessage → Flutter Dart
 //
+// The $cef namespace is wrapped in a JavaScript Proxy: any property access
+// (e.g. $cef.Print, $cef.MyChannel) automatically returns a {postMessage}
+// object. No per-channel executeJavaScript injection is needed. Channels
+// are available from the very first page load and survive all navigations.
+//
 // @example
 // ```javascript
 //   // Fire-and-forget
-//   Print.postMessage(JSON.stringify({msg: 'hello'}));
+//   $cef.Print.postMessage(JSON.stringify({msg: 'hello'}));
 //
 //   // With callback: callback(error, result)
-//   Print.postMessage(JSON.stringify({msg: 'hello'}), function(err, res) {
+//   $cef.Print.postMessage(JSON.stringify({msg: 'hello'}), function(err, res) {
 //     console.log('reply:', res);
 //   });
 // ```
@@ -224,6 +229,7 @@ void WebviewApp::SetUnSafelyTreatInsecureOriginAsSecure(const CefString &strFilt
 //   StartRequest(...)           — V8 native function, sends cross-process message
 //   GetNextReqID()              — monotonic request ID generator
 //   EvaluateCallback(id, val)   — callback channel for evaluateJavascript
+//   <any>                       — Proxy auto-creates {postMessage} for any name
 void WebviewApp::OnWebKitInitialized()
 {
     //inject js function for jssdk
@@ -287,6 +293,26 @@ void WebviewApp::OnWebKitInitialized()
 				  native function GetNextReqID();
 				  return GetNextReqID();
 				};
+
+				// Proxy: any property access on $cef auto-creates a channel
+				// object with postMessage. No executeJavaScript injection
+				// needed — channels are available from the first page load
+				// and survive all navigations.
+				$cef = new Proxy($cef, {
+					get: function(target, prop, receiver) {
+						if (prop in target) {
+							return Reflect.get(target, prop, receiver);
+						}
+						if (typeof prop === 'string') {
+							return {
+								postMessage: function(e, r) {
+									$cef.JavaScriptChannel(prop, e, r);
+								}
+							};
+						}
+						return Reflect.get(target, prop, receiver);
+					}
+				});
 			})();
 		 )";
 

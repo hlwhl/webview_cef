@@ -729,16 +729,11 @@ void WebviewHandler::visitUrlCookies(const std::string& domain, const bool& isHt
 
 void WebviewHandler::setJavaScriptChannels(int browserId, const std::vector<std::string> channels)
 {
-    std::string extensionCode = "try{";
-    for(auto& channel : channels)
-    {
-        extensionCode += "$cef." + channel;
-        extensionCode += " = {postMessage: (e,r) => {$cef.JavaScriptChannel('";
-        extensionCode += channel;
-        extensionCode += "',e,r)}};";
-    }
-    extensionCode += "}catch(e){console.log(e);}";
-    executeJavaScript(browserId, extensionCode);
+    // No-op: the V8 extension ($cef Proxy in OnWebKitInitialized) handles
+    // all channel names automatically. No executeJavaScript injection or
+    // OnLoadEnd re-injection is needed.
+    (void)browserId;
+    (void)channels;
 }
 
 void WebviewHandler::sendJavaScriptChannelCallBack(const bool error, const std::string result, const std::string callbackId, const int browserId, const std::string frameId)
