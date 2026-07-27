@@ -232,89 +232,143 @@ void WebviewApp::SetUnSafelyTreatInsecureOriginAsSecure(const CefString &strFilt
 //   <any>                       — Proxy auto-creates {postMessage} for any name
 void WebviewApp::OnWebKitInitialized()
 {
-    //inject js function for jssdk
+    // Register the V8 extension that wires the JS ↔ C++ bridge.
+    // The JS code below is injected into every V8 context before any page
+    // script runs, so channels ($cef.Print, etc.) are available immediately.
     std::string extensionCode = R"(
-			var $cef = {};
-			var clientSdk = {};
-			(() => {
-				clientSdk.jsCmd = (functionName, arg1, arg2, arg3) => {
-					if (typeof arg1 === 'function') {
-						native function jsCmd(functionName, arg1);
-						return jsCmd(functionName, arg1);
-					} 
-					else if	 (typeof arg2 === 'function') {
-                        jsonString = arg1;
-                        if	(typeof arg1 !== 'string'){
-						    jsonString = JSON.stringify(arg1);
-                        }
-						native function jsCmd(functionName, jsonString, arg2);
-						return jsCmd(functionName, jsonString, arg2);
-					}
-					else if	 (typeof arg3 === 'function') {
-                        jsonString = arg1;
-                        if	(typeof arg1 !== 'string'){
-						    jsonString = JSON.stringify(arg1);
-                        }
-						native function jsCmd(functionName, jsonString, arg2, arg3);
-						return jsCmd(functionName, jsonString, arg2, arg3);
-					}else {
+        var $cef = {};
+        var clientSdk = {};
 
-					}
-				};
-
-                $cef.JavaScriptChannel = (n,e,r) => {
-                    var a; 
-                    null == r ? a = '' : (a = '_' + new Date + (1e3 + Math.floor(8999 * Math.random())), window[a] = function (n, e) { 
-                        return function () { 
-                            try {
-                                e && e.call && e.call(null, arguments[1]) 
-                            } finally {
-                                delete window[n]
-                            } 
-                        } 
-                    }(a, r)); 
-                    try {
-                        $cef.StartRequest($cef.GetNextReqID(), n, a, JSON.stringify(e || {}), '') 
-                    } catch (l) {
-                        console.log('messeage send')
+        (() => {
+            // ── clientSdk.jsCmd ──────────────────────────────────────────
+            // Cross-process RPC: calls a C++ function by name with optional
+            // parameters and a callback. Used by older SDK integrations.
+            // Overloads are resolved by which argument position holds the
+            // callback function:
+            //   jsCmd(name, callback)
+            //   jsCmd(name, jsonString, callback)
+            //   jsCmd(name, jsonString, rawdata, callback)
+            clientSdk.jsCmd = (functionName, arg1, arg2, arg3) => {
+                if (typeof arg1 === 'function') {
+                    native function jsCmd(functionName, arg1);
+                    return jsCmd(functionName, arg1);
+                }
+                else if (typeof arg2 === 'function') {
+                    jsonString = arg1;
+                    if (typeof arg1 !== 'string') {
+                        jsonString = JSON.stringify(arg1);
                     }
+                    native function jsCmd(functionName, jsonString, arg2);
+                    return jsCmd(functionName, jsonString, arg2);
+                }
+                else if (typeof arg3 === 'function') {
+                    jsonString = arg1;
+                    if (typeof arg1 !== 'string') {
+                        jsonString = JSON.stringify(arg1);
+                    }
+                    native function jsCmd(functionName, jsonString, arg2, arg3);
+                    return jsCmd(functionName, jsonString, arg2, arg3);
+                }
+            };
+
+            // ── $cef.JavaScriptChannel(n, e, r) ──────────────────────────
+            // Core channel dispatcher. Called by Proxy-generated channel
+            // objects (e.g. $cef.Print.postMessage).
+            //   n — channel name (e.g. "Print")
+            //   e — message payload (string or object, JSON-stringified)
+            //   r — optional callback function(error, result)
+            //
+            // When a callback is provided, it is wrapped in a uniquely-named
+            // window function so the browser process can call it back later
+            // via ExecuteJavaScript. The wrapper self-cleans by deleting
+            // itself from window after the callback fires.
+            $cef.JavaScriptChannel = (n, e, r) => {
+                var callbackName;
+                if (r == null) {
+                    callbackName = '';
+                } else {
+                    callbackName = '_' + new Date
+                        + (1e3 + Math.floor(8999 * Math.random()));
+                    window[callbackName] = (function (name, fn) {
+                        return function () {
+                            try {
+                                fn && fn.call && fn.call(null, arguments[1]);
+                            } finally {
+                                delete window[name];
+                            }
+                        };
+                    })(callbackName, r);
                 }
 
-                $cef.EvaluateCallback = (nReqID, result) => {
-                    native function EvaluateCallback();
-                    EvaluateCallback(nReqID, result);
+                try {
+                    $cef.StartRequest(
+                        $cef.GetNextReqID(),
+                        n,
+                        callbackName,
+                        JSON.stringify(e || {}),
+                        ''
+                    );
+                } catch (ex) {
+                    console.log(
+                        'JavaScriptChannel: failed to send for "'
+                        + n + '"', ex
+                    );
                 }
+            };
 
-				$cef.StartRequest  = (nReqID, strCmd, strCallBack, strArgs, strLog) => {
-					native function StartRequest();
-					StartRequest(nReqID, strCmd, strCallBack, strArgs, strLog);
-				};
-				$cef.GetNextReqID  = () => {
-				  native function GetNextReqID();
-				  return GetNextReqID();
-				};
+            // ── $cef.EvaluateCallback(id, val) ───────────────────────────
+            // Callback channel for evaluateJavascript (Dart → JS → Dart).
+            // The browser process wraps the JS expression in a self-invoking
+            // function whose return value calls back through this native
+            // binding → CefJSBridge::EvaluateCallback → PID_BROWSER.
+            $cef.EvaluateCallback = (nReqID, result) => {
+                native function EvaluateCallback();
+                EvaluateCallback(nReqID, result);
+            };
 
-				// Proxy: any property access on $cef auto-creates a channel
-				// object with postMessage. No executeJavaScript injection
-				// needed — channels are available from the first page load
-				// and survive all navigations.
-				$cef = new Proxy($cef, {
-					get: function(target, prop, receiver) {
-						if (prop in target) {
-							return Reflect.get(target, prop, receiver);
-						}
-						if (typeof prop === 'string') {
-							return {
-								postMessage: function(e, r) {
-									$cef.JavaScriptChannel(prop, e, r);
-								}
-							};
-						}
-						return Reflect.get(target, prop, receiver);
-					}
-				});
-			})();
-		 )";
+            // ── $cef.StartRequest(reqId, cmd, callback, args, log) ───────
+            // V8 native function → CefJSHandler::Execute("StartRequest")
+            // → CefJSBridge::StartRequest()
+            // → frame->SendProcessMessage(PID_BROWSER)
+            // → WebviewHandler::OnProcessMessageReceived
+            // → onJavaScriptChannelMessage → Flutter Dart
+            $cef.StartRequest = (nReqID, strCmd, strCallBack,
+                                 strArgs, strLog) => {
+                native function StartRequest();
+                StartRequest(nReqID, strCmd, strCallBack, strArgs, strLog);
+            };
+
+            // ── $cef.GetNextReqID() ──────────────────────────────────────
+            // Monotonically increasing request ID (atomic, thread-safe).
+            // JavaScriptChannel requests use negative IDs to distinguish
+            // them from jsCmd positive IDs in the callback map.
+            $cef.GetNextReqID = () => {
+                native function GetNextReqID();
+                return GetNextReqID();
+            };
+
+            // ── $cef Proxy ──────────────────────────────────────────────
+            // Proxy: any property access on $cef auto-creates a channel
+            // object with postMessage. No executeJavaScript injection
+            // needed — channels are available from the first page load
+            // and survive all navigations.
+            $cef = new Proxy($cef, {
+                get: function(target, prop, receiver) {
+                    if (prop in target) {
+                        return Reflect.get(target, prop, receiver);
+                    }
+                    if (typeof prop === 'string') {
+                        return {
+                            postMessage: function(e, r) {
+                                $cef.JavaScriptChannel(prop, e, r);
+                            }
+                        };
+                    }
+                    return Reflect.get(target, prop, receiver);
+                }
+            });
+        })();
+     )";
 
     CefRefPtr<CefJSHandler> handler = new CefJSHandler();
 
