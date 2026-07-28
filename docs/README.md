@@ -15,6 +15,7 @@
 | [渲染管线](chapter/5-渲染管线.md) | GPU 零拷贝 vs 软件回退、macOS Metal / Windows D3D11、外部帧时钟 |
 | [平台输入处理](chapter/6-平台输入处理.md) | 鼠标/指针、macOS/Windows/Linux/eLinux 键盘、IME 组合输入 |
 | [构建与集成](chapter/7-构建与集成.md) | macOS CocoaPods、Windows/Linux/eLinux CMake、CEF 下载、编译标志 |
+| [macOS Universal 构建](chapter/8-macOS%20Universal构建.md) | arm64 + x86_64 双架构 fat binary 构建方案，含回退机制 |
 
 ## 核心文件速查
 
@@ -36,3 +37,4 @@
 5. [JSBridge 详解](chapter/4-JSBridge详解.md) 是最复杂的子系统，建议在理解前两者后阅读
 6. [渲染管线](chapter/5-渲染管线.md) 和 [平台输入处理](chapter/6-平台输入处理.md) 可按需查阅
 7. [构建与集成](chapter/7-构建与集成.md) 在需要了解编译配置时查阅
+8. [macOS Universal 构建](chapter/8-macOS%20Universal构建.md) 在需要打双架构 release 包或配置 CI 时查阅
