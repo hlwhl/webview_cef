@@ -750,8 +750,23 @@ void WebviewHandler::sendJavaScriptChannelCallBack(const bool error, const std::
         CefRefPtr<CefFrame> frame = bit->second.browser->GetMainFrame();
 
         // CefFrame::GetIdentifier() returns a string identifier in current CEF
-        // (since CEF 122) on every platform.
-        bool identifierMatch = std::stoll(frame->GetIdentifier().ToString()) == frameIdInt;
+        // (since CEF 122) on every platform. The identifier is typically numeric
+        // but may be empty or non-numeric in edge cases (e.g. frame not yet loaded,
+        // renderer process crash). We use atoll() instead of std::stoll() here
+        // because:
+        //
+        //  - std::stoll() throws std::invalid_argument when the input string is
+        //    not a valid integer. In C++ this exception propagates as an uncaught
+        //    C++ exception → std::terminate() → abort() → SIGABRT crash.
+        //
+        //  - atoll() is a C function that returns 0 on parse failure instead of
+        //    throwing. It is safe for untrusted / potentially-empty input.
+        //
+        // CefString::ToString() returns std::string (owned copy); calling .c_str()
+        // on it yields a temporary const char* that atoll can consume. Note that
+        // .c_str() alone on a temporary std::string is safe here because the
+        // temporary lives until the full expression ends (at the semicolon).
+        bool identifierMatch = atoll(frame->GetIdentifier().ToString().c_str()) == frameIdInt;
         if (identifierMatch)
         {
             frame->SendProcessMessage(PID_RENDERER, message);
