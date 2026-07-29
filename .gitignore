@@ -70,3 +70,7 @@ app.*.map.json
 
 /macos/third/cef/Chromium Embedded Framework.framework
 /macos/third/cef/libcef_dll_wrapper.a
+
+# CEF prebuilt tarballs are too large for git (~300MB each). Place them
+# manually in cef_tar/ for offline builds — see cef_tar/README.md.
+/cef_tar/*.tar.bz2

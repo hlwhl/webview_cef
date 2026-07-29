@@ -18,7 +18,9 @@
 # Without this hook the plugin still works, but falls back to single-process.
 module WebviewCEF
   PHASE_NAME = 'Embed CEF Helpers'.freeze
-  SCRIPT = 'bash "${SRCROOT}/Flutter/ephemeral/.symlinks/plugins/webview_cef/macos/scripts/embed_cef_helpers.sh"'.freeze
+  SCRIPT = 'echo "$PRODUCT_NAME.app" > "${SRCROOT}/Flutter/ephemeral/.app_filename"' + "\n" +
+         '"$FLUTTER_ROOT"/packages/flutter_tools/bin/macos_assemble.sh embed' + "\n" +
+         'bash "${SRCROOT}/Flutter/ephemeral/.symlinks/plugins/webview_cef/macos/scripts/embed_cef_helpers.sh"'.freeze
 
   def self.install_helper_phase(installer)
     installer.aggregate_targets.each do |aggregate|
