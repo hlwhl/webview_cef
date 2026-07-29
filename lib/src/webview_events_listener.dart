@@ -45,16 +45,26 @@ typedef PageProgressCallback = void Function(
 typedef PageErrorCallback = void Function(
     WebViewController controller, String url, WebViewError error);
 
-/* Log severity levels. from CEF include/internal/cef_types.h
-  0:default logging (currently info logging)
-  1:verbose logging or debug logging
-  2:info logging
-  3:warning logging
-  4:error logging
-  5:fatal logging
-  99:disable logging to file for all messages, and to stderr for messages with severity less than fatal
- */
+/// Called when the CEF render process terminates unexpectedly (crash, OOM,
+/// killed). Use [WebViewController.reload] to restore the page — CEF has
+/// already created a new render process.
+///
+/// [status]: 0 = TS_ABNORMAL_TERMINATION, 1 = TS_PROCESS_WAS_KILLED,
+///           2 = TS_PROCESS_CRASHED, 3 = TS_PROCESS_OOM.
+/// [errorCode]: platform-specific exit/crash code (e.g. Posix signal).
+/// [errorString]: human-readable error description.
+typedef RenderProcessTerminatedCallback = void Function(
+    WebViewController controller, int status, int errorCode, String errorString);
+
 /// Called when a console message is emitted from the page.
+///
+/// [level]: log severity (from CEF include/internal/cef_types.h):
+///   0 = default logging (currently info), 1 = verbose/debug,
+///   2 = info, 3 = warning, 4 = error, 5 = fatal,
+///   99 = disable logging.
+/// [message]: the console message text.
+/// [source]: the source URL or identifier.
+/// [line]: the line number in the source.
 typedef PageConsoleCallback = void Function(
     int level, String message, String source, int line);
 
@@ -67,6 +77,7 @@ class WebViewEventsListener {
     this.onPageFinished,
     this.onProgressUpdated,
     this.onPageFailed,
+    this.onRenderProcessTerminated,
   });
 
   /// Console message from the web page.
@@ -86,4 +97,8 @@ class WebViewEventsListener {
 
   /// A page load failed.
   final PageErrorCallback? onPageFailed;
+
+  /// The CEF render process terminated unexpectedly (crash, OOM, killed).
+  /// Reload the page to restore it — CEF created a new render process.
+  final RenderProcessTerminatedCallback? onRenderProcessTerminated;
 }

@@ -64,6 +64,7 @@ initialize() → createWebView() → [使用中] → dispose() / quit()
 | `onBeforeBrowse` | listener | `WebViewEventsListener.onNavigateRequest` |
 | `onLoadingProgressChange` | listener | `WebViewEventsListener.onProgressUpdated` |
 | `onLoadError` | listener | `WebViewEventsListener.onPageFailed` |
+| `onRenderProcessTerminated` | listener | `WebViewEventsListener.onRenderProcessTerminated` |
 | `javascriptChannelMessage` | controller | `onJavascriptChannelMessage` → `JavascriptChannel.onMessageReceived` |
 | `onTooltip` | controller | `onToolTip` → `WebviewTooltip` |
 | `onCursorChanged` | controller | `onCursorChanged` → `MouseRegion` cursor |
@@ -235,6 +236,7 @@ WebViewEventsListener(
   onPageFinished: (WebViewController controller, String url) {},
   onProgressUpdated: (WebViewController controller, double progress) {},
   onPageFailed: (WebViewController controller, String url, WebViewError error) {},
+  onRenderProcessTerminated: (WebViewController controller, int status, int errorCode, String errorString) {},
 )
 ```
 
@@ -250,6 +252,7 @@ WebViewEventsListener(
 | `onPageFinished` | `PageFinishedCallback` | `OnLoadEnd` | 页面加载完成 |
 | `onProgressUpdated` | `PageProgressCallback` | `OnLoadingProgressChange` | 加载进度 0.0–1.0 |
 | `onPageFailed` | `PageErrorCallback` | `OnLoadError` | 加载失败，携带 `WebViewError` |
+| `onRenderProcessTerminated` | `RenderProcessTerminatedCallback` | `OnRenderProcessTerminated` | 渲染进程异常终止（崩溃、OOM、被杀），可调用 `reload()` 恢复 |
 
 ### 辅助类型
 

@@ -69,6 +69,11 @@ public:
     std::function<void(int browserId, double progress)> onLoadingProgressChangeCallback;
     // Page load error
     std::function<void(int browserId, int errorCode, std::string errorText, std::string failedUrl)> onLoadErrorCallback;
+    // Render process terminated unexpectedly (crash / OOM / killed).
+    // |status|: TS_ABNORMAL_TERMINATION (0), TS_PROCESS_WAS_KILLED (1),
+    // TS_PROCESS_CRASHED (2) or TS_PROCESS_OOM (3). Use controller.reload()
+    // to restore the page — CEF already created a new render process.
+    std::function<void(int browserId, int status, int errorCode, std::string errorString)> onRenderProcessTerminated;
     
     explicit WebviewHandler();
     ~WebviewHandler();
@@ -156,6 +161,10 @@ public:
                                 CefRefPtr<CefRequest> request,
                                 bool user_gesture,
                                 bool is_redirect) override;
+    virtual void OnRenderProcessTerminated(CefRefPtr<CefBrowser> browser,
+                                           TerminationStatus status,
+                                           int error_code,
+                                           const CefString& error_string) override;
 
     // CefRenderHandler methods:
     virtual void GetViewRect(CefRefPtr<CefBrowser> browser, CefRect& rect) override;

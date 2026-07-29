@@ -241,6 +241,18 @@ class WebviewManager extends ValueNotifier<bool> {
         await controller.ready;
         controller.listener?.onProgressUpdated?.call(controller, progress);
         return;
+      case 'onRenderProcessTerminated':
+        int browserId = call.arguments['browserId'] as int;
+        int status = call.arguments['status'] as int;
+        int errorCode = call.arguments['errorCode'] as int;
+        String errorString = call.arguments['errorString'] as String;
+        final renderController = _webViews[browserId];
+        if (renderController == null) return;
+
+        await renderController.ready;
+        renderController.listener?.onRenderProcessTerminated
+            ?.call(renderController, status, errorCode, errorString);
+        return;
       case 'onLoadError':
         int browserId = call.arguments['browserId'] as int;
         String errorUrl = call.arguments['url'] as String;

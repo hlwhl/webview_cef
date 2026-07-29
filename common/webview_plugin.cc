@@ -297,6 +297,26 @@ namespace webview_cef {
                 }
             };
 
+            m_handler->onRenderProcessTerminated = [=, this](int nBrowserId, int status, int errorCode, std::string errorString) {
+                if (m_invokeFunc) {
+                    WValue* bId = webview_value_new_int(nBrowserId);
+                    WValue* s = webview_value_new_int(status);
+                    WValue* code = webview_value_new_int(errorCode);
+                    WValue* errStr = webview_value_new_string(const_cast<char*>(errorString.c_str()));
+                    WValue* retMap = webview_value_new_map();
+                    webview_value_set_string(retMap, "browserId", bId);
+                    webview_value_set_string(retMap, "status", s);
+                    webview_value_set_string(retMap, "errorCode", code);
+                    webview_value_set_string(retMap, "errorString", errStr);
+                    m_invokeFunc("onRenderProcessTerminated", retMap);
+                    webview_value_unref(bId);
+                    webview_value_unref(s);
+                    webview_value_unref(code);
+                    webview_value_unref(errStr);
+                    webview_value_unref(retMap);
+                }
+            };
+
 			m_init = true;
 		}
 	}
@@ -315,6 +335,7 @@ namespace webview_cef {
 		m_handler->onBeforeBrowseCallback = nullptr;
 		m_handler->onLoadingProgressChangeCallback = nullptr;
 		m_handler->onLoadErrorCallback = nullptr;
+		m_handler->onRenderProcessTerminated = nullptr;
 		m_init = false;
 	}
 

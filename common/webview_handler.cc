@@ -234,6 +234,18 @@ void WebviewHandler::OnLoadError(CefRefPtr<CefBrowser> browser,
     // }
 }
 
+void WebviewHandler::OnRenderProcessTerminated(CefRefPtr<CefBrowser> browser,
+                                               TerminationStatus status,
+                                               int error_code,
+                                               const CefString& error_string) {
+    if (onRenderProcessTerminated) {
+        onRenderProcessTerminated(browser->GetIdentifier(),
+                                  static_cast<int>(status),
+                                  error_code,
+                                  error_string.ToString());
+    }
+}
+
 void WebviewHandler::OnLoadStart(CefRefPtr<CefBrowser> browser, CefRefPtr<CefFrame> frame,
                                  CefLoadHandler::TransitionType transition_type) {
     if(onLoadStart){
