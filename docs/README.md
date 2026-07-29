@@ -16,6 +16,8 @@
 | [平台输入处理](chapter/6-平台输入处理.md) | 鼠标/指针、macOS/Windows/Linux/eLinux 键盘、IME 组合输入 |
 | [构建与集成](chapter/7-构建与集成.md) | macOS CocoaPods、Windows/Linux/eLinux CMake、CEF 下载、编译标志 |
 | [macOS Universal 构建](chapter/8-macOS%20Universal构建.md) | arm64 + x86_64 双架构 fat binary 构建方案，含回退机制 |
+| [CEF 详解](chapter/9-CEF%E8%AF%A6%E8%A7%A3.md) | CEF 多进程架构、文件结构、Helper 应用、渲染模式、缓存目录、命令行开关 |
+| [新旧项目差异对比](chapter/10-%E6%96%B0%E6%97%A7%E9%A1%B9%E7%9B%AE%E5%B7%AE%E5%BC%82%E5%AF%B9%E6%AF%94.md) | 旧项目（cef_flutter）与新项目（webview_cef）在 CEF 版本、Helper 构建、代码架构、渲染管线、JSBridge 等多维度的全面对比 |
 
 ## 核心文件速查
 
@@ -38,3 +40,5 @@
 6. [渲染管线](chapter/5-渲染管线.md) 和 [平台输入处理](chapter/6-平台输入处理.md) 可按需查阅
 7. [构建与集成](chapter/7-构建与集成.md) 在需要了解编译配置时查阅
 8. [macOS Universal 构建](chapter/8-macOS%20Universal构建.md) 在需要打双架构 release 包或配置 CI 时查阅
+9. [CEF 详解](chapter/9-CEF详解.md) 在需要了解 CEF 本身的文件、进程、子进程机制时查阅
+10. [新旧项目差异对比](chapter/10-新旧项目差异对比.md) 在对比旧项目实现或验证迁移完整性时查阅
