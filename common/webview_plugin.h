@@ -72,6 +72,12 @@ namespace webview_cef {
                         const std::string& frameworkDirPath,
                         const std::string& mainBundlePath);
 #endif
+    // Set an explicit root cache path for CEF so that multiple instances of the
+    // same CEF-based app — or different apps embedding the same CEF framework —
+    // each get their own isolated cache directory. Must be called before
+    // startCEF(). On macOS the platform layer passes
+    // ~/Library/Caches/<bundle_id>/cef.
+    void setCefCachePath(const std::string& cachePath);
     void doMessageLoopWork();
     void SwapBufferFromBgraToRgba(void* _dest, const void* _src, int width, int height);
     void stopCEF();

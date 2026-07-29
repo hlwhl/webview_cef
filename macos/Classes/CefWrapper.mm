@@ -445,6 +445,7 @@ private:
             // (see the example Runner's "Embed CEF Helpers" build phase).
             NSBundle* mainBundle = [NSBundle mainBundle];
             NSString* bundlePath = [mainBundle bundlePath];
+            NSString* bundleId = [mainBundle bundleIdentifier];
             NSString* exeName = [mainBundle objectForInfoDictionaryKey:@"CFBundleExecutable"];
             NSString* helperName = [exeName stringByAppendingString:@" Helper"];
             NSString* frameworksDir = [bundlePath stringByAppendingPathComponent:@"Contents/Frameworks"];
@@ -457,6 +458,21 @@ private:
                 webview_cef::setMacCEFPaths(std::string([subprocessPath UTF8String]),
                                             std::string([frameworkDir UTF8String]),
                                             std::string([bundlePath UTF8String]));
+            }
+            // Assign each app instance its own CEF cache directory so that
+            // multiple CEF-based apps can run concurrently without locking
+            // each other out of the default shared cache. Uses the macOS
+            // ~/Library/Caches/<bundle_identifier>/cef convention.
+            if (bundleId) {
+                NSString* cachesDir = [NSSearchPathForDirectoriesInDomains(
+                    NSCachesDirectory, NSUserDomainMask, YES) firstObject];
+                if (cachesDir) {
+                    NSString* cachePath = [[cachesDir
+                        stringByAppendingPathComponent:bundleId]
+                        stringByAppendingPathComponent:@"cef"];
+                    webview_cef::setCefCachePath(
+                        std::string([cachePath UTF8String]));
+                }
             }
             webview_cef::initCEFProcesses();
             isCefProcessInit = YES;

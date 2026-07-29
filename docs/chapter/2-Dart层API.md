@@ -43,7 +43,7 @@ initialize() → createWebView() → [使用中] → dispose() / quit()
 
 | 方法 | 说明 |
 |------|------|
-| `initialize({String? userAgent, ProcessMode processMode = ProcessMode.processPerSite})` | 启动 CEF 进程，设置 `methodCallhandler`，等待 300ms 确保初始化完成 |
+| `initialize({String? userAgent, ProcessMode processMode = ProcessMode.processPerSite, String? cachePath})` | 启动 CEF 进程，设置 `methodCallhandler`，等待 300ms 确保初始化完成 |
 | `createWebView({Widget? loading, InjectUserScripts? injectUserScripts})` | 创建 WebViewController，暂存到 `_tempWebViews` |
 | `onBrowserCreated(browserIndex, browserId)` | CEF 浏览器创建完成后，将 controller 从临时表迁至 `_webViews` |
 | `dispose()` | 清理 channel handler 和 webview 映射 |
@@ -90,6 +90,25 @@ initialize() → createWebView() → [使用中] → dispose() / quit()
 | `ProcessMode.singleProcess` | 单进程 | ~1 | 调试、嵌入式/Kiosk、受信内容 |
 
 > **注意**：单进程模式下无沙箱隔离，渲染进程崩溃会导致整个应用退出，不建议用于加载不受信第三方页面。
+
+### cachePath 参数
+
+通过 `initialize()` 的 `cachePath` 参数为 CEF 指定独立的缓存目录：
+
+| 行为 | 说明 |
+|------|------|
+| 显式指定 | `initialize(cachePath: "/path/to/cache")`，CEF 使用该目录 |
+| 不指定 | 各平台自动推导唯一路径（见下表），确保多个 App 实例共存时不冲突 |
+
+**各平台默认路径**：
+
+| 平台 | 默认路径 | 唯一性来源 |
+|------|---------|-----------|
+| macOS | `~/Library/Caches/<bundle_id>/cef` | Bundle Identifier |
+| Windows | `%LOCALAPPDATA%\<exe名称>\cef` | 可执行文件名 |
+| Linux / eLinux | `$XDG_CACHE_HOME/<exe名称>/cef` | `/proc/self/exe` 文件名 |
+
+> **为什么需要？** CEF 不指定 `root_cache_path` 时使用系统默认位置，多个 CEF 实例同时运行会导致缓存目录文件锁冲突，使浏览器创建失败。设置独立路径后，多个 App（如同一框架的不同项目）可同时运行。
 
 ---
 

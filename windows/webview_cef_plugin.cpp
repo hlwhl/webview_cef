@@ -400,6 +400,29 @@ namespace webview_cef {
 		
 	WebviewCefPlugin::WebviewCefPlugin() {
 		m_plugin = std::make_shared<WebviewPlugin>();
+
+		// Derive a default CEF cache path from the executable name so that
+		// multiple apps embedding the same CEF framework each get their own
+		// isolated cache directory.  If the Dart layer provides a cachePath
+		// via initialize(), it will override this default in startCEF().
+		wchar_t exePath[MAX_PATH] = {};
+		if (GetModuleFileNameW(nullptr, exePath, MAX_PATH) > 0) {
+			std::wstring ws(exePath);
+			size_t lastSlash = ws.find_last_of(L"\\/");
+			size_t lastDot   = ws.find_last_of(L'.');
+			std::wstring exeName = ws.substr(
+				lastSlash == std::wstring::npos ? 0 : lastSlash + 1,
+				(lastDot == std::wstring::npos || lastDot < lastSlash)
+					? std::wstring::npos
+					: lastDot - lastSlash - 1);
+			char localAppData[MAX_PATH] = {};
+			if (GetEnvironmentVariableA("LOCALAPPDATA", localAppData, MAX_PATH) > 0) {
+				std::string cachePath = std::string(localAppData) + "\\"
+					+ std::string(exeName.begin(), exeName.end())
+					+ "\\cef";
+				webview_cef::setCefCachePath(cachePath);
+			}
+		}
 	}
 
 	WebviewCefPlugin::~WebviewCefPlugin() {

@@ -15,6 +15,7 @@ namespace webview_cef {
 	CefRefPtr<WebviewApp> app;
 	CefString userAgent;
 	bool isCefInitialized = false;
+	std::string g_cefCachePath;
 #ifdef OS_MAC
 	std::string g_macSubprocessPath;
 	std::string g_macFrameworkDirPath;
@@ -28,6 +29,9 @@ namespace webview_cef {
 		g_macMainBundlePath = mainBundlePath;
 	}
 #endif
+	void setCefCachePath(const std::string& cachePath) {
+		g_cefCachePath = cachePath;
+	}
 
 	WebviewPlugin::WebviewPlugin() {
 		m_handler = new WebviewHandler();
@@ -329,6 +333,10 @@ namespace webview_cef {
 						if (ua != nullptr && webview_value_get_type(ua) == Webview_Value_Type_String) {
 							userAgent = CefString(webview_value_get_string(ua));
 						}
+						WValue* cp = webview_value_get_by_string(values, "cachePath");
+						if (cp != nullptr && webview_value_get_type(cp) == Webview_Value_Type_String) {
+							setCefCachePath(webview_value_get_string(cp));
+						}
 					} else {
 						// Old API: init arg is a bare string (userAgent).
 						userAgent = CefString(webview_value_get_string(values));
@@ -347,6 +355,13 @@ namespace webview_cef {
 		else if (name.compare("create") == 0) {
 			std::string url = webview_value_get_string(values);
 			m_handler->createBrowser(url, [=, this](int browserId) {
+				if (browserId < 0) {
+					std::cerr << "[webview_cef] ERROR: createBrowser failed, "
+					             "browser creation returned invalid ID."
+					          << std::endl;
+					result(0, nullptr);
+					return;
+				}
 				std::shared_ptr<WebviewTexture> renderer = m_createTextureFunc();
 				m_renderers[browserId] = renderer;
 				WValue	*response = webview_value_new_list();
@@ -828,6 +843,9 @@ namespace webview_cef {
 		//cef message run in another thread on windows/linux
 		cefs.multi_threaded_message_loop = true;
 #endif
+		if (!g_cefCachePath.empty()) {
+			CefString(&cefs.root_cache_path) = g_cefCachePath;
+		}
 		CefInitialize(mainArgs, cefs, app.get(), nullptr);
 	}
 

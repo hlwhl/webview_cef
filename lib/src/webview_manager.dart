@@ -105,15 +105,27 @@ class WebviewManager extends ValueNotifier<bool> {
   /// - [ProcessMode.singleProcess] — everything in one process (~1 process
   ///   total). Great for debugging, embedded/kiosk apps, or trusted content.
   ///   No sandbox — avoid with untrusted third-party pages.
+  ///
+  /// [cachePath] overrides the default CEF root cache directory. When omitted,
+  /// each platform derives a unique default to prevent file-lock conflicts
+  /// between multiple CEF-based apps running simultaneously:
+  /// - macOS: `~/Library/Caches/<bundle_id>/cef`
+  /// - Windows: `%LOCALAPPDATA%\<exe_name>\cef`
+  /// - Linux / eLinux: `$XDG_CACHE_HOME/<exe_name>/cef`
+  /// Set this only when your app needs the cache at a specific location.
   Future<void> initialize({
     String? userAgent,
     ProcessMode processMode = ProcessMode.processPerSite,
+    String? cachePath,
   }) async {
     _creatingCompleter = Completer<void>();
     try {
       final args = <String, dynamic>{'processMode': processMode.value};
       if (userAgent != null && userAgent.isNotEmpty) {
         args['userAgent'] = userAgent;
+      }
+      if (cachePath != null && cachePath.isNotEmpty) {
+        args['cachePath'] = cachePath;
       }
       await pluginChannel.invokeMethod('init', args);
       pluginChannel.setMethodCallHandler(methodCallhandler);

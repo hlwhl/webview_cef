@@ -319,7 +319,16 @@ void WebviewHandler::createBrowser(std::string url, std::function<void(int)> cal
     // an IDXGIOutput vblank wait, macOS from a CVDisplayLink.
     window_info.external_begin_frame_enabled = true;
 #endif
-    callback(CefBrowserHost::CreateBrowserSync(window_info, this, url, browser_settings, nullptr, nullptr)->GetIdentifier());
+    CefRefPtr<CefBrowser> browser =
+        CefBrowserHost::CreateBrowserSync(window_info, this, url,
+                                          browser_settings, nullptr, nullptr);
+    if (!browser) {
+        std::cerr << "[webview_cef] ERROR: CreateBrowserSync failed for URL: "
+                  << url << std::endl;
+        callback(-1);  // Invalid browser ID signals creation failure.
+        return;
+    }
+    callback(browser->GetIdentifier());
 #ifdef WEBVIEW_CEF_GPU_TEXTURE
     // The GPU shared-texture path is the only render path on this build (no
     // OnPaint fallback). If no accelerated frame arrives shortly, the GPU
