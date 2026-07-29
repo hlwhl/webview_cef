@@ -696,13 +696,6 @@ namespace webview_cef {
 		}
 
 		m_handler->sendKeyEvent(ev);
-		if(ev.type == KEYEVENT_RAWKEYDOWN && ev.windows_key_code == 0x7B && (ev.modifiers & EVENTFLAG_CONTROL_DOWN) != 0){
-			for(auto render : m_renderers){
-				if(render.second.get()->isFocused){
-					m_handler->openDevTools(render.first);
-				}
-			}
-		}
 	}
 
 	void WebviewPlugin::setInvokeMethodFunc(std::function<void(std::string, WValue*)> func){

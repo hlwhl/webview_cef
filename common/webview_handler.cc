@@ -482,6 +482,57 @@ void WebviewHandler::sendKeyEvent(CefKeyEvent& ev)
     if (!browser.get()) {
         return;
     }
+
+    // Intercept DevTools keyboard shortcuts before forwarding the key to the
+    // page so the shortcut does not reach the web content.
+    if (ev.type == KEYEVENT_RAWKEYDOWN) {
+        bool open = false;
+
+        // F12 — mapped to VK_F12 (0x7B) on Windows/Linux, native key code 111
+        // on macOS (CEF off-screen rendering does not populate windows_key_code
+        // from NSEvent).
+#ifdef OS_MAC
+        if (ev.native_key_code == 111) {  // F12 on macOS
+            open = true;
+        }
+#else
+        if (ev.windows_key_code == 0x7B) {  // VK_F12
+            open = true;
+        }
+#endif
+
+        // Cmd+Opt+I (macOS) / Ctrl+Shift+I (Windows/Linux).
+        // Use unmodified_character so the check is independent of the Shift
+        // modifier state; fall back to character when it is unset.
+        char16_t ch = ev.unmodified_character != 0 ? ev.unmodified_character
+                                                    : ev.character;
+        if (ch == 'I' || ch == 'i') {
+#ifdef OS_MAC
+            if ((ev.modifiers & (EVENTFLAG_COMMAND_DOWN |
+                                 EVENTFLAG_ALT_DOWN)) ==
+                (EVENTFLAG_COMMAND_DOWN | EVENTFLAG_ALT_DOWN)) {
+                open = true;
+            }
+#else
+            if ((ev.modifiers & (EVENTFLAG_CONTROL_DOWN |
+                                 EVENTFLAG_SHIFT_DOWN)) ==
+                (EVENTFLAG_CONTROL_DOWN | EVENTFLAG_SHIFT_DOWN)) {
+                open = true;
+            }
+#endif
+        }
+
+        if (open) {
+            CefWindowInfo windowInfo;
+#ifdef OS_WIN
+            windowInfo.SetAsPopup(nullptr, "DevTools");
+#endif
+            browser->GetHost()->ShowDevTools(windowInfo, this,
+                                             CefBrowserSettings(), CefPoint());
+            return;  // Consume the shortcut — do not forward to the web page.
+        }
+    }
+
     browser->GetHost()->SendKeyEvent(ev);
 }
 
