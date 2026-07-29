@@ -318,4 +318,4 @@ $cef.Print.postMessage(JSON.stringify({msg: 'hello'}), function(err, res) {
 
 **文件**：`lib/src/webview_tooltip.dart`
 
-基于 Flutter Overlay 系统的 tooltip 实现。状态机：`hide → prepare（500ms 延迟）→ shown`。
+基于 Flutter Overlay 系统的 tooltip 实现。状态机：`hide → prepare（500ms 延迟）→ shown`，`shown` 状态收到新文本时拆除旧浮层重建。页面导航（`onLoadStart`）时主动清除 tooltip，兜底 CEF 不发送空 `OnTooltip` 的情况。

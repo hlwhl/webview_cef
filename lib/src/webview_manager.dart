@@ -198,6 +198,11 @@ class WebviewManager extends ValueNotifier<bool> {
         int browserId = call.arguments["browserId"] as int;
         String urlId = call.arguments["urlId"] as String;
 
+        // Clear any visible tooltip when navigating away from the current
+        // page — CEF does not guarantee an empty OnTooltip() before the
+        // old page is destroyed.
+        _webViews[browserId]?.onToolTip?.call('');
+
         final controller = _webViews[browserId];
         if (controller == null) return;
         await controller.ready;
