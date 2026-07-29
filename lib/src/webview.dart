@@ -357,7 +357,8 @@ class WebView extends StatefulWidget {
   WebViewState createState() => WebViewState();
 }
 
-class WebViewState extends State<WebView> with WebeViewTextInput {
+class WebViewState extends State<WebView>
+    with WebeViewTextInput, WidgetsBindingObserver {
   final GlobalKey _key = GlobalKey();
   String _composingText = '';
   late final _focusNode = FocusNode();
@@ -412,6 +413,7 @@ class WebViewState extends State<WebView> with WebeViewTextInput {
   @override
   void initState() {
     super.initState();
+    WidgetsBinding.instance.addObserver(this);
     _controller._onFocusedNodeChangeMessage = (editable) {
       _composingText = '';
       if (editable) {
@@ -471,6 +473,22 @@ class WebViewState extends State<WebView> with WebeViewTextInput {
     // Report initial surface size
     WidgetsBinding.instance
         .addPostFrameCallback((_) => _reportSurfaceSize(context));
+  }
+
+  @override
+  void dispose() {
+    WidgetsBinding.instance.removeObserver(this);
+    super.dispose();
+  }
+
+  @override
+  void didChangeMetrics() {
+    // Window / screen metrics changed (e.g. resize, DPI change). Report the
+    // new surface size to CEF so the browser view rect stays in sync with the
+    // Flutter widget. This is a more reliable signal than
+    // SizeChangedLayoutNotifier during macOS live resize, where Flutter's
+    // layout pipeline may be throttled.
+    _reportSurfaceSize(context);
   }
 
   KeyEventResult _onKeyEvent(FocusNode node, KeyEvent event) {
