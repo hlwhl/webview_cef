@@ -115,6 +115,16 @@
       border-bottom: 1px solid #1a1a2e;
       padding: 3px 0;
     }
+    .file-row { display: flex; gap: 8px; align-items: center; }
+    .btn-file {
+      background: #1a6b3c; color: #fff; border: none; border-radius: 8px;
+      padding: 8px 16px; font-size: 0.85rem; font-weight: 600; cursor: pointer;
+      transition: opacity 0.2s; white-space: nowrap;
+    }
+    .btn-file:hover { opacity: 0.85; }
+    .btn-file:active { opacity: 0.7; }
+    #file-name { font-size: 0.78rem; color: #a0a0b0; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+    #file-info { margin-top: 6px; font-size: 0.75rem; color: #707088; min-height: 1em; }
   </style>
 </head>
 
@@ -144,6 +154,18 @@
           border:1px solid #2a2a4a;border-radius:8px;padding:10px;
           font-family:'SF Mono','Fira Code',monospace;font-size:0.85rem;
           resize:vertical;"></textarea>
+    </div>
+
+    <div class="section">
+      <p class="section-label">File Picker Test</p>
+      <div class="file-row">
+        <input type="file" id="file-input" style="display:none" onchange="onFileSelected(this.files)" />
+        <button class="btn-file" onclick="document.getElementById('file-input').click()">
+          &#x1F4C2; Choose File
+        </button>
+        <span id="file-name">No file chosen</span>
+      </div>
+      <div id="file-info"></div>
     </div>
 
     <div id="log-area"></div>
@@ -186,6 +208,36 @@
         appendLog('Eval', '<code>abc("bridge_test")</code> → <b>' + result + '</b>');
       } else {
         appendLog('Eval', '<span style="color:#e94560">abc() NOT defined</span>');
+      }
+    }
+
+    // ── 4. File Picker ──────────────────────────────
+    function onFileSelected(files) {
+      var el = document.getElementById('file-name');
+      var info = document.getElementById('file-info');
+      if (!files || files.length === 0) {
+        el.textContent = 'No file chosen';
+        info.textContent = '';
+        return;
+      }
+      var f = files[0];
+      var size = f.size < 1024 ? f.size + ' B'
+        : f.size < 1048576 ? (f.size / 1024).toFixed(1) + ' KB'
+        : (f.size / 1048576).toFixed(2) + ' MB';
+      el.textContent = f.name;
+      info.textContent = 'Type: ' + (f.type || 'unknown') + '  |  Size: ' + size;
+      appendLog('File', '<b>' + f.name + '</b> — ' + size + ' (' + (f.type || 'unknown') + ')');
+
+      // Read the file content as text (up to 4 KB) and display a preview.
+      if (f.size <= 4096) {
+        var reader = new FileReader();
+        reader.onload = function(e) {
+          appendLog('File', 'Content preview: <pre style="margin:4px 0 0 0;font-size:0.72rem;opacity:0.8">'
+            + e.target.result + '</pre>');
+        };
+        reader.readAsText(f);
+      } else {
+        appendLog('File', 'File too large for preview (>4 KB)');
       }
     }
 
