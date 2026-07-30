@@ -52,6 +52,15 @@ namespace webview_cef {
         int focusedBrowserId();
         // Set the composing flag for a specific browser (no-op if unknown).
         void setComposingForBrowser(int browserId, bool composing);
+#ifdef OS_MAC
+        // Intercept macOS Cmd+Arrow / Cmd+Z editing shortcuts. CEF off-screen
+        // rendering bypasses AppKit's interpretKeyEvents: so these key chords
+        // never translate to NSEvent editing selectors. Execute the equivalent
+        // editing action via JavaScript instead.
+        // Returns true if the event was handled; caller should return without
+        // forwarding to CEF.
+        bool handleMacOSOSRShortcut(CefKeyEvent& ev);
+#endif
         int cursorAction(WValue *args, std::string name);
     	std::function<void(std::string, WValue*)> m_invokeFunc;
 	    std::function<std::shared_ptr<WebviewTexture>()> m_createTextureFunc;

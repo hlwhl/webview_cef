@@ -696,28 +696,122 @@ namespace webview_cef {
 
 	void WebviewPlugin::sendKeyEvent(CefKeyEvent& ev)
 	{
-		// CEF off-screen rendering bypasses AppKit's interpretKeyEvents: which maps
-		// macOS Cmd+Backspace to the deleteToBeginningOfLine editing command.
-		// Intercept it here and execute the editing action via JavaScript.
-		if (ev.type == KEYEVENT_RAWKEYDOWN &&
-		    ev.native_key_code == 51 &&
-		    (ev.modifiers & EVENTFLAG_COMMAND_DOWN) &&
-		    !(ev.modifiers & EVENTFLAG_SHIFT_DOWN)) {
-			int bId = focusedBrowserId();
-			if (bId >= 0) {
-				m_handler->executeJavaScript(bId,
-					"(function(){var e=document.activeElement;"
-					"if(e&&(e.tagName==='INPUT'||e.tagName==='TEXTAREA')){"
-					"var p=e.selectionStart;if(p===e.selectionEnd&&p>0){"
-					"var v=e.value,ls=v.lastIndexOf('\\n',p-1);"
-					"ls=(ls===-1)?0:ls+1;e.setSelectionRange(ls,p);"
-					"}}document.execCommand('delete',false,null)})()");
-			}
+#ifdef OS_MAC
+		// CEF off-screen rendering bypasses AppKit's interpretKeyEvents: which
+		// maps macOS Cmd+Arrow / Cmd+Z / Cmd+Backspace to editing commands.
+		// Intercept them here and execute the editing action via JavaScript.
+		if (handleMacOSOSRShortcut(ev)) {
 			return;
 		}
-
+#endif
 		m_handler->sendKeyEvent(ev);
 	}
+
+#ifdef OS_MAC
+	bool WebviewPlugin::handleMacOSOSRShortcut(CefKeyEvent& ev)
+	{
+		// Only intercept RAWKEYDOWN events with Command modifier.
+		if (ev.type != KEYEVENT_RAWKEYDOWN ||
+		    !(ev.modifiers & EVENTFLAG_COMMAND_DOWN)) {
+			return false;
+		}
+
+		int bId = focusedBrowserId();
+		if (bId < 0) return false;
+
+		bool shiftDown = (ev.modifiers & EVENTFLAG_SHIFT_DOWN) != 0;
+		const char* js = nullptr;
+
+		switch (ev.native_key_code) {
+		case 51:  // Backspace — delete to beginning of line.
+			if (!shiftDown) {
+				js = "(function(){var e=document.activeElement;"
+				     "if(e&&(e.tagName==='INPUT'||e.tagName==='TEXTAREA')){"
+				     "var p=e.selectionStart;if(p===e.selectionEnd&&p>0){"
+				     "var v=e.value,ls=v.lastIndexOf('\\n',p-1);"
+				     "ls=(ls===-1)?0:ls+1;e.setSelectionRange(ls,p);"
+				     "}}document.execCommand('delete',false,null)})()";
+			}
+			break;
+
+		case 126:  // Up arrow — beginning of document.
+			if (shiftDown) {
+				js = "(function(){var e=document.activeElement;"
+				     "if(e&&(e.tagName==='INPUT'||e.tagName==='TEXTAREA')){"
+				     "var p=Math.max(e.selectionStart,e.selectionEnd);"
+				     "e.setSelectionRange(p,0);}})()";
+			} else {
+				js = "(function(){var e=document.activeElement;"
+				     "if(e&&(e.tagName==='INPUT'||e.tagName==='TEXTAREA')){"
+				     "e.setSelectionRange(0,0);}})()";
+			}
+			break;
+
+		case 125:  // Down arrow — end of document.
+			if (shiftDown) {
+				js = "(function(){var e=document.activeElement;"
+				     "if(e&&(e.tagName==='INPUT'||e.tagName==='TEXTAREA')){"
+				     "var p=Math.min(e.selectionStart,e.selectionEnd);"
+				     "var l=e.value.length;e.setSelectionRange(p,l);}})()";
+			} else {
+				js = "(function(){var e=document.activeElement;"
+				     "if(e&&(e.tagName==='INPUT'||e.tagName==='TEXTAREA')){"
+				     "var l=e.value.length;e.setSelectionRange(l,l);}})()";
+			}
+			break;
+
+		case 123:  // Left arrow — beginning of line.
+			if (shiftDown) {
+				js = "(function(){var e=document.activeElement;"
+				     "if(e&&(e.tagName==='INPUT'||e.tagName==='TEXTAREA')){"
+				     "var v=e.value,p=Math.max(e.selectionStart,e.selectionEnd);"
+				     "var ls=v.lastIndexOf('\\n',p-1);"
+				     "ls=(ls===-1)?0:ls+1;e.setSelectionRange(p,ls);}})()";
+			} else {
+				js = "(function(){var e=document.activeElement;"
+				     "if(e&&(e.tagName==='INPUT'||e.tagName==='TEXTAREA')){"
+				     "var v=e.value,p=e.selectionStart;"
+				     "var ls=v.lastIndexOf('\\n',p-1);"
+				     "ls=(ls===-1)?0:ls+1;e.setSelectionRange(ls,ls);}})()";
+			}
+			break;
+
+		case 124:  // Right arrow — end of line.
+			if (shiftDown) {
+				js = "(function(){var e=document.activeElement;"
+				     "if(e&&(e.tagName==='INPUT'||e.tagName==='TEXTAREA')){"
+				     "var v=e.value,p=Math.min(e.selectionStart,e.selectionEnd);"
+				     "var le=v.indexOf('\\n',p);"
+				     "le=(le===-1)?v.length:le;e.setSelectionRange(p,le);}})()";
+			} else {
+				js = "(function(){var e=document.activeElement;"
+				     "if(e&&(e.tagName==='INPUT'||e.tagName==='TEXTAREA')){"
+				     "var v=e.value,p=e.selectionEnd;"
+				     "var le=v.indexOf('\\n',p);"
+				     "le=(le===-1)?v.length:le;e.setSelectionRange(le,le);}})()";
+			}
+			break;
+
+		case 6:  // Z — undo / redo (no element check; execCommand works
+		         // at the document level for contenteditable as well).
+			if (shiftDown) {
+				js = "(function(){document.execCommand('redo')})()";
+			} else {
+				js = "(function(){document.execCommand('undo')})()";
+			}
+			break;
+
+		default:
+			return false;
+		}
+
+		if (js) {
+			m_handler->executeJavaScript(bId, js);
+			return true;
+		}
+		return false;
+	}
+#endif
 
 	void WebviewPlugin::setInvokeMethodFunc(std::function<void(std::string, WValue*)> func){
 		m_invokeFunc = func;
