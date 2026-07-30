@@ -792,6 +792,14 @@ namespace webview_cef {
 			}
 			break;
 
+
+		case 8:  // C — copy (no element restriction; copies the current
+		         // selection, whether inside an input or in the DOM at large).
+			if (!shiftDown) {
+				js = "(function(){document.execCommand('copy')})()";
+			}
+			break;
+
 		case 6:  // Z — undo / redo (no element check; execCommand works
 		         // at the document level for contenteditable as well).
 			if (shiftDown) {
@@ -810,6 +818,40 @@ namespace webview_cef {
 			return true;
 		}
 		return false;
+	}
+
+	void WebviewPlugin::pasteText(const std::string& text) {
+		int bId = focusedBrowserId();
+		if (bId < 0) return;
+
+		// Escape the clipboard text for a JavaScript string literal.
+		std::string escaped;
+		escaped.reserve(text.size() * 2);
+		for (char c : text) {
+			switch (c) {
+				case '\\': escaped += "\\\\"; break;
+				case '"':  escaped += "\\\""; break;
+				case '\n': escaped += "\\n";  break;
+				case '\r': escaped += "\\r";  break;
+				case '\t': escaped += "\\t";  break;
+				default:   escaped += c;      break;
+			}
+		}
+
+		std::string js =
+			"(function(t){"
+			"var e=document.activeElement;"
+			"if(!e)return;"
+			"if(e.tagName==='INPUT'||e.tagName==='TEXTAREA'){"
+			"var s=e.selectionStart,p=e.selectionEnd,v=e.value;"
+			"e.value=v.substring(0,s)+t+v.substring(p);"
+			"e.selectionStart=e.selectionEnd=s+t.length;"
+			"e.dispatchEvent(new Event('input',{bubbles:true}));"
+			"}else if(e.isContentEditable||e.getAttribute('contenteditable')==='true'){"
+			"document.execCommand('insertText',false,t);"
+			"}})(\"" + escaped + "\")";
+
+		m_handler->executeJavaScript(bId, js);
 	}
 #endif
 

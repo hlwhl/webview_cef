@@ -46,6 +46,12 @@ namespace webview_cef {
         void imeSetCompositionNative(const std::wstring& text, int cursor);
         void imeCommitTextNative(const std::wstring& text);
         void imeFinishCompositionNative();
+#ifdef OS_MAC
+        // Inject text at the cursor position of the currently focused element
+        // (input / textarea / contenteditable) via JavaScript. Used to paste
+        // system clipboard content that CEF OSR cannot access on its own.
+        void pasteText(const std::string& text);
+#endif
 
     private :
         // Resolve the browserId whose renderer currently has focus, or -1.

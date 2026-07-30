@@ -257,6 +257,20 @@ private:
         return false;
     }
 
+    // Intercept Cmd+V for paste in OSR mode. CEF off-screen rendering
+    // bypasses AppKit's interpretKeyEvents: so Cmd+V never triggers the
+    // system pasteboard read. Grab the clipboard text here and inject it
+    // via JavaScript into the focused element.
+    if ([event type] == NSEventTypeKeyDown &&
+        [event keyCode] == 9 &&  // V key
+        ([event modifierFlags] & NSEventModifierFlagCommand)) {
+        NSString *text = [[NSPasteboard generalPasteboard] stringForType:NSPasteboardTypeString];
+        if (text.length > 0) {
+            currentPlugin->_plugin->pasteText([text UTF8String]);
+        }
+        return YES;
+    }
+
     CefKeyEvent keyEvent = {};
 
     // |characters| and |charactersIgnoringModifiers| are only valid for
