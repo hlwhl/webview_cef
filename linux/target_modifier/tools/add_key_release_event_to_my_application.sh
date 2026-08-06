@@ -1,5 +1,7 @@
 #!/bin/bash
 
+set -euo pipefail
+
 # Add
 # g_signal_connect(view, \"key_release_event\", G_CALLBACK(processKeyEventForCEF), nullptr);
 # after
@@ -34,6 +36,11 @@ else
     }
     { print }
   ' "$file" > "$file.tmp" && mv "$file.tmp" "$file"
+
+  if ! grep -q '^[[:space:]]*g_signal_connect(view, "key_release_event", G_CALLBACK(processKeyEventForCEF), nullptr);' "$file"; then
+    echo "Could not find 'FlView* view = fl_view_new(project);' in $file" >&2
+    exit 1
+  fi
 
   echo "Added 'g_signal_connect(view, \"key_release_event\", G_CALLBACK(processKeyEventForCEF), nullptr);' after 'FlView* view = fl_view_new(project);'."
 fi

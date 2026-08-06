@@ -1,5 +1,7 @@
 #!/bin/bash
 
+set -euo pipefail
+
 # Adds the line
 # '#include <webview_cef/webview_cef_plugin.h>'
 # after the line
@@ -36,5 +38,10 @@ awk '
   }
   { print }
 ' "$file" > "$file.tmp" && mv "$file.tmp" "$file"
+
+if ! grep -q '#include <webview_cef/webview_cef_plugin.h>' "$file"; then
+  echo "Could not find '#include \"flutter/generated_plugin_registrant.h\"' in $file" >&2
+  exit 1
+fi
 
 echo "Added '#include <webview_cef/webview_cef_plugin.h>' after '#include \"flutter/generated_plugin_registrant.h\"'"
