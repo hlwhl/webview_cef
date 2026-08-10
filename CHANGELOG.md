@@ -1,3 +1,10 @@
+## 0.6.0
+- Added eLinux support, including the plugin implementation, example runner, rendering pipeline, mouse input, and keyboard input.
+- Added Dart-side CEF key-event forwarding for platforms without native key handling while avoiding duplicate delivery on Windows, macOS, and desktop Linux.
+- Added Linux ARM64 CEF package selection based on the target architecture, including cross-compilation targets.
+- Fixed nullable map literal types for webviews created without `injectUserScripts` and added regression coverage.
+- Fixed Windows key-event character field conversions for MSVC builds.
+
 ## 0.5.1
 - Docs: fixed a stale version reference in the Chinese README (the upgrade-guide intro still said 0.2.3 instead of 0.5.0). No code changes.
 
