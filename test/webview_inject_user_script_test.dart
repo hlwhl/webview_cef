@@ -28,4 +28,18 @@ void main() {
       'validName',
     );
   });
+
+  test('WebviewManager accepts an omitted injectUserScripts argument', () {
+    final manager = WebviewManager();
+    final browserIndex = manager.nextIndex;
+    final browserId = browserIndex + 1000;
+
+    expect(manager.createWebView(), isA<WebViewController>());
+    expect(
+      () => manager.onBrowserCreated(browserIndex, browserId),
+      returnsNormally,
+    );
+
+    manager.removeWebView(browserId);
+  });
 }
