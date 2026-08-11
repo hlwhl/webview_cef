@@ -574,6 +574,26 @@ namespace webview_cef {
 
 	void WebviewPlugin::sendKeyEvent(CefKeyEvent& ev)
 	{
+		// CEF off-screen rendering bypasses AppKit's interpretKeyEvents: which maps
+		// macOS Cmd+Backspace to the deleteToBeginningOfLine editing command.
+		// Intercept it here and execute the editing action via JavaScript.
+		if (ev.type == KEYEVENT_RAWKEYDOWN &&
+		    ev.native_key_code == 51 &&
+		    (ev.modifiers & EVENTFLAG_COMMAND_DOWN) &&
+		    !(ev.modifiers & EVENTFLAG_SHIFT_DOWN)) {
+			int bId = focusedBrowserId();
+			if (bId >= 0) {
+				m_handler->executeJavaScript(bId,
+					"(function(){var e=document.activeElement;"
+					"if(e&&(e.tagName==='INPUT'||e.tagName==='TEXTAREA')){"
+					"var p=e.selectionStart;if(p===e.selectionEnd&&p>0){"
+					"var v=e.value,ls=v.lastIndexOf('\\n',p-1);"
+					"ls=(ls===-1)?0:ls+1;e.setSelectionRange(ls,p);"
+					"}}document.execCommand('delete',false,null)})()");
+			}
+			return;
+		}
+
 		m_handler->sendKeyEvent(ev);
 		if(ev.type == KEYEVENT_RAWKEYDOWN && ev.windows_key_code == 0x7B && (ev.modifiers & EVENTFLAG_CONTROL_DOWN) != 0){
 			for(auto render : m_renderers){

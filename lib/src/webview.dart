@@ -185,14 +185,8 @@ class WebViewController extends ValueNotifier<bool> {
       return;
     }
     assert(value);
-    return _pluginChannel.invokeMethod('sendKeyEvent', [
-      _browserId,
-      type,
-      keyCode,
-      modifiers,
-      character,
-      unmodifiedCharacter
-    ]);
+    return _pluginChannel.invokeMethod('sendKeyEvent',
+        [_browserId, type, keyCode, modifiers, character, unmodifiedCharacter]);
   }
 
   Future<void> setJavaScriptChannels(Set<JavascriptChannel> channels) async {
@@ -380,7 +374,17 @@ class WebViewState extends State<WebView> with WebeViewTextInput {
     super.initState();
     _controller._onFocusedNodeChangeMessage = (editable) {
       _composingText = '';
-      editable ? attachTextInputClient() : detachTextInputClient();
+      if (editable) {
+        // Ensure CEF knows Flutter has focus before attaching text input.
+        // This is necessary after page reload: the FocusNode may still hold
+        // focus (so onFocusChange won't fire again), but CEF's internal
+        // keyboard focus state was reset during the reload. Without this
+        // call, text input won't work until Flutter focus is toggled off/on.
+        _controller.setClientFocus(true);
+        attachTextInputClient();
+      } else {
+        detachTextInputClient();
+      }
       _controller._focusEditable = editable;
     };
 
@@ -439,10 +443,10 @@ class WebViewState extends State<WebView> with WebeViewTextInput {
     // Map Flutter key event to CEF key event
     final logicalKey = event.logicalKey;
     final character = event.character;
-    
+
     // Convert logical key to Windows keycode
     int keyCode = _logicalKeyToWindowsKeyCode(logicalKey);
-    
+
     // Build modifiers
     int modifiers = 0;
     if (HardwareKeyboard.instance.isShiftPressed) {
@@ -454,7 +458,7 @@ class WebViewState extends State<WebView> with WebeViewTextInput {
     if (HardwareKeyboard.instance.isAltPressed) {
       modifiers |= eventFlagAltDown;
     }
-    
+
     // Determine event type
     int type;
     if (event is KeyDownEvent) {
@@ -464,7 +468,7 @@ class WebViewState extends State<WebView> with WebeViewTextInput {
     } else {
       return KeyEventResult.ignored;
     }
-    
+
     // Send key event to CEF
     _controller.sendKeyEvent(
       type,
@@ -473,7 +477,7 @@ class WebViewState extends State<WebView> with WebeViewTextInput {
       character?.codeUnitAt(0) ?? 0,
       character?.codeUnitAt(0) ?? 0,
     );
-    
+
     // Send CHAR event after RAWKEYDOWN when character is present (required for text entry)
     if (event is KeyDownEvent && character != null) {
       _controller.sendKeyEvent(
@@ -516,7 +520,7 @@ class WebViewState extends State<WebView> with WebeViewTextInput {
     if (key == LogicalKeyboardKey.arrowDown) return 0x28;
     if (key == LogicalKeyboardKey.arrowLeft) return 0x25;
     if (key == LogicalKeyboardKey.arrowRight) return 0x27;
-    
+
     // For alphanumeric keys, use the key label
     final keyLabel = key.keyLabel;
     if (keyLabel.length == 1) {
@@ -530,7 +534,7 @@ class WebViewState extends State<WebView> with WebeViewTextInput {
         return charCode;
       }
     }
-    
+
     // Default fallback
     return 0;
   }
