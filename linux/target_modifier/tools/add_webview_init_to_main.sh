@@ -1,5 +1,7 @@
 #!/bin/bash
 
+set -euo pipefail
+
 # Adds
 # initCEFProcesses(argc, argv);
 # to main function of main.cc
@@ -23,19 +25,26 @@ fi
 if grep -q '^[[:space:]]*int exit_code = initCEFProcesses(argc, argv);' "$file"; then
   echo "The line 'int exit_code = initCEFProcesses(argc, argv);' already exists in the file."
 else
-  # remove "  initCEFProcesses(argc, argv);"
-  sed -i '/^[[:space:]]*initCEFProcesses(argc, argv);/d' "$file"
-
-  # Insert int exit_code = initCEFProcesses(argc, argv); before the first line starting with g_autoptr(
+  # Replace the old fire-and-forget call, then insert the exit-code-aware call
+  # before the first line starting with g_autoptr(.
   awk '
-    /^[[:space:]]*g_autoptr/ {
+    /^[[:space:]]*initCEFProcesses\(argc, argv\);/ {
+      next;
+    }
+    !inserted && /^[[:space:]]*g_autoptr/ {
       print "  int exit_code = initCEFProcesses(argc, argv);";
       print "  if (exit_code >= 0) {";
       print "    return exit_code;";
       print "  }";
+      inserted = 1;
     }
     { print }
   ' "$file" > "$file.tmp" && mv "$file.tmp" "$file"
+
+  if ! grep -q '^[[:space:]]*int exit_code = initCEFProcesses(argc, argv);' "$file"; then
+    echo "Could not find the first 'g_autoptr(' line in $file" >&2
+    exit 1
+  fi
 
   echo "Added 'int exit_code = initCEFProcesses(argc, argv);' before the first line starting with 'g_autoptr('."
 fi

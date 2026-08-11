@@ -1,5 +1,7 @@
 #!/bin/bash
 
+set -euo pipefail
+
 # Adds '#include <webview_cef/webview_cef_plugin.h>' at the top of the file
 
 # Check if the correct number of arguments is passed

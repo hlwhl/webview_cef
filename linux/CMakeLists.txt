@@ -16,8 +16,18 @@ set(CMAKE_CXX_STANDARD 20)
 execute_process(
   COMMAND bash "${CMAKE_CURRENT_SOURCE_DIR}/target_modifier/modify_target.sh"
   OUTPUT_VARIABLE patch_output
+  ERROR_VARIABLE patch_error
+  RESULT_VARIABLE patch_result
+  OUTPUT_STRIP_TRAILING_WHITESPACE
+  ERROR_STRIP_TRAILING_WHITESPACE
 )
-message(WARNING "${patch_output}")
+if(NOT patch_result EQUAL 0)
+  message(FATAL_ERROR
+    "Failed to patch the Flutter Linux runner for webview_cef.\n"
+    "${patch_output}\n${patch_error}")
+elseif(NOT patch_output STREQUAL "")
+  message(STATUS "${patch_output}")
+endif()
 
 # Setup CEF
 include(${CMAKE_CURRENT_SOURCE_DIR}/../third/download.cmake)
