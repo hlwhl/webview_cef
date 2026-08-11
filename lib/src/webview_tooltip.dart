@@ -78,19 +78,31 @@ class WebviewTooltip {
     });
   }
 
+  void _clearOverlay() {
+    _overlayEntry?.remove();
+    _overlayEntry = null;
+  }
+
   void showToolTip(String text) {
     if (text.isEmpty) {
       if (_eStatus == TooltipStatus.prepare) {
         _timer?.cancel();
       } else {
-        _overlayEntry?.remove();
+        _clearOverlay();
       }
       _eStatus = TooltipStatus.hide;
       return;
-    } else if (_eStatus == TooltipStatus.hide) {
-      _eStatus = TooltipStatus.prepare;
-      _buildOverlayEntry(text);
     }
+
+    // If a tooltip is already visible (or being prepared), tear it down
+    // before showing the new one so rapid text changes don't leave
+    // orphaned overlays stuck on screen.
+    if (_eStatus != TooltipStatus.hide) {
+      _timer?.cancel();
+      _clearOverlay();
+    }
+    _eStatus = TooltipStatus.prepare;
+    _buildOverlayEntry(text);
   }
 }
 

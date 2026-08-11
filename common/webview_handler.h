@@ -34,6 +34,7 @@ struct browser_info{
     // right after creation is lost; we re-apply it once the first frame lands.
     bool wants_focus = false;
     bool focus_reasserted = false;
+    std::string title;
 };
 
 class WebviewHandler : public CefClient,
@@ -41,7 +42,8 @@ public CefDisplayHandler,
 public CefLifeSpanHandler,
 public CefFocusHandler,
 public CefLoadHandler,
-public CefRenderHandler{
+public CefRenderHandler,
+public CefRequestHandler{
 public:
     //Paint callback (software off-screen rendering)
     std::function<void(int browserId, const void* buffer, int32_t width, int32_t height)> onPaintCallback;
@@ -61,6 +63,17 @@ public:
     std::function<void(std::string, std::string, std::string, int browserId, std::string)> onJavaScriptChannelMessage;
     std::function<void(int browserId, std::string url)> onLoadStart;
     std::function<void(int browserId, std::string url)> onLoadEnd;
+    // Navigation / loading callback (before navigation starts)
+    std::function<void(int browserId, std::string url)> onBeforeBrowseCallback;
+    // Loading progress (0.0 – 1.0)
+    std::function<void(int browserId, double progress)> onLoadingProgressChangeCallback;
+    // Page load error
+    std::function<void(int browserId, int errorCode, std::string errorText, std::string failedUrl)> onLoadErrorCallback;
+    // Render process terminated unexpectedly (crash / OOM / killed).
+    // |status|: TS_ABNORMAL_TERMINATION (0), TS_PROCESS_WAS_KILLED (1),
+    // TS_PROCESS_CRASHED (2) or TS_PROCESS_OOM (3). Use controller.reload()
+    // to restore the page — CEF already created a new render process.
+    std::function<void(int browserId, int status, int errorCode, std::string errorString)> onRenderProcessTerminated;
     
     explicit WebviewHandler();
     ~WebviewHandler();
@@ -77,6 +90,7 @@ public:
     }
     virtual CefRefPtr<CefLoadHandler> GetLoadHandler() override { return this; }
     virtual CefRefPtr<CefRenderHandler> GetRenderHandler() override { return this; }
+    virtual CefRefPtr<CefRequestHandler> GetRequestHandler() override { return this; }
 
 	bool OnProcessMessageReceived(
         CefRefPtr<CefBrowser> browser,
@@ -136,7 +150,22 @@ public:
     virtual void OnLoadStart(CefRefPtr<CefBrowser> browser,
                              CefRefPtr<CefFrame> frame,
                              CefLoadHandler::TransitionType transition_type) override;
-    
+
+    // CefDisplayHandler methods (continued):
+    virtual void OnLoadingProgressChange(CefRefPtr<CefBrowser> browser,
+                                         double progress) override;
+
+    // CefRequestHandler methods:
+    virtual bool OnBeforeBrowse(CefRefPtr<CefBrowser> browser,
+                                CefRefPtr<CefFrame> frame,
+                                CefRefPtr<CefRequest> request,
+                                bool user_gesture,
+                                bool is_redirect) override;
+    virtual void OnRenderProcessTerminated(CefRefPtr<CefBrowser> browser,
+                                           TerminationStatus status,
+                                           int error_code,
+                                           const CefString& error_string) override;
+
     // CefRenderHandler methods:
     virtual void GetViewRect(CefRefPtr<CefBrowser> browser, CefRect& rect) override;
     virtual void OnPaint(CefRefPtr<CefBrowser> browser, PaintElementType type, const RectList& dirtyRects, const void* buffer, int width, int height) override;
@@ -172,7 +201,11 @@ public:
     void loadUrl(int browserId, std::string url);
     void goForward(int browserId);
     void goBack(int browserId);
+    bool canGoBack(int browserId);
+    bool canGoForward(int browserId);
     void reload(int browserId);
+    void stopLoading(int browserId);
+    std::string getTitle(int browserId);
     void openDevTools(int browserId);
 
     void imeSetComposition(int browserId, std::string text);

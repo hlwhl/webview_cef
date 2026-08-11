@@ -54,8 +54,8 @@ class WebViewController extends ValueNotifier<bool> {
   final Map<String, JavascriptChannel> _javascriptChannels =
       <String, JavascriptChannel>{};
   Map<String, JavascriptChannel> get javascriptChannels => _javascriptChannels;
-  WebviewEventsListener? _listener;
-  WebviewEventsListener? get listener => _listener;
+  WebViewEventsListener? _listener;
+  WebViewEventsListener? get listener => _listener;
 
   get onJavascriptChannelMessage => (final String channelName,
           final String message, final String callbackId, final String frameId) {
@@ -74,7 +74,7 @@ class WebViewController extends ValueNotifier<bool> {
       _onImeCompositionRangeChangedMessage;
 
   /// Initializes the underlying platform view.
-  Future<void> initialize(String url) async {
+  Future<void> initialize({String url = "about:blank"}) async {
     if (_isDisposed) {
       return Future<void>.value();
     }
@@ -95,7 +95,7 @@ class WebViewController extends ValueNotifier<bool> {
     return _creatingCompleter.future;
   }
 
-  setWebviewListener(WebviewEventsListener listener) {
+  setWebviewListener(WebViewEventsListener listener) {
     _listener = listener;
   }
 
@@ -144,12 +144,52 @@ class WebViewController extends ValueNotifier<bool> {
     return _pluginChannel.invokeMethod('goBack', _browserId);
   }
 
+  /// Returns whether the browser can navigate backward.
+  Future<bool> canGoBack() async {
+    if (_isDisposed) {
+      return false;
+    }
+    assert(value);
+    return _pluginChannel
+        .invokeMethod<bool>('canGoBack', _browserId)
+        .then((v) => v ?? false);
+  }
+
+  /// Returns whether the browser can navigate forward.
+  Future<bool> canGoForward() async {
+    if (_isDisposed) {
+      return false;
+    }
+    assert(value);
+    return _pluginChannel
+        .invokeMethod<bool>('canGoForward', _browserId)
+        .then((v) => v ?? false);
+  }
+
   Future<void> openDevTools() async {
     if (_isDisposed) {
       return;
     }
     assert(value);
     return _pluginChannel.invokeMethod('openDevTools', _browserId);
+  }
+
+  /// Returns the current page title, or `null` if unavailable.
+  Future<String?> getTitle() async {
+    if (_isDisposed) {
+      return null;
+    }
+    assert(value);
+    return _pluginChannel.invokeMethod<String>('getTitle', _browserId);
+  }
+
+  /// Stops the current page load.
+  Future<void> stopLoading() async {
+    if (_isDisposed) {
+      return;
+    }
+    assert(value);
+    return _pluginChannel.invokeMethod('stopLoading', _browserId);
   }
 
   Future<void> imeSetComposition(String composingText) async {
@@ -185,14 +225,8 @@ class WebViewController extends ValueNotifier<bool> {
       return;
     }
     assert(value);
-    return _pluginChannel.invokeMethod('sendKeyEvent', [
-      _browserId,
-      type,
-      keyCode,
-      modifiers,
-      character,
-      unmodifiedCharacter
-    ]);
+    return _pluginChannel.invokeMethod('sendKeyEvent',
+        [_browserId, type, keyCode, modifiers, character, unmodifiedCharacter]);
   }
 
   Future<void> setJavaScriptChannels(Set<JavascriptChannel> channels) async {
@@ -323,7 +357,8 @@ class WebView extends StatefulWidget {
   WebViewState createState() => WebViewState();
 }
 
-class WebViewState extends State<WebView> with WebeViewTextInput {
+class WebViewState extends State<WebView>
+    with WebeViewTextInput, WidgetsBindingObserver {
   final GlobalKey _key = GlobalKey();
   String _composingText = '';
   late final _focusNode = FocusNode();
@@ -378,9 +413,20 @@ class WebViewState extends State<WebView> with WebeViewTextInput {
   @override
   void initState() {
     super.initState();
+    WidgetsBinding.instance.addObserver(this);
     _controller._onFocusedNodeChangeMessage = (editable) {
       _composingText = '';
-      editable ? attachTextInputClient() : detachTextInputClient();
+      if (editable) {
+        // Ensure CEF knows Flutter has focus before attaching text input.
+        // This is necessary after page reload: the FocusNode may still hold
+        // focus (so onFocusChange won't fire again), but CEF's internal
+        // keyboard focus state was reset during the reload. Without this
+        // call, text input won't work until Flutter focus is toggled off/on.
+        _controller.setClientFocus(true);
+        attachTextInputClient();
+      } else {
+        detachTextInputClient();
+      }
       _controller._focusEditable = editable;
     };
 
@@ -429,6 +475,22 @@ class WebViewState extends State<WebView> with WebeViewTextInput {
         .addPostFrameCallback((_) => _reportSurfaceSize(context));
   }
 
+  @override
+  void dispose() {
+    WidgetsBinding.instance.removeObserver(this);
+    super.dispose();
+  }
+
+  @override
+  void didChangeMetrics() {
+    // Window / screen metrics changed (e.g. resize, DPI change). Report the
+    // new surface size to CEF so the browser view rect stays in sync with the
+    // Flutter widget. This is a more reliable signal than
+    // SizeChangedLayoutNotifier during macOS live resize, where Flutter's
+    // layout pipeline may be throttled.
+    _reportSurfaceSize(context);
+  }
+
   KeyEventResult _onKeyEvent(FocusNode node, KeyEvent event) {
     // Only handle keys on platforms without native key support (eLinux)
     // Treat null as "don't handle yet" to prevent double-delivery during async gap
@@ -439,10 +501,10 @@ class WebViewState extends State<WebView> with WebeViewTextInput {
     // Map Flutter key event to CEF key event
     final logicalKey = event.logicalKey;
     final character = event.character;
-    
+
     // Convert logical key to Windows keycode
     int keyCode = _logicalKeyToWindowsKeyCode(logicalKey);
-    
+
     // Build modifiers
     int modifiers = 0;
     if (HardwareKeyboard.instance.isShiftPressed) {
@@ -454,7 +516,7 @@ class WebViewState extends State<WebView> with WebeViewTextInput {
     if (HardwareKeyboard.instance.isAltPressed) {
       modifiers |= eventFlagAltDown;
     }
-    
+
     // Determine event type
     int type;
     if (event is KeyDownEvent) {
@@ -464,7 +526,7 @@ class WebViewState extends State<WebView> with WebeViewTextInput {
     } else {
       return KeyEventResult.ignored;
     }
-    
+
     // Send key event to CEF
     _controller.sendKeyEvent(
       type,
@@ -473,7 +535,7 @@ class WebViewState extends State<WebView> with WebeViewTextInput {
       character?.codeUnitAt(0) ?? 0,
       character?.codeUnitAt(0) ?? 0,
     );
-    
+
     // Send CHAR event after RAWKEYDOWN when character is present (required for text entry)
     if (event is KeyDownEvent && character != null) {
       _controller.sendKeyEvent(
@@ -516,7 +578,7 @@ class WebViewState extends State<WebView> with WebeViewTextInput {
     if (key == LogicalKeyboardKey.arrowDown) return 0x28;
     if (key == LogicalKeyboardKey.arrowLeft) return 0x25;
     if (key == LogicalKeyboardKey.arrowRight) return 0x27;
-    
+
     // For alphanumeric keys, use the key label
     final keyLabel = key.keyLabel;
     if (keyLabel.length == 1) {
@@ -530,7 +592,7 @@ class WebViewState extends State<WebView> with WebeViewTextInput {
         return charCode;
       }
     }
-    
+
     // Default fallback
     return 0;
   }

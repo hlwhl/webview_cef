@@ -4,7 +4,10 @@
 #include <gtk/gtk.h>
 #include <sys/utsname.h>
 
+#include <climits>
+#include <cstdlib>
 #include <cstring>
+#include <unistd.h>
 #include <unordered_map>
 #include <webview_plugin.h>
 #include "webview_cef_keyevent.h"
@@ -247,6 +250,35 @@ static void webview_cef_plugin_class_init(WebviewCefPluginClass *klass)
 
 static void webview_cef_plugin_init(WebviewCefPlugin *self) {
   self->m_plugin = std::make_shared<webview_cef::WebviewPlugin>();
+
+  // Derive a default CEF cache path from the executable name so that
+  // multiple apps embedding the same CEF framework each get their own
+  // isolated cache directory.  If the Dart layer provides a cachePath
+  // via initialize(), it will override this default in startCEF().
+  char exePath[PATH_MAX] = {};
+  ssize_t len = readlink("/proc/self/exe", exePath, sizeof(exePath) - 1);
+  std::string exeName = "webview_cef";  // fallback
+  if (len > 0) {
+    exePath[len] = '\0';
+    std::string fullPath(exePath);
+    size_t lastSlash = fullPath.find_last_of('/');
+    if (lastSlash != std::string::npos) {
+      exeName = fullPath.substr(lastSlash + 1);
+    }
+  }
+  const char* xdgCache = getenv("XDG_CACHE_HOME");
+  std::string cacheDir;
+  if (xdgCache && xdgCache[0]) {
+    cacheDir = xdgCache;
+  } else {
+    const char* home = getenv("HOME");
+    if (home && home[0]) {
+      cacheDir = std::string(home) + "/.cache";
+    }
+  }
+  if (!cacheDir.empty()) {
+    webview_cef::setCefCachePath(cacheDir + "/" + exeName + "/cef");
+  }
 }
 
 static void method_call_cb(FlMethodChannel *channel, FlMethodCall *method_call,

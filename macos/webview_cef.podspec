@@ -33,28 +33,42 @@ Flutter webview backed by CEF (Chromium Embedded Framework)
   s.xcconfig = { "HEADER_SEARCH_PATHS" => $dir}
   # s.private_header_files = '../common/simple_app.h', '../common/simple_handler.h'
 
-  # CEF ships separate per-architecture macOS binaries; scripts/download_cef.sh
-  # fetches the one matching the build host (arm64 -> macosarm64, x86_64 ->
-  # macosx64). Exclude the other architecture so a default (universal)
-  # `flutter build macos` doesn't try to link a slice the CEF framework/wrapper
-  # doesn't provide — that fails with "symbol(s) not found for architecture
-  # x86_64". A universal app would require a lipo'd CEF, which is out of scope.
-  host_arch = `uname -m`.strip
-  non_host_arch = (host_arch == 'arm64') ? 'x86_64' : 'arm64'
+  # CEF dual-architecture support: download_cef.sh downloads both macosarm64
+  # and macosx64 packages by default, builds each separately, and merges them
+  # with lipo into universal binaries. No architectures are excluded — Xcode
+  # builds universal by default (ARCHS_STANDARD = arm64 x86_64).
+  #
+  # Set CEF_UNIVERSAL=0 to fall back to single host-architecture mode
+  # (emergency escape hatch for low-disk / poor-network situations).
+  universal_disabled = ENV['CEF_UNIVERSAL'] == '0'
 
   s.platform = :osx, '12.0'
   # CEF 149 public headers require C++20.
-  s.pod_target_xcconfig = {
-    'DEFINES_MODULE' => 'YES',
-    'CLANG_CXX_LANGUAGE_STANDARD' => 'c++20',
-    "EXCLUDED_ARCHS[sdk=macosx*]" => non_host_arch,
-    # Zero-copy GPU rendering: CEF delivers frames as a shared-texture IOSurface
-    # via OnAcceleratedPaint instead of a software CPU buffer (OnPaint). The IME
-    # and frame plumbing key off this define in the shared common/ sources.
-    'GCC_PREPROCESSOR_DEFINITIONS' => '$(inherited) WEBVIEW_CEF_GPU_TEXTURE=1',
-  }
-  # The app target links the CEF framework/wrapper too, so it must drop the same
-  # architecture or its slice fails to link.
-  s.user_target_xcconfig = { "EXCLUDED_ARCHS[sdk=macosx*]" => non_host_arch }
+  if universal_disabled
+    host_arch = `uname -m`.strip
+    non_host_arch = (host_arch == 'arm64') ? 'x86_64' : 'arm64'
+
+    s.pod_target_xcconfig = {
+      'DEFINES_MODULE' => 'YES',
+      'CLANG_CXX_LANGUAGE_STANDARD' => 'c++20',
+      "EXCLUDED_ARCHS[sdk=macosx*]" => non_host_arch,
+      # Zero-copy GPU rendering: CEF delivers frames as a shared-texture IOSurface
+      # via OnAcceleratedPaint instead of a software CPU buffer (OnPaint). The IME
+      # and frame plumbing key off this define in the shared common/ sources.
+      'GCC_PREPROCESSOR_DEFINITIONS' => '$(inherited) WEBVIEW_CEF_GPU_TEXTURE=1',
+    }
+    # The app target links the CEF framework/wrapper too, so it must drop the same
+    # architecture or its slice fails to link.
+    s.user_target_xcconfig = { "EXCLUDED_ARCHS[sdk=macosx*]" => non_host_arch }
+  else
+    s.pod_target_xcconfig = {
+      'DEFINES_MODULE' => 'YES',
+      'CLANG_CXX_LANGUAGE_STANDARD' => 'c++20',
+      # Zero-copy GPU rendering: CEF delivers frames as a shared-texture IOSurface
+      # via OnAcceleratedPaint instead of a software CPU buffer (OnPaint). The IME
+      # and frame plumbing key off this define in the shared common/ sources.
+      'GCC_PREPROCESSOR_DEFINITIONS' => '$(inherited) WEBVIEW_CEF_GPU_TEXTURE=1',
+    }
+  end
   s.swift_version = '5.0'
 end

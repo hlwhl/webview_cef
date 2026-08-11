@@ -16,6 +16,7 @@
 #import "../../common/webview_plugin.h"
 #import "../../common/webview_value.h"
 #import <CoreVideo/CoreVideo.h>
+#import <objc/runtime.h>
 #include <thread>
 
 static NSTimer* _timer;
@@ -29,6 +30,26 @@ NSMapTable* webviewPlugins = [NSMapTable weakToWeakObjectsMapTable];
 // Fires on a high-priority background thread once per display refresh. Hop to
 // the main thread (the CEF UI thread under external_message_pump) to deliver the
 // frame produced by the previous tick and request the next one.
+// CEF on macOS with external_message_pump may call -[NSApplication isHandlingSendEvent]
+// when routing events to a native popup window (e.g. DevTools). That selector belongs
+// to NSWindow, not NSApplication, so it would crash with an unrecognized-selector
+// exception. Provide a no-op implementation on NSApplication as a workaround.
+@interface NSApplication (CEFWorkaround)
+- (BOOL)isHandlingSendEvent;
+- (void)setHandlingSendEvent:(BOOL)handlingSendEvent;
+@end
+
+@implementation NSApplication (CEFWorkaround)
+- (BOOL)isHandlingSendEvent {
+    NSNumber *value = objc_getAssociatedObject(self, @selector(setHandlingSendEvent:));
+    return value ? [value boolValue] : NO;
+}
+- (void)setHandlingSendEvent:(BOOL)handlingSendEvent {
+    objc_setAssociatedObject(self, @selector(setHandlingSendEvent:),
+                             @(handlingSendEvent), OBJC_ASSOCIATION_RETAIN);
+}
+@end
+
 static CVReturn WebviewDisplayLinkCallback(CVDisplayLinkRef displayLink,
                                            const CVTimeStamp* now,
                                            const CVTimeStamp* outputTime,
@@ -185,6 +206,12 @@ private:
 // versus navigation/control keys and shortcuts (which CEF handles as raw key
 // events). Returning YES means "let the IME have it"; NO means "send to CEF".
 + (BOOL)isImeRoutableKeyEvent:(NSEvent*)event {
+    // NSEventTypeFlagsChanged events (modifier-key presses like Ctrl, Opt, Shift,
+    // Cmd, CapsLock, Fn) carry no characters. |charactersIgnoringModifiers| is
+    // only valid for KeyDown / KeyUp and throws on macOS 26+ for FlagsChanged.
+    if ([event type] == NSEventTypeFlagsChanged) {
+        return NO;
+    }
     NSEventModifierFlags flags = [event modifierFlags];
     // Shortcuts / control sequences (⌘/⌃ chords) go straight to CEF.
     if (flags & (NSEventModifierFlagCommand | NSEventModifierFlagControl)) {
@@ -230,32 +257,78 @@ private:
         return false;
     }
 
-    CefKeyEvent keyEvent;
-    
-    NSString* s = [event characters];
-    
-    if ([s length] != 0){
-        keyEvent.character = [s characterAtIndex:0];
+    // Intercept Cmd+V for paste in OSR mode. CEF off-screen rendering
+    // bypasses AppKit's interpretKeyEvents: so Cmd+V never triggers the
+    // system pasteboard read. Grab the clipboard text here and inject it
+    // via JavaScript into the focused element.
+    if ([event type] == NSEventTypeKeyDown &&
+        [event keyCode] == 9 &&  // V key
+        ([event modifierFlags] & NSEventModifierFlagCommand)) {
+        NSString *text = [[NSPasteboard generalPasteboard] stringForType:NSPasteboardTypeString];
+        if (text.length > 0) {
+            currentPlugin->_plugin->pasteText([text UTF8String]);
+        }
+        return YES;
     }
 
-    s = [event charactersIgnoringModifiers];
-    if ([s length] > 0){
-        keyEvent.unmodified_character = [s characterAtIndex:0];
+    CefKeyEvent keyEvent = {};
+
+    // |characters| and |charactersIgnoringModifiers| are only valid for
+    // NSEventTypeKeyDown and NSEventTypeKeyUp. On macOS 26+, calling them on
+    // an NSEventTypeFlagsChanged event throws an ObjC exception. Extract
+    // characters first for key-down/up events, then let the FlagsChanged
+    // branch below zero them out.
+    if ([event type] != NSEventTypeFlagsChanged) {
+        NSString* s = [event characters];
+        if ([s length] != 0){
+            keyEvent.character = [s characterAtIndex:0];
+        }
+
+        s = [event charactersIgnoringModifiers];
+        if ([s length] > 0){
+            keyEvent.unmodified_character = [s characterAtIndex:0];
+        }
     }
-    
-    if ([event type] == NSEventTypeFlagsChanged){
-        keyEvent.character = 0;
-        keyEvent.unmodified_character = 0;
-    }
-        
+
     keyEvent.native_key_code = [event keyCode];
-    
+
     keyEvent.modifiers = [CefWrapper getModifiersForEvent:event];
 
-//    if(keyEvent.native_key_code == 51){
-//        keyEvent.character = 0;
-//        keyEvent.unmodified_character = 0;
-//    }
+    // FlagsChanged (modifier keys like Cmd/Shift/Option/Ctrl) does not
+    // distinguish press vs release — determine it from the new modifier state.
+    // Must handle this BEFORE the KeyDown/KeyUp check so modifier state changes
+    // are consumed and never leak through to Flutter's HardwareKeyboard.
+    if ([event type] == NSEventTypeFlagsChanged) {
+        bool isPress = false;
+        switch ([event keyCode]) {
+            case 54: // Command Right
+            case 55: // Command Left
+                isPress = ([event modifierFlags] & NSEventModifierFlagCommand) != 0;
+                break;
+            case 56: // Shift Left
+            case 60: // Shift Right
+                isPress = ([event modifierFlags] & NSEventModifierFlagShift) != 0;
+                break;
+            case 59: // Control Left
+            case 62: // Control Right
+                isPress = ([event modifierFlags] & NSEventModifierFlagControl) != 0;
+                break;
+            case 58: // Option Left
+            case 61: // Option Right
+                isPress = ([event modifierFlags] & NSEventModifierFlagOption) != 0;
+                break;
+            case 63: // Function
+                isPress = ([event modifierFlags] & NSEventModifierFlagFunction) != 0;
+                break;
+            default:
+                isPress = true;
+                break;
+        }
+        keyEvent.type = isPress ? KEYEVENT_RAWKEYDOWN : KEYEVENT_KEYUP;
+        currentPlugin->_plugin->sendKeyEvent(keyEvent);
+        return true;
+    }
+
     if([event type] == NSEventTypeKeyDown){
         keyEvent.type = KEYEVENT_RAWKEYDOWN;
         currentPlugin->_plugin->sendKeyEvent(keyEvent);
@@ -386,6 +459,7 @@ private:
             // (see the example Runner's "Embed CEF Helpers" build phase).
             NSBundle* mainBundle = [NSBundle mainBundle];
             NSString* bundlePath = [mainBundle bundlePath];
+            NSString* bundleId = [mainBundle bundleIdentifier];
             NSString* exeName = [mainBundle objectForInfoDictionaryKey:@"CFBundleExecutable"];
             NSString* helperName = [exeName stringByAppendingString:@" Helper"];
             NSString* frameworksDir = [bundlePath stringByAppendingPathComponent:@"Contents/Frameworks"];
@@ -398,6 +472,21 @@ private:
                 webview_cef::setMacCEFPaths(std::string([subprocessPath UTF8String]),
                                             std::string([frameworkDir UTF8String]),
                                             std::string([bundlePath UTF8String]));
+            }
+            // Assign each app instance its own CEF cache directory so that
+            // multiple CEF-based apps can run concurrently without locking
+            // each other out of the default shared cache. Uses the macOS
+            // ~/Library/Caches/<bundle_identifier>/cef convention.
+            if (bundleId) {
+                NSString* cachesDir = [NSSearchPathForDirectoriesInDomains(
+                    NSCachesDirectory, NSUserDomainMask, YES) firstObject];
+                if (cachesDir) {
+                    NSString* cachePath = [[cachesDir
+                        stringByAppendingPathComponent:bundleId]
+                        stringByAppendingPathComponent:@"cef"];
+                    webview_cef::setCefCachePath(
+                        std::string([cachePath UTF8String]));
+                }
             }
             webview_cef::initCEFProcesses();
             isCefProcessInit = YES;
@@ -429,14 +518,7 @@ private:
     if(isCefMessageLoop == NO){
         _timer = [NSTimer timerWithTimeInterval:0.016f target:self selector:@selector(doMessageLoopWork) userInfo:nil repeats:YES];
         [[NSRunLoop mainRunLoop] addTimer: _timer forMode:NSRunLoopCommonModes];
-        [NSEvent addLocalMonitorForEventsMatchingMask:NSEventMaskKeyDown handler:^NSEvent * _Nullable(NSEvent * _Nonnull event) {
-            if([CefWrapper processKeyboardEvent:event]){
-                return nil;
-            }
-            return event;
-        }];
-            
-        [NSEvent addLocalMonitorForEventsMatchingMask:NSEventMaskKeyUp handler:^NSEvent * _Nullable(NSEvent * _Nonnull event) {
+        [NSEvent addLocalMonitorForEventsMatchingMask:(NSEventMaskKeyDown | NSEventMaskKeyUp | NSEventMaskFlagsChanged) handler:^NSEvent * _Nullable(NSEvent * _Nonnull event) {
             if([CefWrapper processKeyboardEvent:event]){
                 return nil;
             }
@@ -457,4 +539,37 @@ private:
    }
     webview_value_unref(encodeArgs);
 }
+
+- (void)dealloc {
+    // Destroy the plugin first — ~WebviewPlugin calls CloseAllBrowsers(true)
+    // to close every live browser before we tear down CEF itself.
+    _plugin = nullptr;
+
+    // NSMapTable is weak-to-weak, so this wrapper has already been
+    // auto-removed by the runtime by the time dealloc executes.
+    // If no wrappers remain, stop the global CEF machinery.
+    if ([[webviewPlugins objectEnumerator] allObjects].count == 0) {
+        // Stop the CVDisplayLink (vsync-driven frame clock for GPU path).
+        if (_displayLinkActive && _displayLink) {
+            CVDisplayLinkStop(_displayLink);
+            _displayLinkActive = NO;
+        }
+        if (_displayLink) {
+            CVDisplayLinkRelease(_displayLink);
+            _displayLink = NULL;
+        }
+
+        // Stop the message-pump timer (software path fallback).
+        if (_timer) {
+            [_timer invalidate];
+            _timer = nil;
+        }
+
+        // Shutdown CEF — terminates the browser process and all subprocesses
+        // (renderer, GPU, network, etc.).
+        webview_cef::stopCEF();
+        isCefMessageLoop = NO;
+    }
+}
+
 @end

@@ -6,6 +6,39 @@ import 'package:flutter/widgets.dart';
 import 'package:webview_cef/src/webview_inject_user_script.dart';
 
 import 'webview.dart';
+import 'webview_events_listener.dart';
+
+/// CEF process model.
+///
+/// Chromium runs web content in separate, sandboxed processes by default for
+/// security and stability. Choose the model that fits your use case.
+enum ProcessMode {
+  /// Each unique site (eTLD+1) gets its own renderer process. Other processes
+  /// (GPU, network, audio, etc.) remain separate. Strikes a balance between
+  /// isolation and resource usage — typically **5–8 processes** total.
+  ///
+  /// Recommended for production apps that load arbitrary web content.
+  processPerSite(1),
+
+  /// Each browser tab gets its own renderer process. Maximises isolation at the
+  /// cost of higher memory overhead when many tabs are open.
+  processPerTab(2),
+
+  /// Everything — browser, renderer, GPU, network — runs inside a single
+  /// process. Minimal resource footprint (**~1 process**) but no sandbox
+  /// isolation: a renderer crash kills the whole app.
+  ///
+  /// Best for:
+  /// - embedded / kiosk apps that load known, trusted content
+  /// - development and debugging (quick iteration with fewer processes)
+  ///
+  /// Avoid in production if loading untrusted third-party pages.
+  singleProcess(3);
+
+  final int value;
+
+  const ProcessMode(this.value);
+}
 
 class WebviewManager extends ValueNotifier<bool> {
   static final WebviewManager _instance = WebviewManager._internal();
@@ -56,14 +89,45 @@ class WebviewManager extends ValueNotifier<bool> {
 
   WebviewManager._internal() : super(false);
 
-  Future<void> initialize({String? userAgent}) async {
+  /// Initialize the CEF engine.
+  ///
+  /// Must be called once before creating any web views. Safe to call multiple
+  /// times — subsequent calls are no-ops.
+  ///
+  /// [userAgent] overrides the default User-Agent string sent with HTTP
+  /// requests.
+  ///
+  /// [processMode] controls the Chromium process model:
+  /// - [ProcessMode.processPerSite] (default) — one renderer per unique site,
+  ///   ~5–8 processes. Best for production with arbitrary web content.
+  /// - [ProcessMode.processPerTab] — one renderer per tab, maximum isolation
+  ///   but higher memory use.
+  /// - [ProcessMode.singleProcess] — everything in one process (~1 process
+  ///   total). Great for debugging, embedded/kiosk apps, or trusted content.
+  ///   No sandbox — avoid with untrusted third-party pages.
+  ///
+  /// [cachePath] overrides the default CEF root cache directory. When omitted,
+  /// each platform derives a unique default to prevent file-lock conflicts
+  /// between multiple CEF-based apps running simultaneously:
+  /// - macOS: `~/Library/Caches/<bundle_id>/cef`
+  /// - Windows: `%LOCALAPPDATA%\<exe_name>\cef`
+  /// - Linux / eLinux: `$XDG_CACHE_HOME/<exe_name>/cef`
+  /// Set this only when your app needs the cache at a specific location.
+  Future<void> initialize({
+    String? userAgent,
+    ProcessMode processMode = ProcessMode.processPerSite,
+    String? cachePath,
+  }) async {
     _creatingCompleter = Completer<void>();
     try {
+      final args = <String, dynamic>{'processMode': processMode.value};
       if (userAgent != null && userAgent.isNotEmpty) {
-        await pluginChannel.invokeMethod('init', userAgent);
-      } else {
-        await pluginChannel.invokeMethod('init');
+        args['userAgent'] = userAgent;
       }
+      if (cachePath != null && cachePath.isNotEmpty) {
+        args['cachePath'] = cachePath;
+      }
+      await pluginChannel.invokeMethod('init', args);
       pluginChannel.setMethodCallHandler(methodCallhandler);
       // Wait for the platform to complete initialization.
       await Future.delayed(const Duration(milliseconds: 300));
@@ -92,20 +156,6 @@ class WebviewManager extends ValueNotifier<bool> {
 
   Future<void> methodCallhandler(MethodCall call) async {
     switch (call.method) {
-      case "urlChanged":
-        int browserId = call.arguments["browserId"] as int;
-        _webViews[browserId]
-            ?.listener
-            ?.onUrlChanged
-            ?.call(call.arguments["url"] as String);
-        return;
-      case "titleChanged":
-        int browserId = call.arguments["browserId"] as int;
-        _webViews[browserId]
-            ?.listener
-            ?.onTitleChanged
-            ?.call(call.arguments["title"] as String);
-        return;
       case "onConsoleMessage":
         int browserId = call.arguments["browserId"] as int;
         _webViews[browserId]?.listener?.onConsoleMessage?.call(
@@ -148,21 +198,72 @@ class WebviewManager extends ValueNotifier<bool> {
         int browserId = call.arguments["browserId"] as int;
         String urlId = call.arguments["urlId"] as String;
 
+        // Clear any visible tooltip when navigating away from the current
+        // page — CEF does not guarantee an empty OnTooltip() before the
+        // old page is destroyed.
+        _webViews[browserId]?.onToolTip?.call('');
+
+        final controller = _webViews[browserId];
+        if (controller == null) return;
+        await controller.ready;
+
         await _injectUserScriptIfNeeds(browserId, _injectUserScripts[browserId]?.retrieveLoadStartInjectScripts() ?? []);
 
-        WebViewController controller =
-        _webViews[browserId] as WebViewController;
-        _webViews[browserId]?.listener?.onLoadStart?.call(controller, urlId);
+        controller.listener?.onPageStarted?.call(controller, urlId);
         return;
       case 'onLoadEnd':
         int browserId = call.arguments["browserId"] as int;
         String urlId = call.arguments["urlId"] as String;
 
+        final controller = _webViews[browserId];
+        if (controller == null) return;
+        await controller.ready;
+
         await _injectUserScriptIfNeeds(browserId, _injectUserScripts[browserId]?.retrieveLoadEndInjectScripts() ?? []);
 
-        WebViewController controller =
-        _webViews[browserId] as WebViewController;
-        _webViews[browserId]?.listener?.onLoadEnd?.call(controller, urlId);
+        controller.listener?.onPageFinished?.call(controller, urlId);
+        return;
+      case 'onBeforeBrowse':
+        int browserId = call.arguments['browserId'] as int;
+        String url = call.arguments['url'] as String;
+        final controller = _webViews[browserId];
+        if (controller == null) return;
+
+        await controller.ready;
+        controller.listener?.onNavigateRequest?.call(controller, url);
+        return;
+      case 'onLoadingProgressChange':
+        int browserId = call.arguments['browserId'] as int;
+        double progress = (call.arguments['progress'] as num).toDouble();
+        final controller = _webViews[browserId];
+        if (controller == null) return;
+
+        await controller.ready;
+        controller.listener?.onProgressUpdated?.call(controller, progress);
+        return;
+      case 'onRenderProcessTerminated':
+        int browserId = call.arguments['browserId'] as int;
+        int status = call.arguments['status'] as int;
+        int errorCode = call.arguments['errorCode'] as int;
+        String errorString = call.arguments['errorString'] as String;
+        final renderController = _webViews[browserId];
+        if (renderController == null) return;
+
+        await renderController.ready;
+        renderController.listener?.onRenderProcessTerminated
+            ?.call(renderController, status, errorCode, errorString);
+        return;
+      case 'onLoadError':
+        int browserId = call.arguments['browserId'] as int;
+        String errorUrl = call.arguments['url'] as String;
+        int errorCode = call.arguments['errorCode'] as int;
+        String errorText = call.arguments['errorText'] as String;
+        final controller = _webViews[browserId];
+        if (controller == null) return;
+
+        await controller.ready;
+        final error = WebViewError(errorCode, errorText, {'url': errorUrl});
+        controller.listener?.onPageFailed?.call(controller, errorUrl, error);
         return;
       default:
     }

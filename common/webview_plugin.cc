@@ -15,6 +15,7 @@ namespace webview_cef {
 	CefRefPtr<WebviewApp> app;
 	CefString userAgent;
 	bool isCefInitialized = false;
+	std::string g_cefCachePath;
 #ifdef OS_MAC
 	std::string g_macSubprocessPath;
 	std::string g_macFrameworkDirPath;
@@ -28,6 +29,9 @@ namespace webview_cef {
 		g_macMainBundlePath = mainBundlePath;
 	}
 #endif
+	void setCefCachePath(const std::string& cachePath) {
+		g_cefCachePath = cachePath;
+	}
 
 	WebviewPlugin::WebviewPlugin() {
 		m_handler = new WebviewHandler();
@@ -245,6 +249,74 @@ namespace webview_cef {
                 }
             };
 
+            m_handler->onBeforeBrowseCallback = [=, this](int nBrowserId, std::string url) {
+                if (m_invokeFunc) {
+                    WValue* bId = webview_value_new_int(nBrowserId);
+                    WValue* uId = webview_value_new_string(const_cast<char*>(url.c_str()));
+                    WValue* retMap = webview_value_new_map();
+                    webview_value_set_string(retMap, "browserId", bId);
+                    webview_value_set_string(retMap, "url", uId);
+                    m_invokeFunc("onBeforeBrowse", retMap);
+                    webview_value_unref(bId);
+                    webview_value_unref(uId);
+                    webview_value_unref(retMap);
+                }
+            };
+
+            m_handler->onLoadingProgressChangeCallback = [=, this](int nBrowserId, double progress) {
+                if (m_invokeFunc) {
+                    WValue* bId = webview_value_new_int(nBrowserId);
+                    WValue* prog = webview_value_new_double(progress);
+                    WValue* retMap = webview_value_new_map();
+                    webview_value_set_string(retMap, "browserId", bId);
+                    webview_value_set_string(retMap, "progress", prog);
+                    m_invokeFunc("onLoadingProgressChange", retMap);
+                    webview_value_unref(bId);
+                    webview_value_unref(prog);
+                    webview_value_unref(retMap);
+                }
+            };
+
+            m_handler->onLoadErrorCallback = [=, this](int nBrowserId, int errorCode, std::string errorText, std::string failedUrl) {
+                if (m_invokeFunc) {
+                    WValue* bId = webview_value_new_int(nBrowserId);
+                    WValue* code = webview_value_new_int(errorCode);
+                    WValue* text = webview_value_new_string(const_cast<char*>(errorText.c_str()));
+                    WValue* url = webview_value_new_string(const_cast<char*>(failedUrl.c_str()));
+                    WValue* retMap = webview_value_new_map();
+                    webview_value_set_string(retMap, "browserId", bId);
+                    webview_value_set_string(retMap, "errorCode", code);
+                    webview_value_set_string(retMap, "errorText", text);
+                    webview_value_set_string(retMap, "url", url);
+                    m_invokeFunc("onLoadError", retMap);
+                    webview_value_unref(bId);
+                    webview_value_unref(code);
+                    webview_value_unref(text);
+                    webview_value_unref(url);
+                    webview_value_unref(retMap);
+                }
+            };
+
+            m_handler->onRenderProcessTerminated = [=, this](int nBrowserId, int status, int errorCode, std::string errorString) {
+                if (m_invokeFunc) {
+                    WValue* bId = webview_value_new_int(nBrowserId);
+                    WValue* s = webview_value_new_int(status);
+                    WValue* code = webview_value_new_int(errorCode);
+                    WValue* errStr = webview_value_new_string(const_cast<char*>(errorString.c_str()));
+                    WValue* retMap = webview_value_new_map();
+                    webview_value_set_string(retMap, "browserId", bId);
+                    webview_value_set_string(retMap, "status", s);
+                    webview_value_set_string(retMap, "errorCode", code);
+                    webview_value_set_string(retMap, "errorString", errStr);
+                    m_invokeFunc("onRenderProcessTerminated", retMap);
+                    webview_value_unref(bId);
+                    webview_value_unref(s);
+                    webview_value_unref(code);
+                    webview_value_unref(errStr);
+                    webview_value_unref(retMap);
+                }
+            };
+
 			m_init = true;
 		}
 	}
@@ -260,6 +332,10 @@ namespace webview_cef {
 		m_handler->onJavaScriptChannelMessage = nullptr;
 		m_handler->onFocusedNodeChangeMessage = nullptr;
 		m_handler->onImeCompositionRangeChangedMessage = nullptr;
+		m_handler->onBeforeBrowseCallback = nullptr;
+		m_handler->onLoadingProgressChangeCallback = nullptr;
+		m_handler->onLoadErrorCallback = nullptr;
+		m_handler->onRenderProcessTerminated = nullptr;
 		m_init = false;
 	}
 
@@ -268,7 +344,24 @@ namespace webview_cef {
 		if (name.compare("init") == 0){
 			if(!isCefInitialized){
 				if(values != nullptr){
-					userAgent = CefString(webview_value_get_string(values));
+					if (webview_value_get_type(values) == Webview_Value_Type_Map) {
+						// New API: init args are a map with named keys.
+						WValue* pm = webview_value_get_by_string(values, "processMode");
+						if (pm != nullptr && webview_value_get_type(pm) == Webview_Value_Type_Int) {
+							app->SetProcessMode(static_cast<uint32_t>(webview_value_get_int(pm)));
+						}
+						WValue* ua = webview_value_get_by_string(values, "userAgent");
+						if (ua != nullptr && webview_value_get_type(ua) == Webview_Value_Type_String) {
+							userAgent = CefString(webview_value_get_string(ua));
+						}
+						WValue* cp = webview_value_get_by_string(values, "cachePath");
+						if (cp != nullptr && webview_value_get_type(cp) == Webview_Value_Type_String) {
+							setCefCachePath(webview_value_get_string(cp));
+						}
+					} else {
+						// Old API: init arg is a bare string (userAgent).
+						userAgent = CefString(webview_value_get_string(values));
+					}
 				}
 				startCEF();
 			}
@@ -283,6 +376,13 @@ namespace webview_cef {
 		else if (name.compare("create") == 0) {
 			std::string url = webview_value_get_string(values);
 			m_handler->createBrowser(url, [=, this](int browserId) {
+				if (browserId < 0) {
+					std::cerr << "[webview_cef] ERROR: createBrowser failed, "
+					             "browser creation returned invalid ID."
+					          << std::endl;
+					result(0, nullptr);
+					return;
+				}
 				std::shared_ptr<WebviewTexture> renderer = m_createTextureFunc();
 				m_renderers[browserId] = renderer;
 				WValue	*response = webview_value_new_list();
@@ -341,9 +441,31 @@ namespace webview_cef {
 			m_handler->goBack(browserId);
 			result(1, nullptr);
 		}
+		else if (name.compare("canGoBack") == 0) {
+			int browserId = int(webview_value_get_int(values));
+			bool val = m_handler->canGoBack(browserId);
+			result(1, webview_value_new_bool(val));
+		}
+		else if (name.compare("canGoForward") == 0) {
+			int browserId = int(webview_value_get_int(values));
+			bool val = m_handler->canGoForward(browserId);
+			result(1, webview_value_new_bool(val));
+		}
 		else if (name.compare("reload") == 0) {
 			int browserId = int(webview_value_get_int(values));
 			m_handler->reload(browserId);
+			result(1, nullptr);
+		}
+		else if (name.compare("getTitle") == 0) {
+			int browserId = int(webview_value_get_int(values));
+			std::string title = m_handler->getTitle(browserId);
+			WValue* ret = webview_value_new_string(title.c_str());
+			result(1, ret);
+			webview_value_unref(ret);
+		}
+		else if (name.compare("stopLoading") == 0) {
+			int browserId = int(webview_value_get_int(values));
+			m_handler->stopLoading(browserId);
 			result(1, nullptr);
 		}
 		else if (name.compare("openDevTools") == 0) {			
@@ -574,15 +696,164 @@ namespace webview_cef {
 
 	void WebviewPlugin::sendKeyEvent(CefKeyEvent& ev)
 	{
+#ifdef OS_MAC
+		// CEF off-screen rendering bypasses AppKit's interpretKeyEvents: which
+		// maps macOS Cmd+Arrow / Cmd+Z / Cmd+Backspace to editing commands.
+		// Intercept them here and execute the editing action via JavaScript.
+		if (handleMacOSOSRShortcut(ev)) {
+			return;
+		}
+#endif
 		m_handler->sendKeyEvent(ev);
-		if(ev.type == KEYEVENT_RAWKEYDOWN && ev.windows_key_code == 0x7B && (ev.modifiers & EVENTFLAG_CONTROL_DOWN) != 0){
-			for(auto render : m_renderers){
-				if(render.second.get()->isFocused){
-					m_handler->openDevTools(render.first);
-				}
+	}
+
+#ifdef OS_MAC
+	bool WebviewPlugin::handleMacOSOSRShortcut(CefKeyEvent& ev)
+	{
+		// Only intercept RAWKEYDOWN events with Command modifier.
+		if (ev.type != KEYEVENT_RAWKEYDOWN ||
+		    !(ev.modifiers & EVENTFLAG_COMMAND_DOWN)) {
+			return false;
+		}
+
+		int bId = focusedBrowserId();
+		if (bId < 0) return false;
+
+		bool shiftDown = (ev.modifiers & EVENTFLAG_SHIFT_DOWN) != 0;
+		const char* js = nullptr;
+
+		switch (ev.native_key_code) {
+		case 51:  // Backspace — delete to beginning of line.
+			if (!shiftDown) {
+				js = "(function(){var e=document.activeElement;"
+				     "if(e&&(e.tagName==='INPUT'||e.tagName==='TEXTAREA')){"
+				     "var p=e.selectionStart;if(p===e.selectionEnd&&p>0){"
+				     "var v=e.value,ls=v.lastIndexOf('\\n',p-1);"
+				     "ls=(ls===-1)?0:ls+1;e.setSelectionRange(ls,p);"
+				     "}}document.execCommand('delete',false,null)})()";
+			}
+			break;
+
+		case 126:  // Up arrow — beginning of document.
+			if (shiftDown) {
+				js = "(function(){var e=document.activeElement;"
+				     "if(e&&(e.tagName==='INPUT'||e.tagName==='TEXTAREA')){"
+				     "var p=Math.max(e.selectionStart,e.selectionEnd);"
+				     "e.setSelectionRange(p,0);}})()";
+			} else {
+				js = "(function(){var e=document.activeElement;"
+				     "if(e&&(e.tagName==='INPUT'||e.tagName==='TEXTAREA')){"
+				     "e.setSelectionRange(0,0);}})()";
+			}
+			break;
+
+		case 125:  // Down arrow — end of document.
+			if (shiftDown) {
+				js = "(function(){var e=document.activeElement;"
+				     "if(e&&(e.tagName==='INPUT'||e.tagName==='TEXTAREA')){"
+				     "var p=Math.min(e.selectionStart,e.selectionEnd);"
+				     "var l=e.value.length;e.setSelectionRange(p,l);}})()";
+			} else {
+				js = "(function(){var e=document.activeElement;"
+				     "if(e&&(e.tagName==='INPUT'||e.tagName==='TEXTAREA')){"
+				     "var l=e.value.length;e.setSelectionRange(l,l);}})()";
+			}
+			break;
+
+		case 123:  // Left arrow — beginning of line.
+			if (shiftDown) {
+				js = "(function(){var e=document.activeElement;"
+				     "if(e&&(e.tagName==='INPUT'||e.tagName==='TEXTAREA')){"
+				     "var v=e.value,p=Math.max(e.selectionStart,e.selectionEnd);"
+				     "var ls=v.lastIndexOf('\\n',p-1);"
+				     "ls=(ls===-1)?0:ls+1;e.setSelectionRange(p,ls);}})()";
+			} else {
+				js = "(function(){var e=document.activeElement;"
+				     "if(e&&(e.tagName==='INPUT'||e.tagName==='TEXTAREA')){"
+				     "var v=e.value,p=e.selectionStart;"
+				     "var ls=v.lastIndexOf('\\n',p-1);"
+				     "ls=(ls===-1)?0:ls+1;e.setSelectionRange(ls,ls);}})()";
+			}
+			break;
+
+		case 124:  // Right arrow — end of line.
+			if (shiftDown) {
+				js = "(function(){var e=document.activeElement;"
+				     "if(e&&(e.tagName==='INPUT'||e.tagName==='TEXTAREA')){"
+				     "var v=e.value,p=Math.min(e.selectionStart,e.selectionEnd);"
+				     "var le=v.indexOf('\\n',p);"
+				     "le=(le===-1)?v.length:le;e.setSelectionRange(p,le);}})()";
+			} else {
+				js = "(function(){var e=document.activeElement;"
+				     "if(e&&(e.tagName==='INPUT'||e.tagName==='TEXTAREA')){"
+				     "var v=e.value,p=e.selectionEnd;"
+				     "var le=v.indexOf('\\n',p);"
+				     "le=(le===-1)?v.length:le;e.setSelectionRange(le,le);}})()";
+			}
+			break;
+
+
+		case 8:  // C — copy (no element restriction; copies the current
+		         // selection, whether inside an input or in the DOM at large).
+			if (!shiftDown) {
+				js = "(function(){document.execCommand('copy')})()";
+			}
+			break;
+
+		case 6:  // Z — undo / redo (no element check; execCommand works
+		         // at the document level for contenteditable as well).
+			if (shiftDown) {
+				js = "(function(){document.execCommand('redo')})()";
+			} else {
+				js = "(function(){document.execCommand('undo')})()";
+			}
+			break;
+
+		default:
+			return false;
+		}
+
+		if (js) {
+			m_handler->executeJavaScript(bId, js);
+			return true;
+		}
+		return false;
+	}
+
+	void WebviewPlugin::pasteText(const std::string& text) {
+		int bId = focusedBrowserId();
+		if (bId < 0) return;
+
+		// Escape the clipboard text for a JavaScript string literal.
+		std::string escaped;
+		escaped.reserve(text.size() * 2);
+		for (char c : text) {
+			switch (c) {
+				case '\\': escaped += "\\\\"; break;
+				case '"':  escaped += "\\\""; break;
+				case '\n': escaped += "\\n";  break;
+				case '\r': escaped += "\\r";  break;
+				case '\t': escaped += "\\t";  break;
+				default:   escaped += c;      break;
 			}
 		}
+
+		std::string js =
+			"(function(t){"
+			"var e=document.activeElement;"
+			"if(!e)return;"
+			"if(e.tagName==='INPUT'||e.tagName==='TEXTAREA'){"
+			"var s=e.selectionStart,p=e.selectionEnd,v=e.value;"
+			"e.value=v.substring(0,s)+t+v.substring(p);"
+			"e.selectionStart=e.selectionEnd=s+t.length;"
+			"e.dispatchEvent(new Event('input',{bubbles:true}));"
+			"}else if(e.isContentEditable||e.getAttribute('contenteditable')==='true'){"
+			"document.execCommand('insertText',false,t);"
+			"}})(\"" + escaped + "\")";
+
+		m_handler->executeJavaScript(bId, js);
 	}
+#endif
 
 	void WebviewPlugin::setInvokeMethodFunc(std::function<void(std::string, WValue*)> func){
 		m_invokeFunc = func;
@@ -722,6 +993,9 @@ namespace webview_cef {
 		//cef message run in another thread on windows/linux
 		cefs.multi_threaded_message_loop = true;
 #endif
+		if (!g_cefCachePath.empty()) {
+			CefString(&cefs.root_cache_path) = g_cefCachePath;
+		}
 		CefInitialize(mainArgs, cefs, app.get(), nullptr);
 	}
 

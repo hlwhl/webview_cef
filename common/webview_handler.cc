@@ -102,8 +102,11 @@ bool WebviewHandler::OnProcessMessageReceived(
 
 void WebviewHandler::OnTitleChange(CefRefPtr<CefBrowser> browser,
                                   const CefString& title) {
-    //todo: title change
-    if(onTitleChangedEvent) {
+    auto it = browser_map_.find(browser->GetIdentifier());
+    if (it != browser_map_.end()) {
+        it->second.title = title.ToString();
+    }
+    if (onTitleChangedEvent) {
         onTitleChangedEvent(browser->GetIdentifier(), title);
     }
 }
@@ -111,7 +114,7 @@ void WebviewHandler::OnTitleChange(CefRefPtr<CefBrowser> browser,
 void WebviewHandler::OnAddressChange(CefRefPtr<CefBrowser> browser,
                              CefRefPtr<CefFrame> frame,
                      const CefString& url) {
-    if(onUrlChangedEvent) {
+    if (onUrlChangedEvent) {
         onUrlChangedEvent(browser->GetIdentifier(), url);
     }
 }
@@ -120,7 +123,7 @@ bool WebviewHandler::OnCursorChange(CefRefPtr<CefBrowser> browser,
                             CefCursorHandle cursor,
                             cef_cursor_type_t type,
                             const CefCursorInfo& custom_cursor_info){
-    if(onCursorChangedEvent) {
+    if (onCursorChangedEvent) {
         onCursorChangedEvent(browser->GetIdentifier(), type);
         return true;
     }
@@ -128,7 +131,7 @@ bool WebviewHandler::OnCursorChange(CefRefPtr<CefBrowser> browser,
 }
 
 bool WebviewHandler::OnTooltip(CefRefPtr<CefBrowser> browser, CefString& text) {
-    if(onTooltipEvent) {
+    if (onTooltipEvent) {
         onTooltipEvent(browser->GetIdentifier(), text);
         return true;
     }
@@ -206,15 +209,41 @@ void WebviewHandler::OnLoadError(CefRefPtr<CefBrowser> browser,
     // Don't display an error for downloaded files.
     if (errorCode == ERR_ABORTED)
         return;
-    
-    // Display a load error message using a data: URI.
-    std::stringstream ss;
-    ss << "<html><body bgcolor=\"white\">"
-    "<h2>Failed to load URL "
-    << std::string(failedUrl) << " with error " << std::string(errorText)
-    << " (" << errorCode << ").</h2></body></html>";
-    
-    frame->LoadURL(GetDataURI(ss.str(), "text/html"));
+
+    // Notify Dart so the app can show its own error UI.
+    if (onLoadErrorCallback) {
+        onLoadErrorCallback(browser->GetIdentifier(),
+                            static_cast<int>(errorCode),
+                            errorText.ToString(),
+                            failedUrl.ToString());
+    }
+
+    // The built-in error page is intentionally disabled — it interferes with
+    // goBack/goForward navigation. The Dart listener (onPageFailed) owns error
+    // display now. Uncomment the block below to restore the default error page
+    // when no listener is set:
+    //
+    // if (!onLoadErrorCallback) {
+    //     std::stringstream ss;
+    //     ss << "<html><body bgcolor=\"white\">"
+    //        << "<h2>Failed to load URL "
+    //        << std::string(failedUrl) << " with error "
+    //        << std::string(errorText) << " (" << errorCode
+    //        << ").</h2></body></html>";
+    //     frame->LoadURL(GetDataURI(ss.str(), "text/html"));
+    // }
+}
+
+void WebviewHandler::OnRenderProcessTerminated(CefRefPtr<CefBrowser> browser,
+                                               TerminationStatus status,
+                                               int error_code,
+                                               const CefString& error_string) {
+    if (onRenderProcessTerminated) {
+        onRenderProcessTerminated(browser->GetIdentifier(),
+                                  static_cast<int>(status),
+                                  error_code,
+                                  error_string.ToString());
+    }
 }
 
 void WebviewHandler::OnLoadStart(CefRefPtr<CefBrowser> browser, CefRefPtr<CefFrame> frame,
@@ -231,6 +260,27 @@ void WebviewHandler::OnLoadEnd(CefRefPtr<CefBrowser> browser, CefRefPtr<CefFrame
         onLoadEnd(browser->GetIdentifier(), frame->GetURL());
     }
     return;
+}
+
+void WebviewHandler::OnLoadingProgressChange(CefRefPtr<CefBrowser> browser,
+                                              double progress) {
+    if (onLoadingProgressChangeCallback) {
+        onLoadingProgressChangeCallback(browser->GetIdentifier(), progress);
+    }
+}
+
+bool WebviewHandler::OnBeforeBrowse(CefRefPtr<CefBrowser> browser,
+                                     CefRefPtr<CefFrame> frame,
+                                     CefRefPtr<CefRequest> request,
+                                     bool user_gesture,
+                                     bool is_redirect) {
+    // Always allow the navigation; notify Dart asynchronously so it can
+    // call stopLoading() if the user wants to cancel.
+    if (onBeforeBrowseCallback) {
+        onBeforeBrowseCallback(browser->GetIdentifier(),
+                               request->GetURL().ToString());
+    }
+    return false; // false = allow navigation
 }
 
 void WebviewHandler::CloseAllBrowsers(bool force_close) {
@@ -281,7 +331,16 @@ void WebviewHandler::createBrowser(std::string url, std::function<void(int)> cal
     // an IDXGIOutput vblank wait, macOS from a CVDisplayLink.
     window_info.external_begin_frame_enabled = true;
 #endif
-    callback(CefBrowserHost::CreateBrowserSync(window_info, this, url, browser_settings, nullptr, nullptr)->GetIdentifier());
+    CefRefPtr<CefBrowser> browser =
+        CefBrowserHost::CreateBrowserSync(window_info, this, url,
+                                          browser_settings, nullptr, nullptr);
+    if (!browser) {
+        std::cerr << "[webview_cef] ERROR: CreateBrowserSync failed for URL: "
+                  << url << std::endl;
+        callback(-1);  // Invalid browser ID signals creation failure.
+        return;
+    }
+    callback(browser->GetIdentifier());
 #ifdef WEBVIEW_CEF_GPU_TEXTURE
     // The GPU shared-texture path is the only render path on this build (no
     // OnPaint fallback). If no accelerated frame arrives shortly, the GPU
@@ -435,6 +494,57 @@ void WebviewHandler::sendKeyEvent(CefKeyEvent& ev)
     if (!browser.get()) {
         return;
     }
+
+    // Intercept DevTools keyboard shortcuts before forwarding the key to the
+    // page so the shortcut does not reach the web content.
+    if (ev.type == KEYEVENT_RAWKEYDOWN) {
+        bool open = false;
+
+        // F12 — mapped to VK_F12 (0x7B) on Windows/Linux, native key code 111
+        // on macOS (CEF off-screen rendering does not populate windows_key_code
+        // from NSEvent).
+#ifdef OS_MAC
+        if (ev.native_key_code == 111) {  // F12 on macOS
+            open = true;
+        }
+#else
+        if (ev.windows_key_code == 0x7B) {  // VK_F12
+            open = true;
+        }
+#endif
+
+        // Cmd+Opt+I (macOS) / Ctrl+Shift+I (Windows/Linux).
+        // Use unmodified_character so the check is independent of the Shift
+        // modifier state; fall back to character when it is unset.
+        char16_t ch = ev.unmodified_character != 0 ? ev.unmodified_character
+                                                    : ev.character;
+        if (ch == 'I' || ch == 'i') {
+#ifdef OS_MAC
+            if ((ev.modifiers & (EVENTFLAG_COMMAND_DOWN |
+                                 EVENTFLAG_ALT_DOWN)) ==
+                (EVENTFLAG_COMMAND_DOWN | EVENTFLAG_ALT_DOWN)) {
+                open = true;
+            }
+#else
+            if ((ev.modifiers & (EVENTFLAG_CONTROL_DOWN |
+                                 EVENTFLAG_SHIFT_DOWN)) ==
+                (EVENTFLAG_CONTROL_DOWN | EVENTFLAG_SHIFT_DOWN)) {
+                open = true;
+            }
+#endif
+        }
+
+        if (open) {
+            CefWindowInfo windowInfo;
+#ifdef OS_WIN
+            windowInfo.SetAsPopup(nullptr, "DevTools");
+#endif
+            browser->GetHost()->ShowDevTools(windowInfo, this,
+                                             CefBrowserSettings(), CefPoint());
+            return;  // Consume the shortcut — do not forward to the web page.
+        }
+    }
+
     browser->GetHost()->SendKeyEvent(ev);
 }
 
@@ -460,11 +570,42 @@ void WebviewHandler::goBack(int browserId) {
     }
 }
 
+bool WebviewHandler::canGoBack(int browserId) {
+    auto it = browser_map_.find(browserId);
+    if (it != browser_map_.end()) {
+        return it->second.browser->CanGoBack();
+    }
+    return false;
+}
+
+bool WebviewHandler::canGoForward(int browserId) {
+    auto it = browser_map_.find(browserId);
+    if (it != browser_map_.end()) {
+        return it->second.browser->CanGoForward();
+    }
+    return false;
+}
+
 void WebviewHandler::reload(int browserId) {
     auto it = browser_map_.find(browserId);
     if (it != browser_map_.end()) {
         it->second.browser->GetMainFrame()->GetBrowser()->Reload();
     }
+}
+
+void WebviewHandler::stopLoading(int browserId) {
+    auto it = browser_map_.find(browserId);
+    if (it != browser_map_.end()) {
+        it->second.browser->StopLoad();
+    }
+}
+
+std::string WebviewHandler::getTitle(int browserId) {
+    auto it = browser_map_.find(browserId);
+    if (it != browser_map_.end()) {
+        return it->second.title;
+    }
+    return "";
 }
 
 void WebviewHandler::openDevTools(int browserId) {
@@ -660,16 +801,11 @@ void WebviewHandler::visitUrlCookies(const std::string& domain, const bool& isHt
 
 void WebviewHandler::setJavaScriptChannels(int browserId, const std::vector<std::string> channels)
 {
-    std::string extensionCode = "try{";
-    for(auto& channel : channels)
-    {
-        extensionCode += channel;
-        extensionCode += " = (e,r) => {external.JavaScriptChannel('";
-        extensionCode += channel;
-        extensionCode += "',e,r)};";
-    }
-    extensionCode += "}catch(e){console.log(e);}";
-    executeJavaScript(browserId, extensionCode);
+    // No-op: the V8 extension ($cef Proxy in OnWebKitInitialized) handles
+    // all channel names automatically. No executeJavaScript injection or
+    // OnLoadEnd re-injection is needed.
+    (void)browserId;
+    (void)channels;
 }
 
 void WebviewHandler::sendJavaScriptChannelCallBack(const bool error, const std::string result, const std::string callbackId, const int browserId, const std::string frameId)
@@ -686,8 +822,23 @@ void WebviewHandler::sendJavaScriptChannelCallBack(const bool error, const std::
         CefRefPtr<CefFrame> frame = bit->second.browser->GetMainFrame();
 
         // CefFrame::GetIdentifier() returns a string identifier in current CEF
-        // (since CEF 122) on every platform.
-        bool identifierMatch = std::stoll(frame->GetIdentifier().ToString()) == frameIdInt;
+        // (since CEF 122) on every platform. The identifier is typically numeric
+        // but may be empty or non-numeric in edge cases (e.g. frame not yet loaded,
+        // renderer process crash). We use atoll() instead of std::stoll() here
+        // because:
+        //
+        //  - std::stoll() throws std::invalid_argument when the input string is
+        //    not a valid integer. In C++ this exception propagates as an uncaught
+        //    C++ exception → std::terminate() → abort() → SIGABRT crash.
+        //
+        //  - atoll() is a C function that returns 0 on parse failure instead of
+        //    throwing. It is safe for untrusted / potentially-empty input.
+        //
+        // CefString::ToString() returns std::string (owned copy); calling .c_str()
+        // on it yields a temporary const char* that atoll can consume. Note that
+        // .c_str() alone on a temporary std::string is safe here because the
+        // temporary lives until the full expression ends (at the semicolon).
+        bool identifierMatch = atoll(frame->GetIdentifier().ToString().c_str()) == frameIdInt;
         if (identifierMatch)
         {
             frame->SendProcessMessage(PID_RENDERER, message);
@@ -715,7 +866,7 @@ void WebviewHandler::executeJavaScript(int browserId, const std::string code, st
                 if(callback != nullptr){
                     std::string callbackId = GetCallbackId();
 
-                    finalCode = "external.EvaluateCallback('";
+                    finalCode = "$cef.EvaluateCallback('";
                     finalCode += callbackId;
                     finalCode += "',(function(){return ";
                     finalCode += code;

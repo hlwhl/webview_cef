@@ -46,12 +46,27 @@ namespace webview_cef {
         void imeSetCompositionNative(const std::wstring& text, int cursor);
         void imeCommitTextNative(const std::wstring& text);
         void imeFinishCompositionNative();
+#ifdef OS_MAC
+        // Inject text at the cursor position of the currently focused element
+        // (input / textarea / contenteditable) via JavaScript. Used to paste
+        // system clipboard content that CEF OSR cannot access on its own.
+        void pasteText(const std::string& text);
+#endif
 
     private :
         // Resolve the browserId whose renderer currently has focus, or -1.
         int focusedBrowserId();
         // Set the composing flag for a specific browser (no-op if unknown).
         void setComposingForBrowser(int browserId, bool composing);
+#ifdef OS_MAC
+        // Intercept macOS Cmd+Arrow / Cmd+Z editing shortcuts. CEF off-screen
+        // rendering bypasses AppKit's interpretKeyEvents: so these key chords
+        // never translate to NSEvent editing selectors. Execute the equivalent
+        // editing action via JavaScript instead.
+        // Returns true if the event was handled; caller should return without
+        // forwarding to CEF.
+        bool handleMacOSOSRShortcut(CefKeyEvent& ev);
+#endif
         int cursorAction(WValue *args, std::string name);
     	std::function<void(std::string, WValue*)> m_invokeFunc;
 	    std::function<std::shared_ptr<WebviewTexture>()> m_createTextureFunc;
@@ -72,6 +87,12 @@ namespace webview_cef {
                         const std::string& frameworkDirPath,
                         const std::string& mainBundlePath);
 #endif
+    // Set an explicit root cache path for CEF so that multiple instances of the
+    // same CEF-based app — or different apps embedding the same CEF framework —
+    // each get their own isolated cache directory. Must be called before
+    // startCEF(). On macOS the platform layer passes
+    // ~/Library/Caches/<bundle_id>/cef.
+    void setCefCachePath(const std::string& cachePath);
     void doMessageLoopWork();
     void SwapBufferFromBgraToRgba(void* _dest, const void* _src, int width, int height);
     void stopCEF();

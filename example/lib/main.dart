@@ -1,4 +1,4 @@
-import 'dart:async';
+import 'dart:io';
 
 import 'package:flutter/material.dart';
 import 'package:webview_cef/webview_cef.dart';
@@ -14,11 +14,17 @@ class MyApp extends StatefulWidget {
   State<MyApp> createState() => _MyAppState();
 }
 
-class _MyAppState extends State<MyApp> {
-  late WebViewController _controller;
+class _MyAppState extends State<MyApp> with SingleTickerProviderStateMixin {
+  WebViewController? _controller;
+  bool _webViewInitialized = false;
   final _textController = TextEditingController();
   String title = "";
   Map allCookies = {};
+
+  // Progress bar
+  late AnimationController _progressAnimController;
+  double _progress = 0;
+  bool _showProgress = false;
 
   @override
   void initState() {
@@ -43,68 +49,148 @@ class _MyAppState extends State<MyApp> {
     //   ScriptInjectTime.LOAD_END,
     // ));
 
-    _controller = WebviewManager().createWebView(
-        loading: const Text("not initialized"),
-        injectUserScripts: injectUserScripts);
+    _progressAnimController = AnimationController(
+      vsync: this,
+      duration: const Duration(milliseconds: 800),
+    );
+    _progressAnimController.addListener(() {
+      setState(() {
+        _progress = _progressAnimController.value;
+      });
+    });
+
+    WebviewManager()
+        .initialize(
+            userAgent: "test/userAgent",
+            processMode: ProcessMode.processPerSite)
+        .then((value) async {
+      _controller = WebviewManager().createWebView(
+          loading: const Text("not initialized"),
+          injectUserScripts: injectUserScripts);
+
+      // Register event listener before initialize so that onPageStarted,
+      // onPageFinished, etc. are captured from the very first navigation.
+      _controller!.setWebviewListener(WebViewEventsListener(
+        onPageStarted: (controller, url) {
+          debugPrint("onPageStarted => $url");
+          _progress = 0;
+          _showProgress = true;
+          _progressAnimController.forward(from: 0);
+        },
+        onPageFinished: (controller, url) {
+          debugPrint("onPageFinished => $url");
+          controller.getTitle().then((t) {
+            if (t != null && mounted) {
+              setState(() => title = t);
+            }
+          });
+          _progressAnimController.forward(from: 0).then((_) {
+            if (mounted) {
+              setState(() {
+                _showProgress = false;
+                _progress = 0;
+              });
+            }
+          });
+
+          //also you can build your own jssdk by execute JavaScript code to CEF
+          _controller!.executeJavaScript("function abc(e){return 'abc:'+ e}");
+          _controller!
+              .evaluateJavascript("abc('test')")
+              .then((value) => debugPrint(value));
+        },
+        onNavigateRequest: (controller, url) {
+          debugPrint("onNavigateRequest => $url");
+          // Example: block navigation to certain domains
+          if (url.contains('spam.com')) {
+            debugPrint("Navigation to '$url' blocked.");
+            controller.stopLoading();
+            return NavigationPolicy.cancel;
+          }
+          return NavigationPolicy.allow;
+        },
+        onProgressUpdated: (controller, progress) {
+          debugPrint(
+              "onProgressUpdated => ${(progress * 100).toStringAsFixed(0)}%");
+          // Update a progress indicator with the 0.0-1.0 value.
+          _progressAnimController.value = progress;
+        },
+        onPageFailed: (controller, url, error) {
+          debugPrint("onPageFailed => url: $url, code: ${error.code}, "
+              "message: ${error.message}");
+          // Hide progress on error.
+          _showProgress = false;
+          _progress = 0;
+        },
+      ));
+
+      // Must initialize the browser before setting channels or marking ready.
+      _textController.text = "www.baidu.com";
+      await _controller!.initialize(url: _textController.text);
+
+      setState(() {
+        _webViewInitialized = true;
+      });
+
+      final Set<JavascriptChannel> jsChannels = {
+        JavascriptChannel(
+            name: 'Print',
+            onMessageReceived: (JavascriptMessage message) {
+              debugPrint(message.message);
+              _controller!.sendJavaScriptChannelCallBack(
+                  false,
+                  "{'code':'200','message':'print succeed!'}",
+                  message.callbackId,
+                  message.frameId);
+            }),
+      };
+
+      //normal JavaScriptChannels
+      await _controller!.setJavaScriptChannels(jsChannels);
+    });
+
     super.initState();
-    initPlatformState();
   }
 
   @override
   void dispose() {
-    _controller.dispose();
+    _progressAnimController.dispose();
+    _controller?.dispose();
     WebviewManager().quit();
     super.dispose();
   }
 
-  // Platform messages are asynchronous, so we initialize in an async method.
-  Future<void> initPlatformState() async {
-    await WebviewManager().initialize(userAgent: "test/userAgent");
-    String url = "www.baidu.com";
-    _textController.text = url;
-    //unified interface for all platforms set user agent
-    _controller.setWebviewListener(WebviewEventsListener(
-      onTitleChanged: (t) {
-        setState(() {
-          title = t;
-        });
-      },
-      onUrlChanged: (url) {
-        _textController.text = url;
-        final Set<JavascriptChannel> jsChannels = {
-          JavascriptChannel(
-              name: 'Print',
-              onMessageReceived: (JavascriptMessage message) {
-                debugPrint(message.message);
-                _controller.sendJavaScriptChannelCallBack(
-                    false,
-                    "{'code':'200','message':'print succeed!'}",
-                    message.callbackId,
-                    message.frameId);
-              }),
-        };
-        //normal JavaScriptChannels
-        _controller.setJavaScriptChannels(jsChannels);
-        //also you can build your own jssdk by execute JavaScript code to CEF
-        _controller.executeJavaScript("function abc(e){return 'abc:'+ e}");
-        _controller
-            .evaluateJavascript("abc('test')")
-            .then((value) => debugPrint(value));
-      },
-      onLoadStart: (controller, url) {
-        debugPrint("onLoadStart => $url");
-      },
-      onLoadEnd: (controller, url) {
-        debugPrint("onLoadEnd => $url");
-      },
-    ));
+  void _loadLocalHtml() {
+    final file = File(
+      '${Directory.current.path}'
+      '${Platform.pathSeparator}..'
+      '${Platform.pathSeparator}web-playground'
+      '${Platform.pathSeparator}bridge.html',
+    ).absolute;
+    final fileUrl = file.uri.toString();
+    _controller?.loadUrl(fileUrl);
+    _textController.text = fileUrl;
+  }
 
-    await _controller.initialize(_textController.text);
-
-    // If the widget was removed from the tree while the asynchronous platform
-    // message was in flight, we want to discard the reply rather than calling
-    // setState to update our non-existent appearance.
-    if (!mounted) return;
+  void _showInfoAlert(BuildContext context) {
+    showDialog(
+      context: context,
+      builder: (BuildContext context) {
+        return AlertDialog(
+          backgroundColor: Colors.white.withAlpha(230),
+          title: const Text('Title'),
+          content: const Text('Message'),
+          actions: [
+            TextButton(
+              onPressed: () {
+                Navigator.of(context).pop();
+              },
+              child: const Text('确认'),
+            ),
+          ],
+        );
+      },
+    );
   }
 
   @override
@@ -125,7 +211,7 @@ class _MyAppState extends State<MyApp> {
                 height: 48,
                 child: MaterialButton(
                   onPressed: () {
-                    _controller.reload();
+                    _controller?.reload();
                   },
                   child: const Icon(Icons.refresh),
                 ),
@@ -133,8 +219,10 @@ class _MyAppState extends State<MyApp> {
               SizedBox(
                 height: 48,
                 child: MaterialButton(
-                  onPressed: () {
-                    _controller.goBack();
+                  onPressed: () async {
+                    if (await _controller!.canGoBack()) {
+                      _controller!.goBack();
+                    }
                   },
                   child: const Icon(Icons.arrow_left),
                 ),
@@ -142,8 +230,10 @@ class _MyAppState extends State<MyApp> {
               SizedBox(
                 height: 48,
                 child: MaterialButton(
-                  onPressed: () {
-                    _controller.goForward();
+                  onPressed: () async {
+                    if (await _controller!.canGoForward()) {
+                      _controller!.goForward();
+                    }
                   },
                   child: const Icon(Icons.arrow_right),
                 ),
@@ -152,16 +242,34 @@ class _MyAppState extends State<MyApp> {
                 height: 48,
                 child: MaterialButton(
                   onPressed: () {
-                    _controller.openDevTools();
+                    _controller!.openDevTools();
                   },
                   child: const Icon(Icons.developer_mode),
+                ),
+              ),
+              Builder(
+                builder: (scaffoldContext) => SizedBox(
+                  height: 48,
+                  child: MaterialButton(
+                    onPressed: () {
+                      _showInfoAlert(scaffoldContext);
+                    },
+                    child: const Icon(Icons.info_outline),
+                  ),
+                ),
+              ),
+              SizedBox(
+                height: 48,
+                child: MaterialButton(
+                  onPressed: _loadLocalHtml,
+                  child: const Icon(Icons.file_open),
                 ),
               ),
               Expanded(
                 child: TextField(
                   controller: _textController,
                   onSubmitted: (url) {
-                    _controller.loadUrl(url);
+                    _controller!.loadUrl(url);
                     WebviewManager().visitAllCookies().then((value) {
                       allCookies = Map.of(value);
                       if (url == "baidu.com") {
@@ -179,16 +287,40 @@ class _MyAppState extends State<MyApp> {
             ],
           ),
           Expanded(
-              child: Row(
+              child: Stack(
             children: [
-              ValueListenableBuilder(
-                valueListenable: _controller,
-                builder: (context, value, child) {
-                  return _controller.value
-                      ? Expanded(child: _controller.webviewWidget)
-                      : _controller.loadingWidget;
-                },
+              Row(
+                children: [
+                  // ValueListenableBuilder(
+                  //   valueListenable: _controller!,
+                  //   builder: (context, value, child) {
+                  //     return _controller!.value
+                  //         ? Expanded(child: _controller!.webviewWidget)
+                  //         : _controller!.loadingWidget;
+                  //   },
+                  // ),
+                  Expanded(
+                      child: _webViewInitialized
+                          ? _controller!.webviewWidget
+                          : Container()),
+                ],
               ),
+              // Progress bar overlay on z-axis above the WebView
+              if (_showProgress)
+                Positioned(
+                  top: 0,
+                  left: 0,
+                  right: 0,
+                  child: SizedBox(
+                    height: 3,
+                    child: LinearProgressIndicator(
+                      value: _progress,
+                      backgroundColor: Colors.transparent,
+                      valueColor: const AlwaysStoppedAnimation<Color>(
+                          Colors.blueAccent),
+                    ),
+                  ),
+                ),
             ],
           ))
         ],
