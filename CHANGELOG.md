@@ -1,3 +1,7 @@
+## 0.6.1
+- Fixed Linux runner source detection for current Flutter projects using `linux/runner/`, while retaining compatibility with the legacy `linux/` layout.
+- Added regression coverage for both Linux runner layouts and clearer build failures when runner sources cannot be patched.
+
 ## 0.6.0
 - Added eLinux support, including the plugin implementation, example runner, rendering pipeline, mouse input, and keyboard input.
 - Added Dart-side CEF key-event forwarding for platforms without native key handling while avoiding duplicate delivery on Windows, macOS, and desktop Linux.
