@@ -27,7 +27,7 @@ A Flutter **desktop** WebView backed by [CEF](https://bitbucket.org/chromiumembe
 | Platform | Minimum version | Architectures |
 | --- | --- | --- |
 | Windows | Windows 10 | x64 |
-| macOS  | macOS 12.0 | arm64 or x86_64 (host arch only — no universal build) |
+| macOS  | macOS 12.0 | arm64, x86_64, or universal (arm64 + x86_64) |
 | Linux  | — | x64, arm64 |
 | eLinux | — | x64, arm64 |
 
@@ -45,7 +45,7 @@ A Flutter **desktop** WebView backed by [CEF](https://bitbucket.org/chromiumembe
 - **Toolchain** — upgrade to Flutter **≥ 3.27.0** / Dart **≥ 3.6.0** (was 2.5.0 / 2.17.1). The native build now requires **C++20** (CEF 149); make sure your app doesn't force the plugin target to an older C++ standard.
 - **Removed Dart API** — `WebviewCefPlatform`, `MethodChannelWebviewCef`, and `getPlatformVersion()` were removed (along with the `plugin_platform_interface` dependency). They were never the intended API and have no replacement (`getPlatformVersion` returned a demo value). Import only `package:webview_cef/webview_cef.dart` and use `WebviewManager` / `WebViewController`.
 - **Windows** — `initCEFProcesses` changed signature. Update `windows/runner/main.cpp`: it now takes the `HINSTANCE` and returns a sub-process exit code that must be returned immediately, as the first statement in `wWinMain` (see the Windows install snippet below). The minimum OS is now **Windows 10**.
-- **macOS** — raise the deployment target to **12.0**: set `platform :osx, '12.0'` in `macos/Podfile` **and** the Runner target's macOS Deployment Target in Xcode (CEF 149's framework is built for 12.0). To enable multi-process rendering, add the one-line `post_install` hook to `macos/Podfile` (see the macOS install section). Builds are now **host-architecture only** (arm64 *or* x86_64) — universal macOS apps are no longer produced.
+- **macOS** — raise the deployment target to **12.0**: set `platform :osx, '12.0'` in `macos/Podfile` **and** the Runner target's macOS Deployment Target in Xcode (CEF 149's framework is built for 12.0). To enable multi-process rendering, add the one-line `post_install` hook to `macos/Podfile` (see the macOS install section). Builds target the **host architecture** by default (arm64 *or* x86_64); set `WEBVIEW_CEF_MACOS_ARCH=universal` before `pod install` for a universal (arm64 + x86_64) app.
 
 ---
 
@@ -115,13 +115,29 @@ On the first build, the official CEF *Standard Distribution* (~330 MB, from <htt
 
    Then `pod install` (run automatically by `flutter run`). This installs an "Embed CEF Helpers" build phase that clones the prebuilt helper into the five CEF sub-process `.app` bundles inside your app — no manual Xcode target needed. **Without this hook the plugin still works but falls back to single-process** (an unsupported Chromium mode: no crash isolation, V8 proxy resolver disabled, etc.).
 
-macOS uses CocoaPods, which does not run the CMake download path. Instead the podspec's `prepare_command` runs [`macos/scripts/download_cef.sh`](macos/scripts/download_cef.sh) on `pod install`, which mirrors the Windows/Linux flow: it downloads the official CEF *Standard Distribution* for your arch (from <https://cef-builds.spotifycdn.com>, version pinned by `CEF_VERSION` in [`third/download.cmake`](third/download.cmake)), compiles `libcef_dll_wrapper` from source, lays the framework out as a versioned macOS bundle, and installs everything into the (git-ignored) `macos/third/cef`. The first `pod install` therefore takes noticeably longer; subsequent runs are a no-op once the pinned version is present.
+macOS uses CocoaPods, which does not run the CMake download path. Instead the podspec's `prepare_command` runs [`macos/scripts/download_cef.sh`](macos/scripts/download_cef.sh) on `pod install`, which mirrors the Windows/Linux flow: it downloads the official CEF *Standard Distribution* for the selected architecture (from <https://cef-builds.spotifycdn.com>, version pinned by `CEF_VERSION` in [`third/download.cmake`](third/download.cmake)), compiles `libcef_dll_wrapper` from source, lays the framework out as a versioned macOS bundle, and installs everything into the (git-ignored) `macos/third/cef`. The first `pod install` therefore takes noticeably longer; subsequent runs are a no-op once the pinned version is present.
 
 Requirements: `cmake` (and `ninja`, otherwise `make` is used) must be on `PATH` to build the wrapper — `brew install cmake ninja`.
 
 > The wrapper is built `Debug` by default to match `flutter run` / `flutter build macos --debug`. For a release build set `CEF_WRAPPER_BUILD_TYPE=Release` before `pod install` (debug and release builds need a wrapper compiled in the matching configuration — `#if DCHECK_IS_ON()` changes its ABI).
 
-> The script builds for the host arch only (arm64 **or** x86_64). For a Universal (arm64 + x86_64) app, `lipo` the wrapper and use a universal framework — see [#30](/../../issues/30). **`[HELP WANTED]`** a more elegant binary distribution.
+#### Choosing the architecture
+
+`WEBVIEW_CEF_MACOS_ARCH` selects which slices are prepared. It is read by both the download script and the podspec, so the CEF binaries and the `EXCLUDED_ARCHS` of your app always agree.
+
+| Value | Result |
+| --- | --- |
+| `host` (default) | the build machine's architecture |
+| `arm64` | Apple Silicon only |
+| `x86_64` | Intel only |
+| `universal` | both, merged with `lipo` |
+
+```bash
+WEBVIEW_CEF_MACOS_ARCH=universal CEF_WRAPPER_BUILD_TYPE=Release pod install
+cd .. && flutter build macos --release
+```
+
+A universal build downloads both CEF distributions and compiles the wrapper twice, so it takes about twice as long and needs roughly 8 GB of free scratch space. The framework binary, the ANGLE/SwiftShader dylibs beside it, `libcef_dll_wrapper.a`, and the helper executable are merged with `lipo`, then each is checked for the expected slices; the "Embed CEF Helpers" build phase fails the build if the helper does not cover every architecture the app is being built for. The selected value is recorded in `macos/third/cef/version.txt`, so changing it re-prepares `macos/third/cef` on the next `pod install`.
 
 ### Linux
 
@@ -334,7 +350,7 @@ The CEF/Chromium version is pinned in one place — `CEF_VERSION` in [`third/dow
 - [x] DevTools
 - [x] GPU zero-copy rendering & adaptive frame rate (Windows & macOS)
 - [x] Easier macOS multi-process helper-bundle integration (one-line Podfile hook)
-- [ ] Universal (arm64 + x86_64) macOS builds (needs a lipo'd CEF)
+- [x] Universal (arm64 + x86_64) macOS builds
 - [ ] Tear-free GPU sync (keyed-mutex) on Windows
 
 Pull requests are welcome. Every PR runs build + `flutter analyze` CI on Windows, macOS, and Linux.

@@ -54,3 +54,54 @@ jobs:
         working-directory: example
         run: flutter analyze
       - run: cd example && flutter build macos
+
+  universal:
+    # Universal (arm64 + x86_64) build: WEBVIEW_CEF_MACOS_ARCH=universal makes
+    # the podspec keep both architectures and download_cef.sh lipo the CEF
+    # framework, wrapper and helper. Everything is prepared by `pod install`,
+    # so nothing is downloaded by hand here.
+    runs-on: macos-latest
+    env:
+      WEBVIEW_CEF_MACOS_ARCH: universal
+      CEF_WRAPPER_BUILD_TYPE: Release
+    steps:
+      - name: Clone repository
+        uses: actions/checkout@v4
+      - name: Set up Flutter
+        uses: subosito/flutter-action@v2
+        with:
+          channel: stable
+      - name: Install build tools
+        run: brew install ninja cmake
+      - name: Build example app
+        working-directory: example
+        run: flutter build macos --release
+      - name: Check every Mach-O binary is universal
+        run: |
+          set -eo pipefail
+          app="$(ls -d example/build/macos/Build/Products/Release/*.app | head -1)"
+          fw="${app}/Contents/Frameworks/Chromium Embedded Framework.framework"
+          binaries=("${app}/Contents/MacOS/"* "${fw}/Chromium Embedded Framework" "${fw}/Libraries/"*.dylib)
+          # The five CEF helper .app bundles embedded by embed_cef_helpers.sh.
+          helpers=("${app}/Contents/Frameworks/"*Helper*.app)
+          if [ "${#helpers[@]}" -ne 5 ]; then
+            echo "::error::expected 5 embedded CEF helper bundles, found ${#helpers[@]}"
+            exit 1
+          fi
+          for helper in "${helpers[@]}"; do
+            binaries+=("${helper}/Contents/MacOS/"*)
+          done
+          status=0
+          for binary in "${binaries[@]}"; do
+            archs="$(lipo -archs "${binary}" 2>/dev/null || echo "")"
+            echo "${archs:-<not mach-o>}  ${binary#${app}/}"
+            case " ${archs} " in
+              *" arm64 "*) ;;
+              *) echo "::error::${binary} has no arm64 slice"; status=1 ;;
+            esac
+            case " ${archs} " in
+              *" x86_64 "*) ;;
+              *) echo "::error::${binary} has no x86_64 slice"; status=1 ;;
+            esac
+          done
+          exit ${status}

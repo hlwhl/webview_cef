@@ -21,6 +21,24 @@ if [ ! -f "${HELPER_BIN}" ]; then
   exit 0
 fi
 
+# The helper is prepared by download_cef.sh for the architectures selected with
+# WEBVIEW_CEF_MACOS_ARCH. If the app is being built for an architecture the
+# helper does not contain, the bundles would embed fine and then fail to launch
+# at runtime on that architecture, so fail the build with an actionable message.
+if [ -n "${ARCHS:-}" ]; then
+  helper_archs="$(lipo -archs "${HELPER_BIN}" 2>/dev/null || echo "")"
+  for arch in ${ARCHS}; do
+    case " ${helper_archs} " in
+      *" ${arch} "*) ;;
+      *)
+        echo "error: webview_cef helper has no ${arch} slice (has: ${helper_archs:-none}) while building for '${ARCHS}'." >&2
+        echo "note: re-run pod install with WEBVIEW_CEF_MACOS_ARCH=universal to prepare a universal CEF." >&2
+        exit 1
+        ;;
+    esac
+  done
+fi
+
 BASE="${EXECUTABLE_NAME} Helper"
 DEST="${TARGET_BUILD_DIR}/${FRAMEWORKS_FOLDER_PATH}"
 IDENTITY="${EXPANDED_CODE_SIGN_IDENTITY:--}"
