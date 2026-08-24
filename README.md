@@ -133,7 +133,7 @@ Requirements: `cmake` (and `ninja`, otherwise `make` is used) must be on `PATH` 
 | `universal` | both, merged with `lipo` |
 
 ```bash
-WEBVIEW_CEF_MACOS_ARCH=universal CEF_WRAPPER_BUILD_TYPE=Release pod install
+WEBVIEW_CEF_MACOS_ARCH=universal pod install
 cd .. && flutter build macos --release
 ```
 

@@ -132,7 +132,7 @@ macOS 走 CocoaPods，不跑 CMake 的下载流程。改由 podspec 的 `prepare
 | `universal` | 两者，用 `lipo` 合并 |
 
 ```bash
-WEBVIEW_CEF_MACOS_ARCH=universal CEF_WRAPPER_BUILD_TYPE=Release pod install
+WEBVIEW_CEF_MACOS_ARCH=universal pod install
 cd .. && flutter build macos --release
 ```
 

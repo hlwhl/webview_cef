@@ -53,7 +53,6 @@ jobs:
     runs-on: macos-latest
     env:
       WEBVIEW_CEF_MACOS_ARCH: universal
-      CEF_WRAPPER_BUILD_TYPE: Release
     steps:
       - name: Clone repository
         uses: actions/checkout@v4
