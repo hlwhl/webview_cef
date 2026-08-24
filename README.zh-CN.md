@@ -290,7 +290,7 @@ final controller = WebviewManager().createWebView(injectUserScripts: scripts);
 
 ## 升级 CEF
 
-CEF/Chromium 版本只在一处管理 —— [`third/download.cmake`](third/download.cmake) 里的 `CEF_VERSION`。修改它即可升级三端的 CEF：Windows 与 Linux 自动下载，macOS 也读取同一个 `CEF_VERSION`（通过 podspec `prepare_command` 运行的 [`macos/scripts/download_cef.sh`](macos/scripts/download_cef.sh)），在下次 `pod install` 时重新下载，无需手动放置。唯一的额外步骤是同步 [`.github/workflows/test_macos.yaml`](.github/workflows/test_macos.yaml) 里硬编码的 `CEF_VERSION`。
+CEF/Chromium 版本只在一处管理 —— [`third/download.cmake`](third/download.cmake) 里的 `CEF_VERSION`。修改它即可升级三端的 CEF：Windows 与 Linux 自动下载，macOS 也读取同一个 `CEF_VERSION`（通过 podspec `prepare_command` 运行的 [`macos/scripts/download_cef.sh`](macos/scripts/download_cef.sh)），在下次 `pod install` 时重新下载，无需手动放置。
 
 ---
 
