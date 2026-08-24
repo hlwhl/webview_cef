@@ -2,16 +2,23 @@
 # To learn more about a Podspec see http://guides.cocoapods.org/syntax/podspec.html.
 # Run `pod lib lint webview_cef.podspec` to validate before publishing.
 #
+# Metadata mirrors pubspec.yaml; the version is read from it so the two cannot
+# drift apart (this pod is consumed by path, never published to trunk).
+pubspec = File.read(File.join(__dir__, '..', 'pubspec.yaml'))
+plugin_version = pubspec[/^version:\s*(\S+)/, 1] or
+  raise 'webview_cef: could not read version from pubspec.yaml'
+
 Pod::Spec.new do |s|
   s.name             = 'webview_cef'
-  s.version          = '0.2.3'
+  s.version          = plugin_version
   s.summary          = 'Flutter webview backed by CEF (Chromium Embedded Framework)'
   s.description      = <<-DESC
-Flutter webview backed by CEF (Chromium Embedded Framework)
+Flutter desktop webview backed by CEF (Chromium Embedded Framework). Renders
+Chromium off-screen and presents it inside a Flutter Texture.
                        DESC
-  s.homepage         = 'http://example.com'
+  s.homepage         = 'https://github.com/hlwhl/webview_cef'
   s.license          = { :file => '../LICENSE' }
-  s.author           = { 'Your Company' => 'email@example.com' }
+  s.author           = { 'hlwhl' => 'https://github.com/hlwhl/webview_cef' }
 
   s.source           = { :path => '.' }
   s.source_files     = 'Classes/**/*'
