@@ -136,7 +136,7 @@ WEBVIEW_CEF_MACOS_ARCH=universal pod install
 cd .. && flutter build macos --release
 ```
 
-Universal 构建会下载两份 CEF 发行包并编译两次 wrapper，耗时约为原来的两倍，并需要约 8 GB 临时空间。framework 二进制、其旁边的 ANGLE/SwiftShader dylib、`libcef_dll_wrapper.a` 以及 helper 可执行文件都会用 `lipo` 合并，随后逐个校验切片是否齐全；若 helper 缺少 App 正在构建的某个架构，"Embed CEF Helpers" 构建阶段会直接报错。所选取值会写入 `macos/third/cef/version.txt`，因此改动后下次 `pod install` 会重新准备 `macos/third/cef`。
+Universal 构建会下载两份 CEF 发行包并编译两次 wrapper，耗时约为原来的两倍，并需要约 8 GB 临时空间。framework 二进制、其旁边的 ANGLE/SwiftShader dylib、`libcef_dll_wrapper.a` 以及 helper 可执行文件都会用 `lipo` 合并，随后逐个校验切片是否齐全。Chromium 的 V8 启动快照按架构区分文件名（`v8_context_snapshot.<arch>.bin`），两份都会放进 framework 的 `Resources`，运行时按架构选取；若 helper 缺少 App 正在构建的某个架构，"Embed CEF Helpers" 构建阶段会直接报错。所选取值会写入 `macos/third/cef/version.txt`，因此改动后下次 `pod install` 会重新准备 `macos/third/cef`。
 
 ### Linux
 

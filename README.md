@@ -137,7 +137,7 @@ WEBVIEW_CEF_MACOS_ARCH=universal pod install
 cd .. && flutter build macos --release
 ```
 
-A universal build downloads both CEF distributions and compiles the wrapper twice, so it takes about twice as long and needs roughly 8 GB of free scratch space. The framework binary, the ANGLE/SwiftShader dylibs beside it, `libcef_dll_wrapper.a`, and the helper executable are merged with `lipo`, then each is checked for the expected slices; the "Embed CEF Helpers" build phase fails the build if the helper does not cover every architecture the app is being built for. The selected value is recorded in `macos/third/cef/version.txt`, so changing it re-prepares `macos/third/cef` on the next `pod install`.
+A universal build downloads both CEF distributions and compiles the wrapper twice, so it takes about twice as long and needs roughly 8 GB of free scratch space. The framework binary, the ANGLE/SwiftShader dylibs beside it, `libcef_dll_wrapper.a`, and the helper executable are merged with `lipo`, then each is checked for the expected slices. Chromium's V8 startup snapshot is architecture specific (`v8_context_snapshot.<arch>.bin`), so both are copied into the framework's `Resources` and the right one is picked at runtime; the "Embed CEF Helpers" build phase fails the build if the helper does not cover every architecture the app is being built for. The selected value is recorded in `macos/third/cef/version.txt`, so changing it re-prepares `macos/third/cef` on the next `pod install`.
 
 ### Linux
 

@@ -153,9 +153,9 @@ lipo -create "${wrappers[@]}" -output "${DEST}/libcef_dll_wrapper.a"
 verify_archs "${DEST}/libcef_dll_wrapper.a"
 
 # Lay the framework out as a versioned macOS bundle (Xcode embed/sign requires
-# Versions/Current/Resources/Info.plist; CEF ships a flat bundle). The Resources
-# (locales, .pak/.dat blobs) are architecture independent, so they are taken
-# from the primary distribution; the Mach-O parts are merged.
+# Versions/Current/Resources/Info.plist; CEF ships a flat bundle). Most Resources
+# (locales, .pak/.dat blobs) are architecture independent, so they are taken from
+# the primary distribution; the Mach-O parts and the V8 snapshot are merged.
 FW_SRC="${PRIMARY}/Release/Chromium Embedded Framework.framework"
 FW_DST="${DEST}/Chromium Embedded Framework.framework"
 mkdir -p "${FW_DST}/Versions/A"
@@ -166,6 +166,18 @@ ln -sfn A "${FW_DST}/Versions/Current"
 ln -sfn "Versions/Current/Chromium Embedded Framework" "${FW_DST}/Chromium Embedded Framework"
 ln -sfn Versions/Current/Libraries "${FW_DST}/Libraries"
 ln -sfn Versions/Current/Resources "${FW_DST}/Resources"
+
+# The V8 startup snapshot is the one architecture-dependent resource. Chromium
+# names it per architecture (v8_context_snapshot.<arch>.bin) precisely so a
+# universal bundle can carry both and pick the right one at runtime, so each
+# distribution's snapshot has to be copied in — the Resources above only carry
+# the primary architecture's.
+for arch in "${ARCHS[@]}"; do
+  snapshot="v8_context_snapshot.${arch}.bin"
+  snapshot_src="${WORK}/$(cef_package "${arch}")/Release/Chromium Embedded Framework.framework/Resources/${snapshot}"
+  [ -f "${snapshot_src}" ] || err "${snapshot} not found in the ${arch} distribution"
+  cp "${snapshot_src}" "${FW_DST}/Versions/A/Resources/${snapshot}"
+done
 
 if [ "${#ARCHS[@]}" -gt 1 ]; then
   echo "==> Merging framework binaries (${ARCHS[*]})"

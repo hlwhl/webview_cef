@@ -94,3 +94,21 @@ jobs:
             esac
           done
           exit ${status}
+      - name: Check both V8 context snapshots are present
+        run: |
+          set -eo pipefail
+          app="$(ls -d example/build/macos/Build/Products/Release/*.app | head -1)"
+          res="${app}/Contents/Frameworks/Chromium Embedded Framework.framework/Resources"
+          status=0
+          # Chromium picks v8_context_snapshot.<arch>.bin at runtime, so a
+          # universal app needs both — fat Mach-O files alone are not enough.
+          for arch in arm64 x86_64; do
+            snapshot="${res}/v8_context_snapshot.${arch}.bin"
+            if [ -f "${snapshot}" ]; then
+              echo "$(stat -f%z "${snapshot}") bytes  v8_context_snapshot.${arch}.bin"
+            else
+              echo "::error::missing v8_context_snapshot.${arch}.bin"
+              status=1
+            fi
+          done
+          exit ${status}
