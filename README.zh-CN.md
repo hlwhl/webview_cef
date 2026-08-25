@@ -27,7 +27,7 @@
 | 平台 | 最低版本 | 架构 |
 | --- | --- | --- |
 | Windows | Windows 10 | x64 |
-| macOS | macOS 12.0 | arm64 或 x86_64（仅本机架构，非 Universal） |
+| macOS | macOS 12.0 | arm64、x86_64 或 Universal（arm64 + x86_64） |
 | Linux | — | x64、arm64 |
 
 ## 环境要求
@@ -44,7 +44,7 @@
 - **工具链** —— 升级到 Flutter **≥ 3.27.0** / Dart **≥ 3.6.0**（原为 2.5.0 / 2.17.1）。原生构建现在需要 **C++20**（CEF 149）；请确保你的工程没有把插件 target 强制设为更低的 C++ 标准。
 - **移除的 Dart API** —— `WebviewCefPlatform`、`MethodChannelWebviewCef`、`getPlatformVersion()` 已移除（同时移除了 `plugin_platform_interface` 依赖）。它们本就不是对外 API，且无替代（`getPlatformVersion` 仅返回演示值）。请只 import `package:webview_cef/webview_cef.dart`，使用 `WebviewManager` / `WebViewController`。
 - **Windows** —— `initCEFProcesses` 签名变更。请更新 `windows/runner/main.cpp`：它现在接收 `HINSTANCE` 并返回子进程退出码，且必须作为 `wWinMain` 的第一条语句立即返回（见下方 Windows 安装片段）。最低系统现为 **Windows 10**。
-- **macOS** —— 把部署目标提升到 **12.0**：在 `macos/Podfile` 设置 `platform :osx, '12.0'`，并在 Xcode 中把 Runner target 的 macOS Deployment Target 也设为 12.0（CEF 149 的 framework 以 12.0 构建）。要启用多进程渲染，请在 `macos/Podfile` 的 `post_install` 中加入一行钩子（见 macOS 安装一节）。构建现在**仅针对本机架构**（arm64 *或* x86_64）—— 不再生成 Universal 包。
+- **macOS** —— 把部署目标提升到 **12.0**：在 `macos/Podfile` 设置 `platform :osx, '12.0'`，并在 Xcode 中把 Runner target 的 macOS Deployment Target 也设为 12.0（CEF 149 的 framework 以 12.0 构建）。要启用多进程渲染，请在 `macos/Podfile` 的 `post_install` 中加入一行钩子（见 macOS 安装一节）。构建默认只针对**本机架构**（arm64 *或* x86_64）；在 `pod install` 前设置 `WEBVIEW_CEF_MACOS_ARCH=universal` 即可生成 Universal（arm64 + x86_64）App。
 
 ---
 
@@ -114,13 +114,29 @@
 
    然后 `pod install`(`flutter run` 会自动跑)。它会装一个 "Embed CEF Helpers" 构建阶段,把预编译的 helper 克隆成 5 个 CEF 子进程 `.app` 嵌进你的 App —— 无需手动加 Xcode target。**不加这个钩子插件也能用,但会回退单进程**(Chromium 不支持的模式:无崩溃隔离、V8 proxy resolver 被禁等)。
 
-macOS 走 CocoaPods，不跑 CMake 的下载流程。改由 podspec 的 `prepare_command` 在 `pod install` 时运行 [`macos/scripts/download_cef.sh`](macos/scripts/download_cef.sh)，逻辑与 Windows/Linux 对齐：下载与本机架构匹配的官方 CEF *Standard Distribution*（来自 <https://cef-builds.spotifycdn.com>，版本由 [`third/download.cmake`](third/download.cmake) 的 `CEF_VERSION` 固定），从源码编译 `libcef_dll_wrapper`，把 framework 整理成 versioned macOS bundle，并安装进（已 git-ignore 的）`macos/third/cef`。所以首次 `pod install` 会明显变慢；之后只要版本未变即为 no-op。
+macOS 走 CocoaPods，不跑 CMake 的下载流程。改由 podspec 的 `prepare_command` 在 `pod install` 时运行 [`macos/scripts/download_cef.sh`](macos/scripts/download_cef.sh)，逻辑与 Windows/Linux 对齐：下载所选架构的官方 CEF *Standard Distribution*（来自 <https://cef-builds.spotifycdn.com>，版本由 [`third/download.cmake`](third/download.cmake) 的 `CEF_VERSION` 固定），从源码编译 `libcef_dll_wrapper`，把 framework 整理成 versioned macOS bundle，并安装进（已 git-ignore 的）`macos/third/cef`。所以首次 `pod install` 会明显变慢；之后只要版本未变即为 no-op。
 
 要求：`PATH` 上需有 `cmake`（以及 `ninja`，否则退回 `make`）来编译 wrapper —— `brew install cmake ninja`。
 
 > wrapper 默认编 `Debug`，以匹配 `flutter run` / `flutter build macos --debug`。如需 release 构建，在 `pod install` 前设置 `CEF_WRAPPER_BUILD_TYPE=Release`（debug 与 release 需要对应配置编译的 wrapper —— `#if DCHECK_IS_ON()` 会改变其 ABI）。
 
-> 脚本只为本机架构编译（arm64 **或** x86_64）。如需 Universal（arm64 + x86_64）App，用 `lipo` 合并 wrapper 并使用 universal framework，详见 [#30](/../../issues/30)。**`[征集帮助]`** 更优雅的二进制分发方式。
+#### 选择架构
+
+`WEBVIEW_CEF_MACOS_ARCH` 决定准备哪些架构。下载脚本与 podspec 读取同一个变量，因此 CEF 二进制与 App 的 `EXCLUDED_ARCHS` 始终一致。
+
+| 取值 | 结果 |
+| --- | --- |
+| `host`（默认） | 构建机器的架构 |
+| `arm64` | 仅 Apple Silicon |
+| `x86_64` | 仅 Intel |
+| `universal` | 两者，用 `lipo` 合并 |
+
+```bash
+WEBVIEW_CEF_MACOS_ARCH=universal pod install
+cd .. && flutter build macos --release
+```
+
+Universal 构建会下载两份 CEF 发行包并编译两次 wrapper，耗时约为原来的两倍，并需要约 8 GB 临时空间。framework 二进制、其旁边的 ANGLE/SwiftShader dylib、`libcef_dll_wrapper.a` 以及 helper 可执行文件都会用 `lipo` 合并，随后逐个校验切片是否齐全。Chromium 的 V8 启动快照按架构区分文件名（`v8_context_snapshot.<arch>.bin`），两份都会放进 framework 的 `Resources`，运行时按架构选取；若 helper 缺少 App 正在构建的某个架构，"Embed CEF Helpers" 构建阶段会直接报错。所选取值会写入 `macos/third/cef/version.txt`，因此改动后下次 `pod install` 会重新准备 `macos/third/cef`。
 
 ### Linux
 
@@ -274,7 +290,7 @@ final controller = WebviewManager().createWebView(injectUserScripts: scripts);
 
 ## 升级 CEF
 
-CEF/Chromium 版本只在一处管理 —— [`third/download.cmake`](third/download.cmake) 里的 `CEF_VERSION`。修改它即可升级三端的 CEF：Windows 与 Linux 自动下载，macOS 也读取同一个 `CEF_VERSION`（通过 podspec `prepare_command` 运行的 [`macos/scripts/download_cef.sh`](macos/scripts/download_cef.sh)），在下次 `pod install` 时重新下载，无需手动放置。唯一的额外步骤是同步 [`.github/workflows/test_macos.yaml`](.github/workflows/test_macos.yaml) 里硬编码的 `CEF_VERSION`。
+CEF/Chromium 版本只在一处管理 —— [`third/download.cmake`](third/download.cmake) 里的 `CEF_VERSION`。修改它即可升级三端的 CEF：Windows 与 Linux 自动下载，macOS 也读取同一个 `CEF_VERSION`（通过 podspec `prepare_command` 运行的 [`macos/scripts/download_cef.sh`](macos/scripts/download_cef.sh)），在下次 `pod install` 时重新下载，无需手动放置。
 
 ---
 
@@ -301,7 +317,7 @@ CEF/Chromium 版本只在一处管理 —— [`third/download.cmake`](third/down
 - [x] DevTools
 - [x] GPU 零拷贝渲染与自适应帧率（Windows 与 macOS）
 - [x] 更简单的 macOS 多进程 helper bundle 集成（一行 Podfile 钩子）
-- [ ] macOS Universal（arm64 + x86_64）构建（需要 lipo 合并的 CEF）
+- [x] macOS Universal（arm64 + x86_64）构建
 - [ ] Windows 上无撕裂的 GPU 同步（keyed-mutex）
 
 欢迎提交 PR。每个 PR 都会在 Windows、macOS、Linux 上运行构建 + `flutter analyze` CI。

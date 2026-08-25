@@ -31,22 +31,12 @@ jobs:
           channel: stable
       - name: Install build tools
         run: brew install ninja cmake
-      # macOS uses CocoaPods (not third/download.cmake), so the CEF framework and
-      # libcef_dll_wrapper must be placed into macos/third/cef manually.
-      # Keep CEF_VERSION in sync with third/download.cmake.
+      # Prepare macos/third/cef with the same script the podspec's
+      # prepare_command runs, so the CEF version comes from third/download.cmake
+      # instead of being pinned a second time here. `pod install` then finds it
+      # already prepared and does not download CEF again.
       - name: Download CEF and build libcef_dll_wrapper
-        run: |
-          set -eo pipefail
-          CEF_VERSION="149.0.4+g2f1bfd8+chromium-149.0.7827.156"
-          NAME="cef_binary_${CEF_VERSION}_macosarm64"
-          URL_NAME=$(printf '%s' "$NAME" | sed 's/+/%2B/g')
-          curl -L -o cef.tar.bz2 "https://cef-builds.spotifycdn.com/${URL_NAME}.tar.bz2"
-          tar -xjf cef.tar.bz2
-          cmake -S "$NAME" -B "$NAME/build" -G Ninja -DPROJECT_ARCH=arm64 -DCMAKE_BUILD_TYPE=Release
-          cmake --build "$NAME/build" --target libcef_dll_wrapper
-          mkdir -p macos/third/cef
-          cp -R "$NAME/Release/Chromium Embedded Framework.framework" macos/third/cef/
-          cp "$NAME/build/libcef_dll_wrapper/libcef_dll_wrapper.a" macos/third/cef/
+        run: bash macos/scripts/download_cef.sh
       - run: flutter --version
       - name: Analyze plugin
         run: flutter analyze
@@ -54,3 +44,71 @@ jobs:
         working-directory: example
         run: flutter analyze
       - run: cd example && flutter build macos
+
+  universal:
+    # Universal (arm64 + x86_64) build: WEBVIEW_CEF_MACOS_ARCH=universal makes
+    # the podspec keep both architectures and download_cef.sh lipo the CEF
+    # framework, wrapper and helper. Everything is prepared by `pod install`,
+    # so nothing is downloaded by hand here.
+    runs-on: macos-latest
+    env:
+      WEBVIEW_CEF_MACOS_ARCH: universal
+    steps:
+      - name: Clone repository
+        uses: actions/checkout@v4
+      - name: Set up Flutter
+        uses: subosito/flutter-action@v2
+        with:
+          channel: stable
+      - name: Install build tools
+        run: brew install ninja cmake
+      - name: Build example app
+        working-directory: example
+        run: flutter build macos --release
+      - name: Check every Mach-O binary is universal
+        run: |
+          set -eo pipefail
+          app="$(ls -d example/build/macos/Build/Products/Release/*.app | head -1)"
+          fw="${app}/Contents/Frameworks/Chromium Embedded Framework.framework"
+          binaries=("${app}/Contents/MacOS/"* "${fw}/Chromium Embedded Framework" "${fw}/Libraries/"*.dylib)
+          # The five CEF helper .app bundles embedded by embed_cef_helpers.sh.
+          helpers=("${app}/Contents/Frameworks/"*Helper*.app)
+          if [ "${#helpers[@]}" -ne 5 ]; then
+            echo "::error::expected 5 embedded CEF helper bundles, found ${#helpers[@]}"
+            exit 1
+          fi
+          for helper in "${helpers[@]}"; do
+            binaries+=("${helper}/Contents/MacOS/"*)
+          done
+          status=0
+          for binary in "${binaries[@]}"; do
+            archs="$(lipo -archs "${binary}" 2>/dev/null || echo "")"
+            echo "${archs:-<not mach-o>}  ${binary#${app}/}"
+            case " ${archs} " in
+              *" arm64 "*) ;;
+              *) echo "::error::${binary} has no arm64 slice"; status=1 ;;
+            esac
+            case " ${archs} " in
+              *" x86_64 "*) ;;
+              *) echo "::error::${binary} has no x86_64 slice"; status=1 ;;
+            esac
+          done
+          exit ${status}
+      - name: Check both V8 context snapshots are present
+        run: |
+          set -eo pipefail
+          app="$(ls -d example/build/macos/Build/Products/Release/*.app | head -1)"
+          res="${app}/Contents/Frameworks/Chromium Embedded Framework.framework/Resources"
+          status=0
+          # Chromium picks v8_context_snapshot.<arch>.bin at runtime, so a
+          # universal app needs both — fat Mach-O files alone are not enough.
+          for arch in arm64 x86_64; do
+            snapshot="${res}/v8_context_snapshot.${arch}.bin"
+            if [ -f "${snapshot}" ]; then
+              echo "$(stat -f%z "${snapshot}") bytes  v8_context_snapshot.${arch}.bin"
+            else
+              echo "::error::missing v8_context_snapshot.${arch}.bin"
+              status=1
+            fi
+          done
+          exit ${status}
