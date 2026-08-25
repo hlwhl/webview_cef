@@ -1,4 +1,4 @@
-## Unreleased
+## 0.6.2
 - macOS: added universal (arm64 + x86_64) builds. `WEBVIEW_CEF_MACOS_ARCH` (`host`, `arm64`, `x86_64`, `universal`) is read by both `macos/scripts/download_cef.sh` and the podspec, so the prepared CEF slices and `EXCLUDED_ARCHS` always match; the framework, its ANGLE/SwiftShader dylibs, `libcef_dll_wrapper.a`, and the helper executable are merged with `lipo` and verified, and the helper embed phase fails the build if the helper does not cover every architecture being built.
 
 ## 0.6.1
