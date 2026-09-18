@@ -60,7 +60,8 @@ class WebviewManager extends ValueNotifier<bool> {
   ///
   /// [rootCachePath] is the directory CEF stores its user data in. Leaving it out makes CEF use
   /// the platform default, where it also keeps the process singleton lock that lets a second
-  /// instance hand its request to the first one and exit.
+  /// instance hand its request to the first one and exit. CEF only accepts an absolute path, a
+  /// relative one is resolved against the working directory of the process.
   Future<void> initialize({String? userAgent, String? rootCachePath}) async {
     _creatingCompleter = Completer<void>();
     try {

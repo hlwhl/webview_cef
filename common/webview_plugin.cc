@@ -725,14 +725,33 @@ namespace webview_cef {
 		// browser, and a home the app may not write to stops CEF right away. CEF expects the
 		// directory to exist.
 		if(!rootCachePath.empty()){
+			// The narrow string of CefString is UTF-8, but on Windows std::filesystem::path decodes
+			// narrow strings in the active code page, so the wide string is used there
+#ifdef OS_WIN
+			std::filesystem::path cachePath(rootCachePath.ToWString());
+#else
+			std::filesystem::path cachePath(rootCachePath.ToString());
+#endif
+			// CEF requires an absolute path and clears a relative one while normalizing its
+			// settings, which would put the cache back into the default directory unnoticed
 			std::error_code error;
-			std::filesystem::create_directories(rootCachePath.ToString(), error);
+			cachePath = std::filesystem::absolute(cachePath, error).lexically_normal();
+			if(!error){
+				std::filesystem::create_directories(cachePath, error);
+			}
+
 			if(error){
-				std::cout << "webview_cef: could not create root cache path " << rootCachePath.ToString()
+				// The path given by the embedder is logged, converting the resolved one back to a
+				// narrow string would run through the code page conversion again
+				std::cout << "webview_cef: could not prepare root cache path " << rootCachePath.ToString()
 						  << " (" << error.message() << "), falling back to the CEF default" << std::endl;
 			}
 			else{
-				CefString(&cefs.root_cache_path) = rootCachePath;
+#ifdef OS_WIN
+				CefString(&cefs.root_cache_path) = cachePath.wstring();
+#else
+				CefString(&cefs.root_cache_path) = cachePath.string();
+#endif
 			}
 		}
 		//locale language setting
