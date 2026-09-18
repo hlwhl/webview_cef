@@ -5,6 +5,9 @@
 #endif
 
 #include <math.h>
+#include <filesystem>
+#include <memory>
+#include <math.h>
 #include <memory>
 #include <thread>
 #include <iostream>
@@ -14,6 +17,7 @@ namespace webview_cef {
 	CefMainArgs mainArgs;
 	CefRefPtr<WebviewApp> app;
 	CefString userAgent;
+	CefString rootCachePath;
 	bool isCefInitialized = false;
 #ifdef OS_MAC
 	std::string g_macSubprocessPath;
@@ -268,7 +272,20 @@ namespace webview_cef {
 		if (name.compare("init") == 0){
 			if(!isCefInitialized){
 				if(values != nullptr){
-					userAgent = CefString(webview_value_get_string(values));
+					// A plain string is the user agent, a map carries the settings by name
+					if(webview_value_get_type(values) == Webview_Value_Type_Map){
+						WValue* agent = webview_value_get_by_string(values, "userAgent");
+						if(agent != nullptr && webview_value_get_type(agent) == Webview_Value_Type_String){
+							userAgent = CefString(webview_value_get_string(agent));
+						}
+						WValue* cachePath = webview_value_get_by_string(values, "rootCachePath");
+						if(cachePath != nullptr && webview_value_get_type(cachePath) == Webview_Value_Type_String){
+							rootCachePath = CefString(webview_value_get_string(cachePath));
+						}
+					}
+					else{
+						userAgent = CefString(webview_value_get_string(values));
+					}
 				}
 				startCEF();
 			}
@@ -701,6 +718,41 @@ namespace webview_cef {
 		cefs.no_sandbox = true;
 		if(!userAgent.empty()){
 			CefString(&cefs.user_agent_product) = userAgent;
+		}
+		// Without a root cache path CEF uses the platform default (~/.config/cef_user_data on
+		// Linux) and keeps its process singleton lock there, see the warning CEF logs about it.
+		// A lock left behind by an app that was killed keeps the next start from opening a
+		// browser, and a home the app may not write to stops CEF right away. CEF expects the
+		// directory to exist.
+		if(!rootCachePath.empty()){
+			// The narrow string of CefString is UTF-8, but on Windows std::filesystem::path decodes
+			// narrow strings in the active code page, so the wide string is used there
+#ifdef OS_WIN
+			std::filesystem::path cachePath(rootCachePath.ToWString());
+#else
+			std::filesystem::path cachePath(rootCachePath.ToString());
+#endif
+			// CEF requires an absolute path and clears a relative one while normalizing its
+			// settings, which would put the cache back into the default directory unnoticed
+			std::error_code error;
+			cachePath = std::filesystem::absolute(cachePath, error).lexically_normal();
+			if(!error){
+				std::filesystem::create_directories(cachePath, error);
+			}
+
+			if(error){
+				// The path given by the embedder is logged, converting the resolved one back to a
+				// narrow string would run through the code page conversion again
+				std::cout << "webview_cef: could not prepare root cache path " << rootCachePath.ToString()
+						  << " (" << error.message() << "), falling back to the CEF default" << std::endl;
+			}
+			else{
+#ifdef OS_WIN
+				CefString(&cefs.root_cache_path) = cachePath.wstring();
+#else
+				CefString(&cefs.root_cache_path) = cachePath.string();
+#endif
+			}
 		}
 		//locale language setting
 		//CefString(&cefs.locale) = "zh-CN";
