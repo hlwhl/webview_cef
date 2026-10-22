@@ -1,4 +1,5 @@
 import 'dart:async';
+import 'dart:convert';
 
 import 'package:flutter/gestures.dart';
 import 'package:flutter/material.dart';
@@ -64,6 +65,26 @@ class WebViewController extends ValueNotifier<bool> {
               JavascriptMessage(message, callbackId, frameId));
         } else {
           debugPrint('Channel "$channelName" is not exists');
+          // The page may be waiting on a reply. Answer with an error rather
+          // than dropping it, or its callback is never called and the caller
+          // hangs silently.
+          //
+          // The failure has to travel in the payload: sendJavaScriptChannelCallBack's
+          // |error| flag is not forwarded to the page (ExecuteJSCallbackFunc
+          // passes only the callback id and the result).
+          //
+          // Replied to unconditionally: the browser allocates a request id for
+          // every message, so callbackId cannot tell us whether the page passed
+          // a callback. For a page that did not, ExecuteJSCallbackFunc drops
+          // the reply.
+          sendJavaScriptChannelCallBack(
+              true,
+              jsonEncode({
+                'ok': false,
+                'error': 'no such channel: $channelName',
+              }),
+              callbackId,
+              frameId);
         }
       };
 
