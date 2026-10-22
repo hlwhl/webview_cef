@@ -3,7 +3,8 @@ class JavascriptMessage {
   /// Constructs a JavaScript message object.
   ///
   /// The `message` parameter must not be null.
-  const JavascriptMessage(this.message, this.callbackId, this.frameId);
+  const JavascriptMessage(this.message, this.callbackId, this.frameId,
+      {this.frameUrl = '', this.isMainFrame = true});
 
   /// The contents of the message that was sent by the JavaScript code.
   final String message;
@@ -12,6 +13,16 @@ class JavascriptMessage {
   final String callbackId;
   //  the frameId of the webview frame
   final String frameId;
+
+  /// The URL of the frame that sent the message.
+  ///
+  /// Any frame can send messages, including cross-origin iframes and whatever
+  /// site the view has navigated to, so a handler that does anything
+  /// privileged should check this against the origins it trusts.
+  final String frameUrl;
+
+  /// Whether the message came from the main frame rather than an iframe.
+  final bool isMainFrame;
 }
 
 final RegExp _validChannelNames = RegExp('^[a-zA-Z_][a-zA-Z0-9.]*\$');

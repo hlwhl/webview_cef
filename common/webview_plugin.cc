@@ -144,7 +144,7 @@ namespace webview_cef {
 				}
 			};
 
-			m_handler->onJavaScriptChannelMessage = [=, this](std::string channelName, std::string message, std::string callbackId, int browserId, std::string frameId)
+			m_handler->onJavaScriptChannelMessage = [=, this](std::string channelName, std::string message, std::string callbackId, int browserId, std::string frameId, std::string frameUrl, bool isMainFrame)
 			{
 				if (m_invokeFunc)
 				{
@@ -154,11 +154,15 @@ namespace webview_cef {
 					WValue* cbId = webview_value_new_string(const_cast<char*>(callbackId.c_str()));
 					WValue* bId = webview_value_new_int(browserId);
 					WValue* fId = webview_value_new_string(const_cast<char*>(frameId.c_str()));
+					WValue* fUrl = webview_value_new_string(const_cast<char*>(frameUrl.c_str()));
+					WValue* isMain = webview_value_new_bool(isMainFrame);
 					webview_value_set_string(retMap, "channel", channel);
 					webview_value_set_string(retMap, "message", msg);
 					webview_value_set_string(retMap, "callbackId", cbId);
 					webview_value_set_string(retMap, "browserId", bId);
 					webview_value_set_string(retMap, "frameId", fId);
+					webview_value_set_string(retMap, "frameUrl", fUrl);
+					webview_value_set_string(retMap, "isMainFrame", isMain);
 					m_invokeFunc("javascriptChannelMessage", retMap);
 					webview_value_unref(retMap);
 					webview_value_unref(channel);
@@ -166,6 +170,8 @@ namespace webview_cef {
 					webview_value_unref(cbId);
 					webview_value_unref(bId);
 					webview_value_unref(fId);
+					webview_value_unref(fUrl);
+					webview_value_unref(isMain);
 				}
 			};
 

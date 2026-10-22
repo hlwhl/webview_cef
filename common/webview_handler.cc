@@ -83,7 +83,8 @@ bool WebviewHandler::OnProcessMessageReceived(
 	    }
 
         onJavaScriptChannelMessage(
-            fun_name,param,stringpatch::to_string(js_callback_id), browser->GetIdentifier(), frame->GetIdentifier().ToString());
+            fun_name,param,stringpatch::to_string(js_callback_id), browser->GetIdentifier(), frame->GetIdentifier().ToString(),
+            frame->GetURL().ToString(), frame->IsMain());
     }
     else if(message_name == kEvaluateCallbackMessage){
         CefString callbackId = message->GetArgumentList()->GetString(0);
@@ -680,15 +681,16 @@ void WebviewHandler::sendJavaScriptChannelCallBack(const bool error, const std::
     args->SetBool(1, error);
     args->SetString(2, result);
     auto bit = browser_map_.find(browserId);
-    if(bit != browser_map_.end()){
-        int64_t frameIdInt = atoll(frameId.c_str());
-
-        CefRefPtr<CefFrame> frame = bit->second.browser->GetMainFrame();
-
+    if(bit != browser_map_.end() && bit->second.browser.get()){
+        // Look the frame up by the identifier the call came in with. Comparing
+        // against GetMainFrame() only meant a call made from an iframe was
+        // never answered: the page's callback was never called, and stayed on
+        // that frame's window.
+        //
         // CefFrame::GetIdentifier() returns a string identifier in current CEF
-        // (since CEF 122) on every platform.
-        bool identifierMatch = std::stoll(frame->GetIdentifier().ToString()) == frameIdInt;
-        if (identifierMatch)
+        // (since CEF 122) on every platform, which is what frameId carries.
+        CefRefPtr<CefFrame> frame = bit->second.browser->GetFrameByIdentifier(frameId);
+        if (frame)
         {
             frame->SendProcessMessage(PID_RENDERER, message);
         }
