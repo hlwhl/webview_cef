@@ -54,6 +54,14 @@ class WebviewManager extends ValueNotifier<bool> {
     }
   }
 
+  /// Drops the bookkeeping [createWebView] set up for a controller that never
+  /// reached [onBrowserCreated], so one created and disposed without a
+  /// successful initialize does not leak an entry here.
+  void removePendingWebView(int browserIndex) {
+    _tempWebViews.remove(browserIndex);
+    _tempInjectUserScripts.remove(browserIndex);
+  }
+
   WebviewManager._internal() : super(false);
 
   /// Initializes the CEF runtime.
