@@ -217,8 +217,30 @@ void WebviewHandler::OnLoadError(CefRefPtr<CefBrowser> browser,
     frame->LoadURL(GetDataURI(ss.str(), "text/html"));
 }
 
+static std::string GetJavaScriptChannelsCode(const std::set<std::string>& channels)
+{
+    std::string extensionCode = "try{";
+    for(auto& channel : channels)
+    {
+        extensionCode += channel;
+        extensionCode += " = (e,r) => {external.JavaScriptChannel('";
+        extensionCode += channel;
+        extensionCode += "',e,r)};";
+    }
+    extensionCode += "}catch(e){console.log(e);}";
+    return extensionCode;
+}
+
 void WebviewHandler::OnLoadStart(CefRefPtr<CefBrowser> browser, CefRefPtr<CefFrame> frame,
                                  CefLoadHandler::TransitionType transition_type) {
+    // The channel globals went away with the previous document. Injected here,
+    // early in the new one, though not ahead of every script the page runs.
+    if(frame->IsMain()){
+        auto bit = browser_map_.find(browser->GetIdentifier());
+        if(bit != browser_map_.end() && !bit->second.js_channels.empty()){
+            frame->ExecuteJavaScript(GetJavaScriptChannelsCode(bit->second.js_channels), frame->GetURL(), 0);
+        }
+    }
     if(onLoadStart){
         onLoadStart(browser->GetIdentifier(), frame->GetURL());
     }
@@ -660,16 +682,19 @@ void WebviewHandler::visitUrlCookies(const std::string& domain, const bool& isHt
 
 void WebviewHandler::setJavaScriptChannels(int browserId, const std::vector<std::string> channels)
 {
-    std::string extensionCode = "try{";
-    for(auto& channel : channels)
-    {
-        extensionCode += channel;
-        extensionCode += " = (e,r) => {external.JavaScriptChannel('";
-        extensionCode += channel;
-        extensionCode += "',e,r)};";
+#ifndef OS_MAC
+    // The channel set is read again from OnLoadStart, which runs on the UI thread
+    if(!CefCurrentlyOn(TID_UI)) {
+        CefPostTask(TID_UI, base::BindOnce(&WebviewHandler::setJavaScriptChannels, this, browserId, channels));
+        return;
     }
-    extensionCode += "}catch(e){console.log(e);}";
-    executeJavaScript(browserId, extensionCode);
+#endif
+    auto bit = browser_map_.find(browserId);
+    if(bit == browser_map_.end()){
+        return;
+    }
+    bit->second.js_channels.insert(channels.begin(), channels.end());
+    executeJavaScript(browserId, GetJavaScriptChannelsCode(bit->second.js_channels));
 }
 
 void WebviewHandler::sendJavaScriptChannelCallBack(const bool error, const std::string result, const std::string callbackId, const int browserId, const std::string frameId)
