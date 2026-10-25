@@ -26,6 +26,49 @@ G_DEFINE_TYPE(WebviewCefPlugin, webview_cef_plugin, g_object_get_type())
 
 std::unordered_map<int64_t, std::shared_ptr<webview_cef::WebviewPlugin>> webviewPlugins;
 
+namespace {
+
+// One queued native->Dart call, owning its arguments until the platform thread
+// drains it.
+struct PendingInvoke
+{
+  FlMethodChannel *channel;  // owned ref
+  std::string method;
+  FlValue *args;             // owned ref
+};
+
+// Weak handle to the method channel, owned by the invoke callback.
+//
+// The channel holds the only strong ref to the plugin (see the method-call
+// handler in register_with_registrar), so the callback must not hold a strong
+// ref back: that cycle would keep the channel alive forever, and with it the
+// plugin, so webview_cef_plugin_dispose — and the stopCEF()/CefShutdown() it
+// runs — would never happen at engine teardown. GWeakRef hands out a strong
+// ref only while the channel is still alive, and is safe to read from the CEF
+// UI thread.
+struct ChannelWeakRef
+{
+  explicit ChannelWeakRef(FlMethodChannel *channel) { g_weak_ref_init(&ref, channel); }
+  ~ChannelWeakRef() { g_weak_ref_clear(&ref); }
+  ChannelWeakRef(const ChannelWeakRef &) = delete;
+  ChannelWeakRef &operator=(const ChannelWeakRef &) = delete;
+  GWeakRef ref;
+};
+
+// Drains one queued call. Runs on the platform thread via the GLib main loop.
+gboolean invoke_on_platform_thread(gpointer data)
+{
+  PendingInvoke *pending = static_cast<PendingInvoke *>(data);
+  fl_method_channel_invoke_method(pending->channel, pending->method.c_str(),
+                                  pending->args, NULL, NULL, NULL);
+  fl_value_unref(pending->args);
+  g_object_unref(pending->channel);
+  delete pending;
+  return G_SOURCE_REMOVE;
+}
+
+}  // namespace
+
 class WebviewTextureRenderer : public webview_cef::WebviewTexture
 {
 public:
@@ -275,10 +318,36 @@ void webview_cef_plugin_register_with_registrar(FlPluginRegistrar *registrar)
                                             g_object_ref(plugin),
                                             g_object_unref);
 
-  plugin->m_plugin->setInvokeMethodFunc([=](std::string method, WValue *arguments) {
+  // The lambda outlives this function, and |channel| is a g_autoptr dropped
+  // when we return — but it must not take a ref of its own; see ChannelWeakRef.
+  // The channel itself stays alive because the messenger holds a ref to it for
+  // as long as its handler is registered.
+  auto channel_ref = std::make_shared<ChannelWeakRef>(channel);
+
+  plugin->m_plugin->setInvokeMethodFunc([channel_ref](std::string method, WValue *arguments) {
+    // NULL once the engine has torn the channel down.
+    FlMethodChannel *chan = FL_METHOD_CHANNEL(g_weak_ref_get(&channel_ref->ref));
+    if (chan == nullptr) {
+      return;
+    }
+
     FlValue *args = encode_wavlue_to_flvalue(arguments);
-    fl_method_channel_invoke_method(channel, method.c_str(), args, NULL, NULL, NULL);
-    fl_value_unref(args);
+
+    // CEF is initialised with multi_threaded_message_loop, so every handler
+    // callback (onLoadEnd, onConsoleMessage, ...) arrives on the CEF UI
+    // thread. Flutter requires platform channels be used from the platform
+    // thread only; calling straight through here is what produces "sent a
+    // message from native to Flutter on a non-platform thread" and risks data
+    // loss or a crash. Hop via the GLib main loop, which the Flutter Linux
+    // embedder runs on the platform thread.
+    //
+    // At G_PRIORITY_DEFAULT rather than g_idle_add's G_PRIORITY_DEFAULT_IDLE,
+    // which sits below GDK_PRIORITY_REDRAW: an off-screen browser painting
+    // continuously keeps the redraw source ready on every iteration and would
+    // starve these callbacks, including the JS channel replies a page is
+    // awaiting.
+    PendingInvoke *pending = new PendingInvoke{chan, std::move(method), args};
+    g_idle_add_full(G_PRIORITY_DEFAULT, invoke_on_platform_thread, pending, nullptr);
   });
 
   plugin->m_plugin->setCreateTextureFunc([=](){
