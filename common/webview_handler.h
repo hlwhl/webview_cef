@@ -58,7 +58,7 @@ public:
     std::function<void(int browserId, bool editable)> onFocusedNodeChangeMessage;
     std::function<void(int browserId, int32_t x, int32_t y, int32_t height)> onImeCompositionRangeChangedMessage;
     //webpage message
-    std::function<void(std::string, std::string, std::string, int browserId, std::string)> onJavaScriptChannelMessage;
+    std::function<void(std::string, std::string, std::string, int browserId, std::string, std::string, bool)> onJavaScriptChannelMessage;
     std::function<void(int browserId, std::string url)> onLoadStart;
     std::function<void(int browserId, std::string url)> onLoadEnd;
     

@@ -138,7 +138,9 @@ class WebviewManager extends ValueNotifier<bool> {
             call.arguments['channel'] as String,
             call.arguments['message'] as String,
             call.arguments['callbackId'] as String,
-            call.arguments['frameId'] as String);
+            call.arguments['frameId'] as String,
+            call.arguments['frameUrl'] as String? ?? '',
+            call.arguments['isMainFrame'] as bool? ?? true);
         return;
       case 'onTooltip':
         int browserId = call.arguments['browserId'] as int;

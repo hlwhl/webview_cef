@@ -65,10 +65,15 @@ class WebViewController extends ValueNotifier<bool> {
   WebviewEventsListener? get listener => _listener;
 
   get onJavascriptChannelMessage => (final String channelName,
-          final String message, final String callbackId, final String frameId) {
+          final String message,
+          final String callbackId,
+          final String frameId,
+          final String frameUrl,
+          final bool isMainFrame) {
         if (_javascriptChannels.containsKey(channelName)) {
-          _javascriptChannels[channelName]!.onMessageReceived(
-              JavascriptMessage(message, callbackId, frameId));
+          _javascriptChannels[channelName]!.onMessageReceived(JavascriptMessage(
+              message, callbackId, frameId,
+              frameUrl: frameUrl, isMainFrame: isMainFrame));
         } else {
           debugPrint('Channel "$channelName" is not exists');
         }
