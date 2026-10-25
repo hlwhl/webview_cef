@@ -43,8 +43,15 @@ class WebViewController extends ValueNotifier<bool> {
   Widget get webviewWidget => _webviewWidget;
   Widget get loadingWidget => _loadingWidget ?? const Text("loading...");
 
-  late Completer<void> _creatingCompleter;
+  // Created eagerly so [ready] and anything chained off it are usable before
+  // [initialize] is called — registering channels up front needs that.
+  Completer<void> _creatingCompleter = Completer<void>();
   Future<void> get ready => _creatingCompleter.future;
+  bool _initializeStarted = false;
+  bool _initializing = false;
+  // [_browserId] is `late`; this says whether the platform side has handed one
+  // back yet, because reading it before that throws.
+  bool _browserCreated = false;
   bool _isDisposed = false;
   bool _focusEditable = false;
 
@@ -78,19 +85,44 @@ class WebViewController extends ValueNotifier<bool> {
     if (_isDisposed) {
       return Future<void>.value();
     }
-    _creatingCompleter = Completer<void>();
+    // A second call while one is running would create a second browser, orphan
+    // the first and complete the same completer twice. It joins the first instead.
+    if (_initializing) {
+      return _creatingCompleter.future;
+    }
+    // Only replace it on a re-initialize; the first one is created with the
+    // controller so callers can chain off [ready] before this point.
+    if (_creatingCompleter.isCompleted) {
+      _creatingCompleter = Completer<void>();
+    }
+    _initializeStarted = true;
+    _initializing = true;
     try {
       await WebviewManager().ready;
       List args = await _pluginChannel.invokeMethod('create', url);
       _browserId = args[0] as int;
       _textureId = args[1] as int;
+      _browserCreated = true;
       WebviewManager().onBrowserCreated(_index, _browserId);
       await Future.delayed(const Duration(milliseconds: 50));
       _webviewWidget = WebView(this);
       value = true;
+      // Channels registered before initialize() have had no browser to inject
+      // their globals into until now. Driven from here rather than chained off
+      // [_creatingCompleter]: a failed attempt replaces that completer, so a
+      // continuation captured earlier is dropped and the retry that succeeds
+      // would inject nothing.
+      if (_javascriptChannels.isNotEmpty) {
+        await _pluginChannel.invokeMethod('setJavaScriptChannels',
+            [_browserId, _javascriptChannels.keys.toList()]);
+      }
       _creatingCompleter.complete();
-    } on PlatformException catch (e) {
-      _creatingCompleter.completeError(e);
+    } catch (e, stackTrace) {
+      // Any error, not only a PlatformException: one left uncaught would leave
+      // the completer pending, and dispose() waits on it
+      _creatingCompleter.completeError(e, stackTrace);
+    } finally {
+      _initializing = false;
     }
     return _creatingCompleter.future;
   }
@@ -101,11 +133,27 @@ class WebViewController extends ValueNotifier<bool> {
 
   @override
   Future<void> dispose() async {
-    await _creatingCompleter.future;
+    // Waiting on the completer is only meaningful once initialize() has begun;
+    // it is created with the controller, so on a never-initialized (or
+    // failed-early) controller this would otherwise never settle.
+    if (_initializeStarted) {
+      try {
+        await _creatingCompleter.future;
+      } catch (_) {
+        // initialize() failed; there is still local state to tear down.
+      }
+    }
     if (!_isDisposed) {
       _isDisposed = true;
-      WebviewManager().removeWebView(_browserId);
-      await _pluginChannel.invokeMethod('close', _browserId);
+      if (_browserCreated) {
+        WebviewManager().removeWebView(_browserId);
+        await _pluginChannel.invokeMethod('close', _browserId);
+      } else {
+        // Never initialized, or initialize() failed before 'create' returned:
+        // there is no browser to close and _browserId is unset, so reading it
+        // here would throw. Drop the pending registration instead.
+        WebviewManager().removePendingWebView(_index);
+      }
     }
     super.dispose();
   }
@@ -195,15 +243,27 @@ class WebViewController extends ValueNotifier<bool> {
     ]);
   }
 
+  /// Registers [channels] to receive messages from page JavaScript.
+  ///
+  /// Safe to call before [initialize]. Registration is Dart-side routing, and
+  /// [initialize] is what starts the page loading — so requiring a live browser
+  /// here would mean a script on the page could send a message before its
+  /// handler exists, and that message would be dropped.
   Future<void> setJavaScriptChannels(Set<JavascriptChannel> channels) async {
     if (_isDisposed) {
       return;
     }
-    assert(value);
     _assertJavascriptChannelNamesAreUnique(channels);
 
     for (var channel in channels) {
       _javascriptChannels[channel.name] = channel;
+    }
+
+    // Injecting the channel-name globals needs a browser, and there is none
+    // yet. [initialize] injects every registered channel once it has one;
+    // nothing is lost meanwhile, because inbound routing is already live.
+    if (!value) {
+      return;
     }
 
     return _pluginChannel.invokeMethod('setJavaScriptChannels',
