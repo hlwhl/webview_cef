@@ -228,20 +228,30 @@ void WebviewApp::OnWebKitInitialized()
 				};
 
                 external.JavaScriptChannel = (n,e,r) => {
-                    var a; 
-                    null == r ? a = '' : (a = '_' + new Date + (1e3 + Math.floor(8999 * Math.random())), window[a] = function (n, e) { 
-                        return function () { 
-                            try {
-                                e && e.call && e.call(null, arguments[1]) 
-                            } finally {
-                                delete window[n]
-                            } 
-                        } 
-                    }(a, r)); 
+                    var a = '';
                     try {
-                        external.StartRequest(external.GetNextReqID(), n, a, JSON.stringify(e || {}), '') 
+                        var id = external.GetNextReqID();
+                        // Named after the request id, which is unique within the
+                        // renderer process. A timestamp plus a random number repeats
+                        // within the same second, and two calls sharing a name
+                        // answer each other's callbacks and leave one never called.
+                        if (null != r) {
+                            a = '_jsChannelCallback' + id;
+                            window[a] = function (n, e) { 
+                                return function () { 
+                                    try {
+                                        e && e.call && e.call(null, arguments[1]) 
+                                    } finally {
+                                        delete window[n]
+                                    } 
+                                } 
+                            }(a, r);
+                        }
+                        external.StartRequest(id, n, a, JSON.stringify(e || {}), '') 
                     } catch (l) {
-                        console.log('messeage send')
+                        // Nothing will ever call it back now
+                        if (a) { delete window[a]; }
+                        console.log('JavaScriptChannel send failed: ' + l)
                     }
                 }
 
