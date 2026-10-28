@@ -9,6 +9,7 @@
 
 #include <functional>
 #include <list>
+#include <set>
 #include <unordered_map>
 
 #include "webview_cookieVisitor.h"
@@ -34,6 +35,9 @@ struct browser_info{
     // right after creation is lost; we re-apply it once the first frame lands.
     bool wants_focus = false;
     bool focus_reasserted = false;
+    // Names given to setJavaScriptChannels. Their globals live in the document,
+    // so they are injected again whenever the main frame starts a new one.
+    std::set<std::string> js_channels;
 };
 
 class WebviewHandler : public CefClient,
