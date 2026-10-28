@@ -370,6 +370,38 @@ void WebviewHandler::cursorClick(int browserId, int x, int y, bool up)
     }
 }
 
+void WebviewHandler::sendTouchEvent(int browserId, int type, int id, int x, int y)
+{
+    auto it = browser_map_.find(browserId);
+    if (it == browser_map_.end()) {
+        return;
+    }
+
+    CefTouchEvent ev;
+    switch (type) {
+        case 0: ev.type = CEF_TET_PRESSED; break;
+        case 1: ev.type = CEF_TET_RELEASED; break;
+        case 2: ev.type = CEF_TET_MOVED; break;
+        case 3: ev.type = CEF_TET_CANCELLED; break;
+        default: return;
+    }
+    // CEF tracks concurrent contacts by id, so passing Flutter's pointer id
+    // through unchanged is what makes multi-touch work.
+    ev.id = id;
+    ev.x = static_cast<float>(x);
+    ev.y = static_cast<float>(y);
+    ev.radius_x = 0;
+    ev.radius_y = 0;
+    ev.rotation_angle = 0;
+    // Not every Flutter embedder reports pressure for touch (the Linux one
+    // doesn't), and 0 would read as "no contact", so report full pressure.
+    ev.pressure = 1.0f;
+    ev.modifiers = EVENTFLAG_NONE;
+    ev.pointer_type = CEF_POINTER_TYPE_TOUCH;
+
+    it->second.browser->GetHost()->SendTouchEvent(ev);
+}
+
 void WebviewHandler::cursorMove(int browserId, int x , int y, bool dragging)
 {
     auto it = browser_map_.find(browserId);

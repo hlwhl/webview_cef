@@ -339,6 +339,22 @@ class WebViewController extends ValueNotifier<bool> {
         [_browserId, position.dx.round(), position.dy.round()]);
   }
 
+  /// Forwards a real touch contact to CEF.
+  ///
+  /// [type] is 0=down, 1=up, 2=move, 3=cancel; [id] is the Flutter pointer id,
+  /// which CEF uses to track concurrent contacts, so passing it through
+  /// unchanged is what gives multi-touch. Deliberately separate from the
+  /// cursor* methods so the page receives touch events rather than
+  /// synthesised mouse ones.
+  Future<void> sendTouchEvent(int type, int id, Offset position) async {
+    if (_isDisposed) {
+      return;
+    }
+    assert(value);
+    return _pluginChannel.invokeMethod('sendTouchEvent',
+        [_browserId, type, id, position.dx.round(), position.dy.round()]);
+  }
+
   /// Sets the horizontal and vertical scroll delta.
   Future<void> _setScrollDelta(Offset position, int dx, int dy) async {
     if (_isDisposed) {
@@ -648,13 +664,30 @@ class WebViewState extends State<WebView> with WebeViewTextInput {
                 }
               });
             }
+            if (ev.kind == PointerDeviceKind.touch) {
+              _controller.sendTouchEvent(0, ev.pointer, ev.localPosition);
+              return;
+            }
             _controller._cursorClickDown(ev.localPosition);
           },
           onPointerUp: (ev) {
+            if (ev.kind == PointerDeviceKind.touch) {
+              _controller.sendTouchEvent(1, ev.pointer, ev.localPosition);
+              return;
+            }
             _controller._cursorClickUp(ev.localPosition);
           },
           onPointerMove: (ev) {
+            if (ev.kind == PointerDeviceKind.touch) {
+              _controller.sendTouchEvent(2, ev.pointer, ev.localPosition);
+              return;
+            }
             _controller._cursorDragging(ev.localPosition);
+          },
+          onPointerCancel: (ev) {
+            if (ev.kind == PointerDeviceKind.touch) {
+              _controller.sendTouchEvent(3, ev.pointer, ev.localPosition);
+            }
           },
           onPointerSignal: (signal) {
             if (signal is PointerScrollEvent) {

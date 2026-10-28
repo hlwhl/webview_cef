@@ -345,6 +345,15 @@ namespace webview_cef {
 			|| name.compare("cursorDragging") == 0) {
 			result(cursorAction(values, name), nullptr);
 		}
+		else if (name.compare("sendTouchEvent") == 0) {
+			int browserId = int(webview_value_get_int(webview_value_get_list_value(values, 0)));
+			auto type = webview_value_get_int(webview_value_get_list_value(values, 1));
+			auto id = webview_value_get_int(webview_value_get_list_value(values, 2));
+			auto x = webview_value_get_int(webview_value_get_list_value(values, 3));
+			auto y = webview_value_get_int(webview_value_get_list_value(values, 4));
+			m_handler->sendTouchEvent(browserId, (int)type, (int)id, (int)x, (int)y);
+			result(1, nullptr);
+		}
 		else if (name.compare("setScrollDelta") == 0) {
 			int browserId = int(webview_value_get_int(webview_value_get_list_value(values, 0)));
 			auto x = webview_value_get_int(webview_value_get_list_value(values, 1));
