@@ -168,6 +168,11 @@ public:
     void changeSize(int browserId, float a_dpi, int width, int height);
     void cursorClick(int browserId, int x, int y, bool up);
     void cursorMove(int browserId, int x, int y, bool dragging);
+    // Real touch input, kept off the mouse path so the page receives
+    // touchstart/touchmove/touchend instead of synthesised mouse events.
+    // type: 0=down, 1=up, 2=move, 3=cancel. id is the Flutter pointer id, so
+    // each finger becomes its own CEF touch point.
+    void sendTouchEvent(int browserId, int type, int id, int x, int y);
     void sendKeyEvent(CefKeyEvent& ev);
     void loadUrl(int browserId, std::string url);
     void goForward(int browserId);
